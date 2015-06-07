@@ -1,4 +1,5 @@
 from threading import Thread
+from OpenSSL.SSL import SysCallError
 
 __author__ = 'Mike'
 
@@ -14,15 +15,29 @@ context.use_privatekey_file('key')
 context.use_certificate_file('cert')
 
 
+def filter_func(connection, address):
+    inc_data = connection.recv(1024)
+    print 'The message type is[', inc_data, ']'
+    echo_func(connection,address)
+
+
 def echo_func(connection, address):
-    while True:
-        inc_data = connection.recv(4096)
-        if not inc_data:
-            break
+    inc_data = connection.recv(1024)
+    while inc_data:
+        # if not inc_data:
+        #     break
         print inc_data
         connection.sendall(inc_data)
-        connection.close()
-        break
+        # break
+        # inc_data = connection.recv(1024)
+
+        try:
+            inc_data = connection.recv(1024)
+        except SysCallError:
+            print '>>> There was an exception in Remote.echo_func, receiving data'
+            break
+
+    connection.close()
     print 'connection to ' + str(address) + ' closed, ayy lmao'
 
 
@@ -37,7 +52,7 @@ if __name__ == '__main__':
 
         print 'Connected by', address
         # spawn a new thread to handle this connection
-        thread = Thread(target=echo_func, args=[connection, address])
+        thread = Thread(target=filter_func, args=[connection, address])
         thread.start()
         # echo_func(connection, address)
 

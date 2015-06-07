@@ -14,14 +14,11 @@ def walktree(top, callback):
     for f in os.listdir(top):
         pathname = os.path.join(top, f)
         mode = os.stat(pathname).st_mode
-        if S_ISDIR(mode):
-            # It's a directory, recurse into it
+        if S_ISDIR(mode):  # It's a directory, recurse into it
             walktree(pathname, callback)
-        elif S_ISREG(mode):
-            # It's a file, call the callback function
+        elif S_ISREG(mode):  # It's a file, call the callback function
             callback(pathname)
-        else:
-            # Unknown file type, print a message
+        else:  # Unknown file type, print a message
             print 'Skipping %s' % pathname
 
 
