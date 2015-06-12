@@ -1,4 +1,8 @@
 .idea
+*.db
+cert
+key
+db_repository
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

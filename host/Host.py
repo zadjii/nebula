@@ -18,6 +18,8 @@ PORT = 12345
 file_tree_root = {}
 modified_files = []
 
+nebs_basedir = os.path.abspath(os.path.dirname(__file__))
+DATABASE_URI = 'sqlite:///' + os.path.join(nebs_basedir, 'nebs.db')
 
 def dict_walktree(top, callback, root_struct):
     """recursively descend the directory tree rooted at top,
