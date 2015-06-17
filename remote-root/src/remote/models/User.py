@@ -10,7 +10,8 @@ class User(remote_db.Base):
     __tablename__ = 'users'
 
     id = Column(Integer, primary_key=True)
+    username = Column(String)
+    email = Column(String)
     name = Column(String)
-    fullname = Column(String)
     password = Column(String)
     created_on = Column(DateTime)
