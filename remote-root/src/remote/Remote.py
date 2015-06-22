@@ -1,4 +1,5 @@
 import sys
+import os
 import socket
 from threading import Thread
 from werkzeug.security import generate_password_hash, \
@@ -7,8 +8,13 @@ import getpass
 from OpenSSL.SSL import SysCallError
 from OpenSSL import SSL
 
-import sys; print(sys.executable)
-import os; print(os.getcwd())
+
+# print sys.executable
+sys.path.append(os.path.join(sys.path[0], '..'))
+# todo this is a dirty hack, I'm sure.
+# print sys.path
+# It's so I can access the 'remote' module one dir up.
+# regarding dirty hack status, it's /better/ now, not great.
 
 from datetime import datetime
 
@@ -45,15 +51,11 @@ def echo_func(connection, address):
         try:
             inc_data = connection.recv(1024)
         except SysCallError:
-            print '>>> There was an exception in Remote.echo_func, receiving data'
+            print '>>There was an exception in Remote.echo_func, receiving data'
             break
 
     connection.close()
     print 'connection to ' + str(address) + ' closed, ayy lmao'
-
-
-def usage():
-    print 'neb-remote [new-user start init]'
 
 
 def start():
@@ -112,8 +114,37 @@ def new_user():
     print 'There are now ', User.query.count(), 'users'
 
 
-def init():
+def create():
     pass
+
+
+def list_users():
+    users = User.query.all()
+    print '[{}] {:16} {:16}'.format('id', 'name', 'email')
+    for user in users:
+        print '[{}] {:16} {:16}'.format(user.id, user.name, user.email)
+
+
+commands = {
+    'new-user': new_user
+    , 'start': start
+    , 'create': create
+    , 'list-users': list_users
+}
+command_descriptions = {
+    'new-user': '\tadd a new user to the database'
+    , 'start': '\t\tstart the remote server'
+    , 'create': '\t\tcreate a new cloud to track'
+    , 'list-users': '\tlist all current users'
+}
+
+
+def usage():
+    print 'usage: neb-remote <command>'
+    print ''
+    print 'The available commands are:'
+    for command in command_descriptions.keys():
+        print '\t', command, command_descriptions[command]
 
 
 if __name__ == '__main__':
@@ -124,11 +155,7 @@ if __name__ == '__main__':
         sys.exit(0)
 
     command = sys.argv[1]
-    commands = {
-        'new-user': new_user
-        , 'start': start
-        , 'init': init
-    }
+
     selected = commands.get(command, usage)
     selected()
     sys.exit(0)
