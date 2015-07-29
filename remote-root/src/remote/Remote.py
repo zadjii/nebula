@@ -58,7 +58,7 @@ def echo_func(connection, address):
     print 'connection to ' + str(address) + ' closed, ayy lmao'
 
 
-def start():
+def start(argv):
 
     context = SSL.Context(SSL.SSLv23_METHOD)
     context.use_privatekey_file('key')
@@ -78,7 +78,7 @@ def start():
     pass
 
 
-def new_user():
+def new_user(argv):
     print 'here we\'ll make a new user'
 
     email = raw_input('Enter an email for the new user: ').lower()
@@ -114,7 +114,7 @@ def new_user():
     print 'There are now ', User.query.count(), 'users'
 
 
-def create():
+def create(argv):
     """Creates a new cloud in the db to be tracked. Needs the credentials of the
     User who owns it."""
     print 'Creating a new cloud. First, enter credentials for the owner'
@@ -175,7 +175,7 @@ def create_cloud(username, password, cloudname, max_size):
     db.session.commit()
 
 
-def list_users():
+def list_users(argv):
     users = User.query.all()
     print 'There are ', len(users), 'users.'
     print '[{}] {:16} {:16}'.format('id', 'name', 'email')
@@ -183,7 +183,7 @@ def list_users():
         print '[{}] {:16} {:16}'.format(user.id, user.name, user.email)
 
 
-def list_clouds():
+def list_clouds(argv):
     clouds = Cloud.query.all()
     print 'There are ', len(clouds), 'clouds.'
     print '[{}] {:16} {:16} {:16}'.format('id', 'name', 'max_size', 'owners')
@@ -229,7 +229,7 @@ if __name__ == '__main__':
     command = sys.argv[1]
 
     selected = commands.get(command, usage)
-    selected()
+    selected(sys.argv[2:])
     sys.exit(0)
 
 
