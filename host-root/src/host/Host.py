@@ -7,6 +7,7 @@ from werkzeug.security import generate_password_hash, \
 import getpass
 from OpenSSL.SSL import SysCallError
 from OpenSSL import SSL
+import ssl
 
 
 # print sys.executable
@@ -40,6 +41,10 @@ modified_files = []
 
 # nebs_basedir = os.path.abspath(os.path.dirname(__file__))
 # DATABASE_URI = 'sqlite:///' + os.path.join(nebs_basedir, 'nebs.db')
+
+def check_response(expected, recieved):
+    if not(int(expected) == int(recieved)):
+        raise Exception('Received wrong msg-code, expected',expected,', received',recieved)
 
 def dict_walktree(top, callback, root_struct):
     """recursively descend the directory tree rooted at top,
@@ -83,7 +88,65 @@ def visit_file(filename):
 
 
 def mirror(argv):
+    """
+    Things we need for this:
+     - [-r address]
+     -- The name of the host. Either ip(4/6) or web address?
+     -- I think either will work just fine.
+     - [cloudname]
+     -- The name of a cloud to connect to. We'll figure this out later.
+    """
     print 'mirror',argv
+    host = None
+    port = PORT
+    cloudname = None
+
+    while len(argv) > 0:
+        arg = argv[0]
+        args_left = len(argv)
+        args_eaten = 0
+        if arg == '-r':
+            if args_left < 2:
+                # throw some exception
+                raise Exception('not enough args supplied to mirror')
+            host = argv[1]
+            args_eaten = 2
+        elif arg == '-p':
+            if args_left < 2:
+                # throw some exception
+                raise Exception('not enough args supplied to mirror')
+            port = argv[1]
+            args_eaten = 2
+        else:
+            cloudname = arg
+            args_eaten = 1
+        argv = argv[args_eaten:]
+
+    if cloudname is None:
+        raise Exception('Must specify a cloud name to mirror')
+    print 'attempting to get cloud named \''+cloudname+'\' from',\
+        'host at [',host,'] on port[',port,']'
+    # okay, so manually decipher the FQDN if they input one.
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect((host, port))
+    # s.create_connection((host, port))
+    # May want to use:
+    # socket.create_connection(address[, timeout[, source_address]])
+    # instead, where address is a (host,port) tuple. It'll try and
+    # auto-resolve? which would be dope.
+    sslSocket = ssl.wrap_socket(s)
+    sslSocket.write(str(0))  # Host doesn't have an ID yet
+    data = sslSocket.recv(1024)
+    # print 'Remote responded with a msg-code[', data,']'
+    check_response(1, data)
+    data = sslSocket.recv(1024)
+    print 'Remote says my id is', data
+    # I have no idea wtf to do with this.
+    data = sslSocket.recv(1024)
+    print 'Remote says my key is', data
+    data = sslSocket.recv(1024)
+    print 'Remote says my cert is', data
+
 
 
 commands = {
@@ -147,8 +210,13 @@ if __name__ == '__main__':
 #         # if now_modified > last_modified:
 #         #     print default_filename, ' was modified at ', now_modified, ', last ', last_modified
 #         #     last_modified = now_modified
+#             # This socket can either be AF_INET for v4 or AF_INET6 for v6
 #             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 #             s.connect((HOST, PORT))
+#             # May want to use:
+#             # socket.create_connection(address[, timeout[, source_address]])
+#             # instead, where address is a (host,port) tuple. It'll try and
+#             # auto-resolve? which would be dope.
 #             sslSocket = ssl.wrap_socket(s)
 #             sslSocket.write(str(-1))  # placeholder message type
 #             num_sent = 0

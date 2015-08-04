@@ -30,12 +30,27 @@ HOST = ''                 # Symbolic name meaning all available interfaces
 PORT = 12345              # Arbitrary non-privileged port
 
 ###############################################################################
-
+last_host_id = 0
 
 def filter_func(connection, address):
     inc_data = connection.recv(1024)
     print 'The message type is[', inc_data, ']'
-    echo_func(connection, address)
+    if int(inc_data) == 0:
+        new_host_handler(connection, address)
+    else:
+        print 'I don\'t know what to do with [',inc_data,']'
+
+        # echo_func(connection, address)
+    connection.close()
+
+def new_host_handler(connection, address):
+    print 'Handling new host'
+    connection.send('1')
+    global last_host_id
+    last_host_id += 1
+    connection.send(str(last_host_id)) #placeholder
+    connection.send(str(address[0])) #placeholder
+    connection.send(str(address[1])) #placeholder
 
 
 def echo_func(connection, address):
@@ -66,6 +81,8 @@ def start(argv):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s = SSL.Connection(context, s)
     s.bind((HOST, PORT))
+    # print 'Listening on', HOST, PORT
+
     s.listen(5)
     while True:
         (connection, address) = s.accept()
