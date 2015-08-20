@@ -1,10 +1,13 @@
 from datetime import datetime
 import socket
 import ssl
+import getpass
+from werkzeug.security import generate_password_hash
 
 from host import Cloud
 from host import host_db as db
 from host.util import check_response
+from host.msg_codes import *
 
 __author__ = 'Mike'
 
@@ -30,10 +33,10 @@ def ask_remote_for_id(host, port):
      Returns a (0,cloud.id) if it successfully gets something back.
      """
     sslSocket = setup_remote_socket(host,port)
-    sslSocket.write(str(0))  # Host doesn't have an ID yet
+    sslSocket.write(str(NEW_HOST_MSG))  # Host doesn't have an ID yet
     data = sslSocket.recv(1024)
     # print 'Remote responded with a msg-code[', data,']'
-    check_response(1, data)
+    check_response(ASSIGN_HOST_ID, data)
     my_id = sslSocket.recv(1024)
     print 'Remote says my id is', my_id
     # I have no idea wtf to do with this.
@@ -49,7 +52,23 @@ def ask_remote_for_id(host, port):
     db.session.add(cloud)
     db.session.commit()
 
-    return (0, cloud)
+    return (0, cloud)  # returning a status code as well...
+    # I've been in kernel land too long, haven't I...
+
+
+def request_cloud(cloud):
+    sslSocket = setup_remote_socket(cloud.remote_host, cloud.remote_port)
+    username = raw_input('Enter the username for ' + cloud.name + ':').lower()
+    password = getpass.getpass('Enter the password for ' + cloud.name + ':').lower()
+    password_hash = generate_password_hash(password)
+
+    sslSocket.write(str(REQUEST_CLOUD))
+    sslSocket.write(str(cloud.my_id_from_remote))
+    sslSocket.write(str(len(cloud.name)))
+    sslSocket.write(str(cloud.name))
+    sslSocket.write(username)
+    sslSocket.write(password_hash)
+
 
 
 def mirror_usage():
@@ -121,3 +140,5 @@ def mirror(argv):
     cloud.root_directory = root
     cloud.name = cloudname
     db.session.commit()
+    request_cloud(cloud)
+
