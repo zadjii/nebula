@@ -1,6 +1,7 @@
 import os
 from stat import S_ISDIR, S_ISREG
 from host import Cloud
+from host import host_db as db
 
 __author__ = 'Mike'
 
