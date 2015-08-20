@@ -102,7 +102,7 @@ def visit_file(filename):
     pass
 
 
-def setup_romote_socket(host, port):
+def setup_remote_socket(host, port):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect((host, port))
     # s.create_connection((host, port))
@@ -120,7 +120,7 @@ def ask_remote_for_id(host, port):
      Creates a new Cloud for this host:port.
      Returns a (0,cloud.id) if it successfully gets something back.
      """
-    sslSocket = setup_romote_socket(host,port)
+    sslSocket = setup_remote_socket(host,port)
     sslSocket.write(str(0))  # Host doesn't have an ID yet
     data = sslSocket.recv(1024)
     # print 'Remote responded with a msg-code[', data,']'
@@ -240,9 +240,53 @@ def list_clouds(argv):
                     , cloud.remote_host, cloud.remote_port)
 
 
+def db_tree_usage():
+    print 'usage: neb tree (-j)(-a)[cloudname]'
+    print ''
+
+
 def tree_usage():
     print 'usage: neb tree (-j)(-a)[cloudname]'
     print ''
+
+def db_tree(argv):
+    if len(argv) < 1:
+        db_tree_usage()
+        return
+    print 'tree', argv
+    output_json = False
+    output_all = False
+    cloudname = None
+    while len(argv) > 0:
+        arg = argv[0]
+        args_left = len(argv)
+        args_eaten = 0
+        if arg == '-j':
+            output_json = True
+            args_eaten = 1
+        if arg == '-a':
+            output_all = True
+            args_eaten = 1
+            raise Exception('tree -a not implemented yet.')
+        else:
+            cloudname = arg
+            args_eaten = 1
+        argv = argv[args_eaten:]
+    if cloudname is None:
+        raise Exception('Must specify a cloud name to mirror')
+    match = Cloud.query.filter_by(name=cloudname).first()
+    if match is None:
+        raise Exception('No cloud on this host with name', cloudname)
+
+    def print_filename(file_node, depth):
+        print ('--'*depth) + (file_node.name)
+
+    def walk_db_recursive(file_node, depth, callback):
+        callback(file_node, depth)
+        for child in file_node.children.all():
+            walk_db_recursive(child, depth+1, print_filename)
+    for top_level_node in match.files.all():
+        walk_db_recursive(top_level_node, 1, print_filename)
 
 
 def tree(argv):
@@ -276,9 +320,9 @@ def tree(argv):
     root_dir = match.root_directory
 
     def print_filename(filename, depth):
-        print ('  '*depth) + (filename)
+        print ('--'*depth) + (filename)
 
-    walktree(root_dir,0, print_filename)
+    walktree(root_dir, 1, print_filename)
 
 
 def local_file_create(directory_path, dir_node, filename):
@@ -323,10 +367,9 @@ def recursive_local_modifications_check (directory_path, dir_node):
         , key=lambda file: file
         , reverse=False
     )
-    print 'dir_node has ', dir_node.children.count(), 'children'
+    # print 'dir_node has ', dir_node.children.count(), 'children'
 
     nodes = dir_node.children.all()
-        #.sort(key=lambda node: node.name, reverse=False)
     nodes = sorted(
         nodes
         , key=lambda file: file.name
@@ -336,42 +379,25 @@ def recursive_local_modifications_check (directory_path, dir_node):
     j = 0
     num_files = len(files)
     num_nodes = len(nodes) if nodes is not None else 0
-    print 'Iterating over (', num_files, num_nodes, '):', files, nodes
+    # print 'Iterating over (', num_files, num_nodes, '):', files, nodes
     while (i < num_files) and (j < num_nodes):
-        print '\titerating on (file,node)', files[i], nodes[j].name
+        # print '\titerating on (file,node)', files[i], nodes[j].name
         if files[i] == nodes[j].name:
-            print '\tfiles were the same'
+            # print '\tfiles were the same'
             local_file_update(directory_path, dir_node, files[i], nodes[j])
             i += 1
             j += 1
         elif files[i] < nodes[j].name:
-            print '\t', files[i], 'was less than', nodes[j].name
+            # print '\t', files[i], 'was less than', nodes[j].name
             local_file_create(directory_path,dir_node, files[i])
             i += 1
-        elif files[i] > nodes[j].name: # redundant if clause, there for clarity.
+        elif files[i] > nodes[j].name:  # redundant if clause, there for clarity
+            # todo handle file deletes, moves.
             j += 1
     while i < num_files: # create the rest of the files
-        print 'finishing', (num_files-i), 'files'
+        # print 'finishing', (num_files-i), 'files'
         local_file_create(directory_path, dir_node, files[i])
         i += 1
-
-    #os.listdir(dir) by name
-    # nodes = sort dir_node.children by name
-#   i, j = 0
-#   while (i < len(files)) and (j < len(nodes))
-#       if files[i].name == nodes[j].name
-#           check the timestamps
-#           recurse if needed
-#           i++, j++
-#       else if < (i's name before j's)
-#           #this means i hasn't been encountered yet, and i is new
-#           create new node?
-#           recurse as needed
-#           i++
-#       else if >
-#           #this means that node j's file no longer exists...
-#           # probably need to send a special delete
-#           j++
 
 
 def check_local_modifications(cloud):
@@ -382,13 +408,10 @@ def check_local_modifications(cloud):
     fake_root_node.children = cloud.files
     fake_root_node.name = root
     db.session.add(fake_root_node)
-    print 'started with',[node.name for node in cloud.files.all()]
+    # print 'started with', [node.name for node in cloud.files.all()]
     # for file in os.listdir(root):
     recursive_local_modifications_check(root, fake_root_node)
-    # for file_node in cloud.children.all():
-    #     pathname = os.path.join(root, file_node.name)
-    #     recursive_local_modifications_check(pathname, file_node)
-    cloud.files = fake_root_node.children
+    # cloud.files = fake_root_node.children
     all_files = cloud.files
     for child in fake_root_node.children.all():
         if child not in all_files:
@@ -396,7 +419,7 @@ def check_local_modifications(cloud):
 
     db.session.delete(fake_root_node)
     db.session.commit()
-    print 'ended with',[node.name for node in cloud.files.all()]
+    # print 'ended with',[node.name for node in cloud.files.all()]
 
 
 def start(argv):
@@ -415,6 +438,7 @@ commands = {
     # , 'list-users': list_users
     , 'list-clouds': list_clouds
     , 'tree': tree
+    , 'db_tree': db_tree
 }
 command_descriptions = {
     'mirror': '\tmirror a remote cloud to this device'
@@ -423,11 +447,11 @@ command_descriptions = {
     # , 'create': '\t\tcreate a new cloud to track'
     # , 'list-users': '\tlist all current users'
     , 'list-clouds': '\tlist all current clouds'
-    , 'tree': '\tdisplays the file structure of a cloud on this host.'
+    , 'db_tree': '\tdisplays the db structure of a cloud on this host.'
 }
 
 
-def usage():
+def usage(argv):
     print 'usage: neb <command>'
     print ''
     print 'The available commands are:'
@@ -439,7 +463,7 @@ if __name__ == '__main__':
 
     # if there weren't any args, print the usage and return
     if len(sys.argv) < 2:
-        usage()
+        usage(sys.argv)
         sys.exit(0)
 
     command = sys.argv[1]
