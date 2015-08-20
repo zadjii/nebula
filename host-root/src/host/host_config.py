@@ -3,6 +3,6 @@ __author__ = 'Mike'
 
 
 
-remote_basedir = os.path.abspath(os.path.dirname(__file__))
-DATABASE_URI = 'sqlite:///' + os.path.join(remote_basedir, 'host.db')
-MIGRATE_REPO = os.path.join(remote_basedir, 'db_repository')
+host_basedir = os.path.abspath(os.path.dirname(__file__))
+DATABASE_URI = 'sqlite:///' + os.path.join(host_basedir, 'host.db')
+MIGRATE_REPO = os.path.join(host_basedir, 'db_repository')

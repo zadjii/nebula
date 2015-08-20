@@ -1,10 +1,12 @@
 import imp
-
+import os, sys
+sys.path.append(os.path.join(os.path.join(sys.path[0], '..'), '..'))#dirtyhack
+# REALLY FUCKING DIRTY
 from migrate.versioning import api
 
-from remote import remote_db as db  # TODO
-from remote.remote_config import DATABASE_URI as SQLALCHEMY_DATABASE_URI
-from remote.remote_config import MIGRATE_REPO as SQLALCHEMY_MIGRATE_REPO
+from host import host_db as db  # TODO
+from host.host_config import DATABASE_URI as SQLALCHEMY_DATABASE_URI
+from host.host_config import MIGRATE_REPO as SQLALCHEMY_MIGRATE_REPO
 
 
 migration = SQLALCHEMY_MIGRATE_REPO + '/versions/%03d_migration.py' % (api.db_version(SQLALCHEMY_DATABASE_URI, SQLALCHEMY_MIGRATE_REPO) + 1)

@@ -45,7 +45,7 @@ def filter_func(connection, address):
 
 def new_host_handler(connection, address):
     print 'Handling new host'
-    connection.send('1')
+    connection.send('1') # new host response todo: replace with code
     global last_host_id
     last_host_id += 1
     connection.send(str(last_host_id)) #placeholder
