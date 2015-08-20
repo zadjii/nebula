@@ -119,14 +119,5 @@ def mirror(argv):
                         ' could not get ID from remote')
 
     cloud.root_directory = root
-    # root_node = FileNode()
-    # root_node.name = root
-    # file_stat = os.stat(root)
-    # mode = file_stat.st_mode
-    # curr_modified = file_stat.st_mtime
-    # root_node.last_modified = curr_modified
-    # root_node.created_on = file_stat.st_ctime
-    # db.session.add(root_node)
     cloud.name = cloudname
-    # cloud.root_node = root_node
     db.session.commit()

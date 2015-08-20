@@ -98,7 +98,7 @@ def local_file_update(directory_path, dir_node, filename, filenode):
 def recursive_local_modifications_check (directory_path, dir_node):
     files = sorted(
         os.listdir(directory_path)
-        , key=lambda file: file
+        , key=lambda filename: filename
         , reverse=False
     )
     # print 'dir_node has ', dir_node.children.count(), 'children'
@@ -106,7 +106,7 @@ def recursive_local_modifications_check (directory_path, dir_node):
     nodes = dir_node.children.all()
     nodes = sorted(
         nodes
-        , key=lambda file: file.name
+        , key=lambda node: node.name
         , reverse=False
     )
     i = 0
@@ -128,7 +128,7 @@ def recursive_local_modifications_check (directory_path, dir_node):
         elif files[i] > nodes[j].name:  # redundant if clause, there for clarity
             # todo handle file deletes, moves.
             j += 1
-    while i < num_files: # create the rest of the files
+    while i < num_files:  # create the rest of the files
         # print 'finishing', (num_files-i), 'files'
         local_file_create(directory_path, dir_node, files[i])
         i += 1
