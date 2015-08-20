@@ -3,6 +3,7 @@
 cert
 key
 db_repository
+other
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
