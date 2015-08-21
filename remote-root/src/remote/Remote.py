@@ -106,7 +106,7 @@ def start(argv):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s = SSL.Connection(context, s)
     s.bind((HOST, PORT))
-    # print 'Listening on', HOST, PORT
+    print 'Listening on ({},{})'.format(HOST, PORT)
 
     s.listen(5)
     while True:
@@ -117,7 +117,6 @@ def start(argv):
         thread = Thread(target=filter_func, args=[connection, address])
         thread.start()
         # echo_func(connection, address)
-    pass
 
 
 def list_users(argv):

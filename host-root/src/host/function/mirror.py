@@ -69,6 +69,18 @@ def request_cloud(cloud):
     sslSocket.write(username)
     sslSocket.write(password_hash)
 
+    other_address = sslSocket.recv(1024)
+    other_port = sslSocket.recv(1024)
+
+    if other_address == '0' and other_port == '0':
+        print 'No other hosts in cloud'
+        return
+
+    host_sock = setup_remote_socket(other_address, other_port)
+    host_sock.write(str(HOST_HOST_FETCH))
+    host_sock.write(cloud.name)
+    host_sock.write('/')
+
 
 
 def mirror_usage():

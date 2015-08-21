@@ -1,10 +1,13 @@
 import os
+import socket
 import sys
+from threading import Thread
+
 sys.path.append(os.path.join(sys.path[0], '..'))
 
 from host.function.mirror import mirror
 from host.function.tree import db_tree, tree
-
+from host.msg_codes import *
 # print sys.executable
 
 # fixme this is a dirty hack, I'm sure.
@@ -19,6 +22,7 @@ from stat import *
 __author__ = 'Mike'
 
 
+
 # sys.path.append(os.path.join(sys.path[0], '..'))
 # fixme this is a dirty hack, I'm sure.
 ###############################################################################
@@ -27,8 +31,11 @@ __author__ = 'Mike'
 default_filename = 'C:\\tmp\\touchme.txt'
 default_root_path = 'C:/tmp/root-0'
 
-HOST = 'localhost'
-PORT = 12345
+REMOTE_HOST = 'localhost'
+REMOTE_PORT = 12345
+HOST_HOST = ''
+HOST_PORT = 23456
+
 ###############################################################################
 
 file_tree_root = {}
@@ -156,12 +163,51 @@ def check_local_modifications(cloud):
     # print 'ended with',[node.name for node in cloud.files.all()]
 
 
-def start(argv):
+def local_update_thread(argv):  # todo argv is a placeholder
     while True:
         for cloud in Cloud.query.all():
             check_local_modifications(cloud)
         time.sleep(1) # todo: This should be replaced with something
         # cont that actually alerts the process as opposed to just sleep/wake
+
+def receive_updates_thread(argv):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind((HOST_HOST, HOST_PORT))
+    print 'Listening on ({},{})'.format(HOST_HOST, HOST_PORT)
+    s.listen(5)
+    while True:
+        (connection, address) = s.accept()
+        print 'Connected by', address
+        thread = Thread(target=filter_func, args=[connection, address])
+        thread.start()
+
+
+def filter_func(connection, address):
+    inc_data = connection.recv(1024)
+    print 'The message type is[', inc_data, ']'
+    if int(inc_data) == PREPARE_FOR_FETCH:
+        print 'I don\'t know what to do with [', inc_data, ']'
+        # new_host_handler(connection, address)
+    elif int(inc_data) == HOST_HOST_FETCH:
+        print 'I don\'t know what to do with [', inc_data, ']'
+        # host_request_cloud(connection, address)
+    else:
+        print 'I don\'t know what to do with [', inc_data, ']'
+
+        # echo_func(connection, address)
+    connection.close()
+
+
+
+def start(argv):
+    # todo process start() args here
+    local_thread = Thread(target=local_update_thread, args=argv)
+    network_thread = Thread(target=receive_updates_thread(), args=argv)
+    local_thread.start()
+    network_thread.start()
+    local_thread.join()
+    network_thread.join()
+    print 'Both the local update checking thread and the network thread have joined.'
 
 
 commands = {
