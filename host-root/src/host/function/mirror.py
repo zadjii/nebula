@@ -69,6 +69,7 @@ def request_cloud(cloud):
     sslSocket.write(username)
     sslSocket.write(password_hash)
 
+    # todo check_response(GO_RETRIEVE_HERE, sslSocket.recv(1024))
     other_address = sslSocket.recv(1024)
     other_port = sslSocket.recv(1024)
 
@@ -77,6 +78,7 @@ def request_cloud(cloud):
         return
 
     host_sock = setup_remote_socket(other_address, other_port)
+    # todo initialize our ssl context here
     host_sock.write(str(HOST_HOST_FETCH))
     host_sock.write(cloud.name)
     host_sock.write('/')

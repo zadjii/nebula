@@ -2,6 +2,7 @@ from host import host_db as db
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table
 from sqlalchemy.orm import relationship, backref
 from FileNode import FileNode
+from IncomingHostEntry import IncomingHostEntry
 
 __author__ = 'Mike'
 
@@ -23,4 +24,7 @@ class Cloud(db.Base):
     # root_node = relationship('FileNode', uselist=False, backref='cloud')
     remote_host = Column(String)
     remote_port = Column(Integer)
+    incoming_hosts = relationship('IncomingHostEntry',  backref='cloud', lazy='dynamic')
+
+
 

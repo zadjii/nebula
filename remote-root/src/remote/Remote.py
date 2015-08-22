@@ -59,9 +59,24 @@ def host_request_cloud(connection, address):
     if match is None:
         raise Exception('No cloud with name ' + cloudname)
     user = match.owners.filter_by(username=username).first()
-    if match is None:
+    if user is None:
         raise Exception(username + ' is not an owner of ' + cloudname)
+    # Here we've established that they are an owner.
     print 'Here, they will have successfully been able to mirror?'
+
+    context = SSL.Context(SSL.SSLv23_METHOD)
+    context.use_privatekey_file('key')
+    context.use_certificate_file('cert')
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s = SSL.Connection(context, s)
+    s.connect((match.ip, match.port))
+    # lol wtf does this even work
+    s.write(str(PREPARE_FOR_FETCH))
+    s.write(host_id)
+    s.write(cloudname)
+    s.write(address[0])
+
+
 
 
 def new_host_handler(connection, address):
