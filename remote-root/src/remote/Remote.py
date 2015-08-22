@@ -47,6 +47,7 @@ def filter_func(connection, address):
 
 
 def host_request_cloud(connection, address):
+
     host_id = int(connection.recv(1024))
     cloudname_length = int(connection.recv(1024))
     cloudname = connection.recv(cloudname_length)
@@ -55,6 +56,10 @@ def host_request_cloud(connection, address):
     print('User provided {},{},{},{},{}'.format(
         host_id, cloudname_length, cloudname, username, password
     ))
+    matching_host = Host.query.get(host_id)
+    if matching_host is None:
+        raise Exception('There was no host with the ID[{}], wtf'.format(host_id))
+
     match = Cloud.query.filter_by(name=cloudname).first()
     if match is None:
         raise Exception('No cloud with name ' + cloudname)
@@ -62,32 +67,53 @@ def host_request_cloud(connection, address):
     if user is None:
         raise Exception(username + ' is not an owner of ' + cloudname)
     # Here we've established that they are an owner.
-    print 'Here, they will have successfully been able to mirror?'
+    # print 'Here, they will have successfully been able to mirror?'
+    ip = '0'
+    port = '0'
+    rand_host = match.hosts.first()
+    if rand_host is not None:
+        ip = rand_host.ip
+        port = 23456
+        print 'rand host is ({},{})'.format(ip, port)
+        context = SSL.Context(SSL.SSLv23_METHOD)
+        context.use_privatekey_file('key')
+        context.use_certificate_file('cert')
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    context = SSL.Context(SSL.SSLv23_METHOD)
-    context.use_privatekey_file('key')
-    context.use_certificate_file('cert')
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s = SSL.Connection(context, s)
-    s.connect((match.ip, match.port))
-    # lol wtf does this even work
-    s.write(str(PREPARE_FOR_FETCH))
-    s.write(host_id)
-    s.write(cloudname)
-    s.write(address[0])
+        # s = SSL.Connection(context, s)
+        # whatever fuck it lets just assume it's good
 
+        s.connect((ip, port))
+        # lol wtf does this even work
+        # s.send(str(PREPARE_FOR_FETCH))
+        # s.send(str(host_id))
+        # s.send(str(cloudname))
+        # s.send(str(address[0]))
+        # fuck it json everything
+        json_msg = '{"type":'+str(PREPARE_FOR_FETCH)+',"id":'+str(host_id)+',"name":"'+cloudname+'","ip":"'+address[0]+'"}'
+        s.send(json_msg)
+        print 'nebr completed talking to rand_host'
 
+    connection.send(str(GO_RETRIEVE_HERE))
+    connection.send(str(ip))
+    connection.send(str(port))  # yolo
+    match.hosts.append(matching_host)
+    db.session.commit()
+    print 'nebr has reached the end of host_request_cloud'
+    connection.close()
 
 
 def new_host_handler(connection, address):
     print 'Handling new host'
-    connection.send('1')  # new host response todo: replace with const code
     host = Host()
     host.ip = address[0]
-    host.port = address[1]
+    host.port = address[1] # todo this actually isn't right.
+    # cont the host needs to tell the remote what port it's listening on.
+    # cont till then, I'll just assume its 23456 cause YOLO
     db.session.add(host)
     db.session.commit()
 
+    connection.send(str(ASSIGN_HOST_ID))
     connection.send(str(host.id))
     connection.send(str(address[0]))  # todo: placeholder key
     connection.send(str(address[1]))  # todo: placeholder cert

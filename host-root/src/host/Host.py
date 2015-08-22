@@ -1,3 +1,4 @@
+import json
 import os
 import socket
 import sys
@@ -12,7 +13,7 @@ from host.msg_codes import *
 
 # fixme this is a dirty hack, I'm sure.
 from host import host_db as db
-from host import Cloud, FileNode
+from host import Cloud, FileNode, IncomingHostEntry
 
 from datetime import datetime
 import time
@@ -142,7 +143,7 @@ def recursive_local_modifications_check (directory_path, dir_node):
 
 
 def check_local_modifications(cloud):
-    print 'Checking for modifications on', cloud.name
+    # print 'Checking for modifications on', cloud.name
     root = cloud.root_directory
     # fixme this is a dirty fucking hack
     fake_root_node = FileNode()
@@ -163,14 +164,15 @@ def check_local_modifications(cloud):
     # print 'ended with',[node.name for node in cloud.files.all()]
 
 
-def local_update_thread(argv):  # todo argv is a placeholder
+def local_update_thread():  # todo argv is a placeholder
+    print 'Beginning to watch for local modifications'
     while True:
         for cloud in Cloud.query.all():
             check_local_modifications(cloud)
         time.sleep(1) # todo: This should be replaced with something
         # cont that actually alerts the process as opposed to just sleep/wake
 
-def receive_updates_thread(argv):
+def receive_updates_thread():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.bind((HOST_HOST, HOST_PORT))
     print 'Listening on ({},{})'.format(HOST_HOST, HOST_PORT)
@@ -182,18 +184,95 @@ def receive_updates_thread(argv):
         thread.start()
 
 
+def prepare_for_fetch(connection, address):
+    # todo I definitely need to confirm that this is
+    # cont   the remote responsible for the cloud
+    other_id = connection.recv(1024)
+    cloudname = connection.recv(1024)
+    incoming_address = connection.recv(1024)
+    matching_cloud = Cloud.query.filter_by(name=cloudname).first()
+    if matching_cloud is None:
+        raise Exception(
+            'Remote told me to prepare for cloudname=\'' + cloudname + '\''
+            + ', however, I don\'t have a matching cloud.'
+        )
+    entry = IncomingHostEntry()
+    entry.their_id_from_remote = other_id
+    entry.created_on = datetime.utcnow()
+    entry.their_address = incoming_address
+    db.session.add(entry)
+    matching_cloud.incoming_hosts.append(entry)
+    db.session.commit()
+
+def handle_fetch(connection, address):
+    other_id = connection.recv(1024)
+    cloudname = connection.recv(1024)
+    requested_root = connection.recv(1024)
+
+    matching_cloud = Cloud.query.filter_by(name=cloudname).first()
+    if matching_cloud is None:
+        connection.send(str(GENERIC_ERROR))
+        raise Exception(
+            'host came asking for cloudname=\'' + cloudname + '\''
+            + ', however, I don\'t have a matching cloud.'
+        )
+    their_ip = connection[0]
+    matching_entry = IncomingHostEntry.query.filter_by(their_address=their_ip).first()
+    if matching_entry is None:
+        connection.send(str(UNPREPARED_HOST_ERROR))
+        raise Exception(
+            'host came asking for cloudname=\'' + cloudname + '\''
+            + ', but I was not told to expect them.'
+        )
+    connection.send('CONGRATULATIONS! You did it!')
+    print 'I SUCCESSFULLY TALKED TO ANOTHER HOST!!!!'
+    print 'They requested the file', requested_root
+    # entry = IncomingHostEntry()
+    # entry.their_id_from_remote = other_id
+    # entry.created_on = datetime.utcnow()
+    # entry.their_address = incoming_address
+    # db.session.add(entry)
+    # matching_cloud.incoming_hosts.append(entry)
+    # db.session.commit()
+
+
 def filter_func(connection, address):
     inc_data = connection.recv(1024)
-    print 'The message type is[', inc_data, ']'
-    if int(inc_data) == PREPARE_FOR_FETCH:
-        print 'I don\'t know what to do with [', inc_data, ']'
-        # new_host_handler(connection, address)
-    elif int(inc_data) == HOST_HOST_FETCH:
-        print 'I don\'t know what to do with [', inc_data, ']'
-        # host_request_cloud(connection, address)
-    else:
-        print 'I don\'t know what to do with [', inc_data, ']'
-
+    try:
+        print 'The message type is[' + inc_data + ']'
+        if int(inc_data) == PREPARE_FOR_FETCH:
+            print 'Handling a PREPARE_FOR_FETCH'
+            # new_host_handler(connection, address)
+        elif int(inc_data) == HOST_HOST_FETCH:
+            handle_fetch(connection, address)
+            print 'I don\'t know what to do with [', inc_data, ']'
+            # host_request_cloud(connection, address)
+        else:
+            print 'I don\'t know what to do with [', inc_data, ']'
+    except ValueError, e:
+        json_string = inc_data
+        msg_obj = json.loads(json_string)
+        type = msg_obj['type']
+        if type == HOST_HOST_FETCH:
+            print 'YEP. Successful json messaging.'
+        elif type == PREPARE_FOR_FETCH:
+            other_id = msg_obj['id']
+            cloudname = msg_obj['name']
+            incoming_address = msg_obj['name']
+            matching_cloud = Cloud.query.filter_by(name=cloudname).first()
+            if matching_cloud is None:
+                raise Exception(
+                    'Remote told me to prepare for cloudname=\'' + cloudname + '\''
+                    + ', however, I don\'t have a matching cloud.'
+                )
+            entry = IncomingHostEntry()
+            entry.their_id_from_remote = other_id
+            entry.created_on = datetime.utcnow()
+            entry.their_address = incoming_address
+            db.session.add(entry)
+            matching_cloud.incoming_hosts.append(entry)
+            db.session.commit()
+            print 'successfully prepared for a host from {}'.format(incoming_address)
         # echo_func(connection, address)
     connection.close()
 
@@ -202,7 +281,7 @@ def filter_func(connection, address):
 def start(argv):
     # todo process start() args here
     local_thread = Thread(target=local_update_thread, args=argv)
-    network_thread = Thread(target=receive_updates_thread(), args=argv)
+    network_thread = Thread(target=receive_updates_thread, args=argv)
     local_thread.start()
     network_thread.start()
     local_thread.join()

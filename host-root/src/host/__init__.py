@@ -6,14 +6,13 @@ from database.SimpleDB import SimpleDB
 host_db = SimpleDB(DATABASE_URI)
 host_db.engine.echo = False
 
-# from models.User import User
 from models.Cloud import Cloud
 from models.FileNode import FileNode
-# from models.Host import Host
-# User.query = remote_db.session.query(User)
+from models.IncomingHostEntry import IncomingHostEntry
+
 Cloud.query = host_db.session.query(Cloud)
 FileNode.query = host_db.session.query(FileNode)
-# Host.query = remote_db.session.query(Host)
+IncomingHostEntry.query = host_db.session.query(IncomingHostEntry)
 # todo: find a way to do this ^^^ automatically.
 
 

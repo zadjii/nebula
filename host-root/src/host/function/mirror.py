@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 import socket
 import ssl
 import getpass
@@ -69,19 +70,35 @@ def request_cloud(cloud):
     sslSocket.write(username)
     sslSocket.write(password_hash)
 
-    # todo check_response(GO_RETRIEVE_HERE, sslSocket.recv(1024))
+    check_response(GO_RETRIEVE_HERE, sslSocket.recv(1024))
     other_address = sslSocket.recv(1024)
-    other_port = sslSocket.recv(1024)
+    other_port = int(sslSocket.recv(1024))
 
-    if other_address == '0' and other_port == '0':
+    if other_address == '0' and other_port == 0:
         print 'No other hosts in cloud'
+        # todo goto code that checks if a nebs.start process is running
         return
 
-    host_sock = setup_remote_socket(other_address, other_port)
+    print 'requesting host at ({},{})'.format(other_address, other_port)
+
+    host_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    host_sock.connect((other_address, other_port))
+
+    # host_sock = setup_remote_socket(other_address, other_port)
     # todo initialize our ssl context here
-    host_sock.write(str(HOST_HOST_FETCH))
-    host_sock.write(cloud.name)
-    host_sock.write('/')
+    msg = {'type' : HOST_HOST_FETCH
+           ,'my_id' : cloud.my_id_from_remote
+           ,'cloudname' : cloud.name
+           ,'filepath' : '/'}
+    fuck_it = '{"type":'+str(HOST_HOST_FETCH)+'}'
+    print(json.dumps(msg))
+    print fuck_it
+    # host_sock.send(json.dumps(msg))
+    host_sock.send(fuck_it)
+    # host_sock.send(str(HOST_HOST_FETCH) + '\n')
+    # host_sock.send(str(cloud.my_id_from_remote) + '\n')
+    # host_sock.send(cloud.name + '\n')
+    # host_sock.send('/\n')
 
 
 
