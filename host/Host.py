@@ -1,17 +1,14 @@
+__author__ = 'Mike'
 import json
 import os
 import socket
 import sys
 from threading import Thread
 
-sys.path.append(os.path.join(sys.path[0], '..'))
-
 from host.function.mirror import mirror
 from host.function.tree import db_tree, tree
-from host.msg_codes import *
-# print sys.executable
+from msg_codes import *
 
-# fixme this is a dirty hack, I'm sure.
 from host import host_db as db
 from host import Cloud, FileNode, IncomingHostEntry
 
@@ -20,12 +17,8 @@ import time
 
 from stat import *
 
-__author__ = 'Mike'
 
 
-
-# sys.path.append(os.path.join(sys.path[0], '..'))
-# fixme this is a dirty hack, I'm sure.
 ###############################################################################
 ###############################################################################
 
@@ -41,9 +34,6 @@ HOST_PORT = 23456
 
 file_tree_root = {}
 modified_files = []
-
-# nebs_basedir = os.path.abspath(os.path.dirname(__file__))
-# DATABASE_URI = 'sqlite:///' + os.path.join(nebs_basedir, 'nebs.db')
 
 
 def list_clouds(argv):
@@ -318,19 +308,22 @@ def usage(argv):
     for command in command_descriptions.keys():
         print '\t', command, command_descriptions[command]
 
-
-if __name__ == '__main__':
-
+def nebs_main(argv):
     # if there weren't any args, print the usage and return
-    if len(sys.argv) < 2:
-        usage(sys.argv)
+    if len(argv) < 2:
+        usage(argv)
         sys.exit(0)
 
-    command = sys.argv[1]
+    command = argv[1]
 
     selected = commands.get(command, usage)
-    selected(sys.argv[2:])
+    selected(argv[2:])
     sys.exit(0)
+
+
+if __name__ == '__main__':
+    nebs_main(sys.argv)
+
 #
 #
 # if __name__ == '__main__':

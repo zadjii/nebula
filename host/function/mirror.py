@@ -3,12 +3,13 @@ import json
 import socket
 import ssl
 import getpass
+
 from werkzeug.security import generate_password_hash
 
 from host import Cloud
 from host import host_db as db
 from host.util import check_response
-from host.msg_codes import *
+from msg_codes import *
 
 __author__ = 'Mike'
 

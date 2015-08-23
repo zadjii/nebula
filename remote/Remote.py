@@ -2,7 +2,6 @@ import sys
 import os
 
 
-sys.path.append(os.path.join(sys.path[0], '..'))
 import socket
 from threading import Thread
 from OpenSSL.SSL import SysCallError
@@ -10,14 +9,8 @@ from OpenSSL import SSL
 from remote.function.new_user import new_user
 from remote.function.create import create
 
-from remote.msg_codes import *
+from msg_codes import *
 
-# print sys.executable
-
-# todo this is a dirty hack, I'm sure.
-# print sys.path
-# It's so I can access the 'remote' module one dir up.
-# regarding dirty hack status, it's /better/ now, not great.
 
 from remote import User, Cloud, Host
 from remote import remote_db as db
@@ -204,21 +197,17 @@ def usage():
         print '\t', command, command_descriptions[command]
 
 
-if __name__ == '__main__':
-
-    # if there weren't any args, print the usage and return
-    if len(sys.argv) < 2:
+def nebr_main(argv):
+    if len(argv) < 2:
         usage()
         sys.exit(0)
 
-    command = sys.argv[1]
+    command = argv[1]
 
     selected = commands.get(command, usage)
-    selected(sys.argv[2:])
+    selected(argv[2:])
     sys.exit(0)
 
 
-
-
-
-
+if __name__ == '__main__':
+    nebr_main(sys.argv)
