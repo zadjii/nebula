@@ -7,7 +7,8 @@ import getpass
 from werkzeug.security import generate_password_hash
 
 from host import Cloud
-from host import host_db as db
+# from host import host_db as db
+from host import get_db
 from host.util import check_response
 from msg_codes import *
 
@@ -28,7 +29,7 @@ def setup_remote_socket(host, port):
     return sslSocket
 
 
-def ask_remote_for_id(host, port):
+def ask_remote_for_id(host, port, db):
     """This performs a code [0] message on the remote host at host:port.
      Awaits a code[1] from the remote.
      Creates a new Cloud for this host:port.
@@ -70,7 +71,7 @@ def ask_remote_for_id(host, port):
     # I've been in kernel land too long, haven't I...
 
 
-def request_cloud(cloud):
+def request_cloud(cloud, db):
     sslSocket = setup_remote_socket(cloud.remote_host, cloud.remote_port)
     username = raw_input('Enter the username for ' + cloud.name + ':').lower()
     password = getpass.getpass('Enter the password for ' + cloud.name + ':').lower()
@@ -144,6 +145,7 @@ def mirror(argv):
      -- the path to the root directory that will store this cloud.
      -- default '.'
     """
+    db = get_db()
     host = None
     port = PORT
     cloudname = None
@@ -187,7 +189,7 @@ def mirror(argv):
         'host at [',host,'] on port[',port,'], into root [',root,']'
     # okay, so manually decipher the FQDN if they input one.
 
-    (status, cloud) = ask_remote_for_id(host, port)
+    (status, cloud) = ask_remote_for_id(host, port, db)
     if not status == 0:
         raise Exception('Exception while mirroring:' +
                         ' could not get ID from remote')
@@ -195,6 +197,6 @@ def mirror(argv):
     cloud.root_directory = root
     cloud.name = cloudname
     db.session.commit()
-    request_cloud(cloud)
+    request_cloud(cloud, db)
     print 'nebs reached bottom of mirror()'
 

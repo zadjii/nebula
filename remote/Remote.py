@@ -12,8 +12,8 @@ from remote.function.create import create
 from msg_codes import *
 
 
-from remote import User, Cloud, Host
-from remote import remote_db as db
+from remote import User, Cloud, Host, get_db
+# from remote import remote_db as db
 
 __author__ = 'Mike'
 ###############################################################################
@@ -45,7 +45,7 @@ def filter_func(connection, address):
 
 
 def host_request_cloud(connection, address, msg_obj):
-
+    db = get_db()
     # host_id = int(connection.recv(1024))
     host_id = msg_obj['id']
 
@@ -62,14 +62,18 @@ def host_request_cloud(connection, address, msg_obj):
     print('User provided {},{},{},{}'.format(
         host_id, cloudname, username, password
     ))
-    matching_host = Host.query.get(host_id)
+    # matching_host = Host.query.get(host_id)
+    matching_host = db.session.query(Host).get(host_id)
     if matching_host is None:
         raise Exception('There was no host with the ID[{}], wtf'.format(host_id))
 
-    match = Cloud.query.filter_by(name=cloudname).first()
+    # match = Cloud.query.filter_by(name=cloudname).first()
+    match = db.session.query(Cloud).filter_by(name=cloudname).first()
     if match is None:
         raise Exception('No cloud with name ' + cloudname)
-    user = match.owners.filter_by(username=username).first()
+
+    # user = match.owners.filter_by(username=username).first()
+    user = db.session.query(User).filter_by(username=username).first()
     if user is None:
         print [owner.username for owner in match.owners.all()]
         raise Exception(username + ' is not an owner of ' + cloudname)
@@ -117,6 +121,7 @@ def host_request_cloud(connection, address, msg_obj):
 
 
 def new_host_handler(connection, address, msg_obj):
+    db = get_db()
     print 'Handling new host'
     host = Host()
     host.ip = address[0]
@@ -180,7 +185,9 @@ def start(argv):
 
 
 def list_users(argv):
-    users = User.query.all()
+    db = get_db()
+    # users = User.query.all()
+    users = db.session.query(User).all()
     print 'There are ', len(users), 'users.'
     print '[{}] {:16} {:16}'.format('id', 'name', 'email')
     for user in users:
@@ -188,7 +195,9 @@ def list_users(argv):
 
 
 def list_clouds(argv):
-    clouds = Cloud.query.all()
+    db = get_db()
+    # clouds = Cloud.query.all()
+    clouds = db.session.query(Cloud).all()
     print 'There are ', len(clouds), 'clouds.'
     print '[{}] {:16} {:16} {:16}'.format('id', 'name', 'max_size', 'owners')
     for cloud in clouds:

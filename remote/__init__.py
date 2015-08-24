@@ -3,15 +3,17 @@ __author__ = 'Mike'
 from remote_config import DATABASE_URI, MIGRATE_REPO
 from database.SimpleDB import SimpleDB
 
-remote_db = SimpleDB(DATABASE_URI)
-remote_db.engine.echo = False
+_remote_db = SimpleDB(DATABASE_URI)
+_remote_db.engine.echo = False
+# note: He unfortunately needs to stay around,
+#  so we can set up ORM metadata.
 
 from models.User import User
 from models.Cloud import Cloud
 from models.Host import Host
-User.query = remote_db.session.query(User)
-Cloud.query = remote_db.session.query(Cloud)
-Host.query = remote_db.session.query(Host)
+# User.query = remote_db.session.query(User)
+# Cloud.query = remote_db.session.query(Cloud)
+# Host.query = remote_db.session.query(Host)
 # todo: find a way to do this ^^^ automatically.
 
 

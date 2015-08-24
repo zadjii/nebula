@@ -1,4 +1,4 @@
-from remote import remote_db
+from remote import _remote_db
 
 __author__ = 'Mike'
 
@@ -6,7 +6,7 @@ from sqlalchemy import Column, Integer, String, DateTime
 # from .. import remote_db
 
 
-class User(remote_db.Base):
+class User(_remote_db.Base):
     __tablename__ = 'user'
 
     id = Column(Integer, primary_key=True)

@@ -1,7 +1,7 @@
 import os
 from stat import S_ISDIR, S_ISREG
 from host import Cloud
-from host import host_db as db
+from host import get_db
 
 __author__ = 'Mike'
 
@@ -17,6 +17,7 @@ def tree_usage():
 
 
 def db_tree(argv):
+    db = get_db()
     if len(argv) < 1:
         db_tree_usage()
         return
@@ -41,7 +42,7 @@ def db_tree(argv):
         argv = argv[args_eaten:]
     if cloudname is None:
         raise Exception('Must specify a cloud name to mirror')
-    match = Cloud.query.filter_by(name=cloudname).first()
+    match = db.session.query(Cloud).filter_by(name=cloudname).first()
     if match is None:
         raise Exception('No cloud on this host with name', cloudname)
 
@@ -57,6 +58,7 @@ def db_tree(argv):
 
 
 def tree(argv):
+    db = get_db()
     if len(argv) < 1:
         tree_usage()
         return
@@ -81,7 +83,7 @@ def tree(argv):
         argv = argv[args_eaten:]
     if cloudname is None:
         raise Exception('Must specify a cloud name to mirror')
-    match = Cloud.query.filter_by(name=cloudname).first()
+    match = db.session.query(Cloud).filter_by(name=cloudname).first()
     if match is None:
         raise Exception('No cloud on this host with name', cloudname)
     root_dir = match.root_directory
@@ -101,7 +103,7 @@ def walktree(top,depth, callback):
         mode = os.stat(pathname).st_mode
         if S_ISDIR(mode):  # It's a directory, recurse into it
             callback(f, depth)
-            walktree(pathname,depth+1, callback)
+            walktree(pathname, depth+1, callback)
         elif S_ISREG(mode):  # It's a file, call the callback function
             callback(f, depth)
         else:  # Unknown file type, print a message

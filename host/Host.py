@@ -10,8 +10,8 @@ from host.function.mirror import mirror
 from host.function.tree import db_tree, tree
 from msg_codes import *
 
-from host import host_db as db
-from host import Cloud, FileNode, IncomingHostEntry
+# from host import host_db as db
+from host import Cloud, FileNode, IncomingHostEntry, get_db
 
 from datetime import datetime
 import time
@@ -37,7 +37,7 @@ file_tree_root = {}
 modified_files = []
 
 
-def local_file_create(directory_path, dir_node, filename):
+def local_file_create(directory_path, dir_node, filename, db):
     print '\t\tAdding',filename,'to filenode for',dir_node.name
     file_pathname = os.path.join(directory_path, filename)
     file_stat = os.stat(file_pathname)
@@ -59,7 +59,7 @@ def local_file_create(directory_path, dir_node, filename):
     print 'total file nodes:', FileNode.query.count()
 
 
-def local_file_update(directory_path, dir_node, filename, filenode):
+def local_file_update(directory_path, dir_node, filename, filenode, db):
     file_pathname = os.path.join(directory_path, filename)
     # pathname = os.path.join(dir_node.name, files[i])
     # todo I think ^this is probably wrong. I think I need the whole path
@@ -77,7 +77,7 @@ def local_file_update(directory_path, dir_node, filename, filenode):
         db.session.commit()
 
 
-def recursive_local_modifications_check (directory_path, dir_node):
+def recursive_local_modifications_check (directory_path, dir_node, db):
     files = sorted(
         os.listdir(directory_path)
         , key=lambda filename: filename
@@ -100,23 +100,24 @@ def recursive_local_modifications_check (directory_path, dir_node):
         # print '\titerating on (file,node)', files[i], nodes[j].name
         if files[i] == nodes[j].name:
             # print '\tfiles were the same'
-            local_file_update(directory_path, dir_node, files[i], nodes[j])
+            local_file_update(directory_path, dir_node, files[i], nodes[j], db)
             i += 1
             j += 1
         elif files[i] < nodes[j].name:
             # print '\t', files[i], 'was less than', nodes[j].name
-            local_file_create(directory_path,dir_node, files[i])
+            local_file_create(directory_path,dir_node, files[i], db)
             i += 1
         elif files[i] > nodes[j].name:  # redundant if clause, there for clarity
             # todo handle file deletes, moves.
             j += 1
     while i < num_files:  # create the rest of the files
         # print 'finishing', (num_files-i), 'files'
-        local_file_create(directory_path, dir_node, files[i])
+        local_file_create(directory_path, dir_node, files[i], db)
         i += 1
 
 
 def check_local_modifications(cloud):
+    db = get_db()
     # print 'Checking for modifications on', cloud.name
     root = cloud.root_directory
     # fixme this is a dirty fucking hack
@@ -126,7 +127,7 @@ def check_local_modifications(cloud):
     db.session.add(fake_root_node)
     # print 'started with', [node.name for node in cloud.files.all()]
     # for file in os.listdir(root):
-    recursive_local_modifications_check(root, fake_root_node)
+    recursive_local_modifications_check(root, fake_root_node, db)
     # cloud.files = fake_root_node.children
     all_files = cloud.files
     for child in fake_root_node.children.all():
@@ -143,7 +144,7 @@ def local_update_thread():  # todo argv is a placeholder
     while True:
         for cloud in Cloud.query.all():
             check_local_modifications(cloud)
-        time.sleep(1) # todo: This should be replaced with something
+        time.sleep(1)  # todo: This should be replaced with something
         # cont that actually alerts the process as opposed to just sleep/wake
 
 def receive_updates_thread():
@@ -161,6 +162,7 @@ def receive_updates_thread():
 
 
 def prepare_for_fetch(connection, address, msg_obj):
+    db = get_db()
     # todo I definitely need to confirm that this is
     # cont   the remote responsible for the cloud
     # other_id = connection.recv(1024)
@@ -172,7 +174,7 @@ def prepare_for_fetch(connection, address, msg_obj):
     # incoming_address = connection.recv(1024)
     incoming_address = msg_obj['ip']
 
-    matching_cloud = Cloud.query.filter_by(name=cloudname).first()
+    matching_cloud = db.session.query(Cloud).filter_by(name=cloudname).first()
     if matching_cloud is None:
         raise Exception(
             'Remote told me to prepare for cloudname=\'' + cloudname + '\''
@@ -189,6 +191,7 @@ def prepare_for_fetch(connection, address, msg_obj):
         'looking for cloud', matching_cloud.name
 
 def handle_fetch(connection, address, msg_obj):
+    db = get_db()
     # other_id = connection.recv(1024)
     other_id = msg_obj['id']
 
@@ -198,7 +201,7 @@ def handle_fetch(connection, address, msg_obj):
     # requested_root = connection.recv(1024)
     requested_root = msg_obj['root']
 
-    matching_cloud = Cloud.query.filter_by(name=cloudname).first()
+    matching_cloud = db.session.query(Cloud).filter_by(name=cloudname).first()
     if matching_cloud is None:
         connection.send(str(GENERIC_ERROR))
         raise Exception(
@@ -206,7 +209,7 @@ def handle_fetch(connection, address, msg_obj):
             + ', however, I don\'t have a matching cloud.'
         )
     their_ip = connection[0]
-    matching_entry = IncomingHostEntry.query.filter_by(their_address=their_ip).first()
+    matching_entry = db.session.query(IncomingHostEntry).filter_by(their_address=their_ip).first()
     if matching_entry is None:
         connection.send(str(UNPREPARED_HOST_ERROR))
         raise Exception(

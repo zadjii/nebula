@@ -1,4 +1,4 @@
-from remote import remote_db as db
+from remote import _remote_db as db
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table
 from sqlalchemy.orm import relationship, backref
 

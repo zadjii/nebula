@@ -1,8 +1,8 @@
 from datetime import datetime
 import getpass
 from werkzeug.security import check_password_hash
-from remote import User, Cloud
-from remote import remote_db as db
+from remote import User, Cloud, get_db
+# from remote import remote_db as db
 
 __author__ = 'zadjii'
 
@@ -10,10 +10,11 @@ __author__ = 'zadjii'
 def create(argv):
     """Creates a new cloud in the db to be tracked. Needs the credentials of the
     User who owns it."""
+    db = get_db()
     print 'Creating a new cloud. First, enter credentials for the owner'
     owner_uname = raw_input('Enter the owner\'s username: ')
     owner_pass = getpass.getpass('Enter the owner\'s password: ')
-    owner = User.query.filter_by(username=owner_uname).first()
+    owner = db.session.query(User).filter_by(username=owner_uname).first()
 
     if (owner is None) or (not (check_password_hash(owner.password, owner_pass))):
         print 'username/password combination invalid.'
@@ -42,7 +43,8 @@ def create(argv):
 
 
 def create_cloud(username, password, cloudname, max_size):
-    owner = User.query.filter_by(username=username).first()
+    db = get_db()
+    owner = db.session.query(User).filter_by(username=username).first()
     if (owner is None) or (not (check_password_hash(owner.password, password))):
         raise Exception('Owner username/password combination invalid.')
     owned_clouds_dups_check = owner.owned_clouds\

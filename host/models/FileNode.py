@@ -1,4 +1,4 @@
-from host import host_db as db
+from host import _host_db as db
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table
 from sqlalchemy.orm import relationship, backref
 

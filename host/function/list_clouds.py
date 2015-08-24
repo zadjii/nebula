@@ -1,10 +1,11 @@
-from host import Cloud
+from host import Cloud, get_db
 
 __author__ = 'zadjii'
 
 
 def list_clouds(argv):
-    clouds = Cloud.query.all()
+    db = get_db()
+    clouds = db.session.query(Cloud).all()
     print 'There are ', len(clouds), 'clouds.'
     print '[{}] {:5} {:16} {:24} {:16} {:8}'.format('id'
                                                     , 'my_id'
