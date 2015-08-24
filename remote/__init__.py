@@ -18,3 +18,8 @@ Host.query = remote_db.session.query(Host)
 # todo: find out if the DB migrate repo was already created.
 # todo: if it wasn't, then make both of them.
 # remote_db.create_all_and_repo(MIGRATE_REPO, DATABASE_URI)
+
+def get_db():
+    db = SimpleDB(DATABASE_URI)
+    db.engine.echo = False
+    return db

@@ -1,5 +1,6 @@
+from host.function.list_clouds import list_clouds
+
 __author__ = 'Mike'
-import json
 import os
 import socket
 import sys
@@ -34,23 +35,6 @@ HOST_PORT = 23456
 
 file_tree_root = {}
 modified_files = []
-
-
-def list_clouds(argv):
-    clouds = Cloud.query.all()
-    print 'There are ', len(clouds), 'clouds.'
-    print '[{}] {:5} {:16} {:24} {:16} {:8}'.format('id'
-                                                    , 'my_id'
-                                                    , 'name'
-                                                    , 'root'
-                                                    , 'address'
-                                                    , 'port')
-    for cloud in clouds:
-
-        print '[{}] {:5} {:16} {:24} {:16} {:8}'\
-            .format(cloud.id, cloud.my_id_from_remote, cloud.name
-                    , cloud.root_directory
-                    , cloud.remote_host, cloud.remote_port)
 
 
 def local_file_create(directory_path, dir_node, filename):
@@ -172,14 +156,22 @@ def receive_updates_thread():
         print 'Connected by', address
         thread = Thread(target=filter_func, args=[connection, address])
         thread.start()
+        # todo: possible that we might want to thread.join here.
+        # cont  Make it so that each request gets handled before blindly continuing
 
 
-def prepare_for_fetch(connection, address):
+def prepare_for_fetch(connection, address, msg_obj):
     # todo I definitely need to confirm that this is
     # cont   the remote responsible for the cloud
-    other_id = connection.recv(1024)
-    cloudname = connection.recv(1024)
-    incoming_address = connection.recv(1024)
+    # other_id = connection.recv(1024)
+    other_id = msg_obj['id']
+
+    # cloudname = connection.recv(1024)
+    cloudname = msg_obj['cname']
+
+    # incoming_address = connection.recv(1024)
+    incoming_address = msg_obj['ip']
+
     matching_cloud = Cloud.query.filter_by(name=cloudname).first()
     if matching_cloud is None:
         raise Exception(
@@ -193,11 +185,18 @@ def prepare_for_fetch(connection, address):
     db.session.add(entry)
     matching_cloud.incoming_hosts.append(entry)
     db.session.commit()
+    print 'Prepared for arrival from', entry.their_address,\
+        'looking for cloud', matching_cloud.name
 
-def handle_fetch(connection, address):
-    other_id = connection.recv(1024)
-    cloudname = connection.recv(1024)
-    requested_root = connection.recv(1024)
+def handle_fetch(connection, address, msg_obj):
+    # other_id = connection.recv(1024)
+    other_id = msg_obj['id']
+
+    # cloudname = connection.recv(1024)
+    cloudname = msg_obj['cname']
+
+    # requested_root = connection.recv(1024)
+    requested_root = msg_obj['root']
 
     matching_cloud = Cloud.query.filter_by(name=cloudname).first()
     if matching_cloud is None:
@@ -217,54 +216,60 @@ def handle_fetch(connection, address):
     connection.send('CONGRATULATIONS! You did it!')
     print 'I SUCCESSFULLY TALKED TO ANOTHER HOST!!!!'
     print 'They requested the file', requested_root
-    # entry = IncomingHostEntry()
-    # entry.their_id_from_remote = other_id
-    # entry.created_on = datetime.utcnow()
-    # entry.their_address = incoming_address
-    # db.session.add(entry)
-    # matching_cloud.incoming_hosts.append(entry)
-    # db.session.commit()
 
 
 def filter_func(connection, address):
     inc_data = connection.recv(1024)
-    try:
-        print 'The message type is[' + inc_data + ']'
-        if int(inc_data) == PREPARE_FOR_FETCH:
-            print 'Handling a PREPARE_FOR_FETCH'
-            # new_host_handler(connection, address)
-        elif int(inc_data) == HOST_HOST_FETCH:
-            handle_fetch(connection, address)
-            print 'I don\'t know what to do with [', inc_data, ']'
-            # host_request_cloud(connection, address)
-        else:
-            print 'I don\'t know what to do with [', inc_data, ']'
-    except ValueError, e:
-        json_string = inc_data
-        msg_obj = json.loads(json_string)
-        type = msg_obj['type']
-        if type == HOST_HOST_FETCH:
-            print 'YEP. Successful json messaging.'
-        elif type == PREPARE_FOR_FETCH:
-            other_id = msg_obj['id']
-            cloudname = msg_obj['name']
-            incoming_address = msg_obj['name']
-            matching_cloud = Cloud.query.filter_by(name=cloudname).first()
-            if matching_cloud is None:
-                raise Exception(
-                    'Remote told me to prepare for cloudname=\'' + cloudname + '\''
-                    + ', however, I don\'t have a matching cloud.'
-                )
-            entry = IncomingHostEntry()
-            entry.their_id_from_remote = other_id
-            entry.created_on = datetime.utcnow()
-            entry.their_address = incoming_address
-            db.session.add(entry)
-            matching_cloud.incoming_hosts.append(entry)
-            db.session.commit()
-            print 'successfully prepared for a host from {}'.format(incoming_address)
+    msg_obj = decode_msg(inc_data)
+    msg_type = msg_obj['type']
+    print 'The message is', msg_obj
+    # print 'The message is', msg_obj
+    if msg_type == PREPARE_FOR_FETCH:
+        prepare_for_fetch(connection, address, msg_obj)
+    elif msg_type == HOST_HOST_FETCH:
+        handle_fetch(connection, address, msg_obj)
+    else:
+        print 'I don\'t know what to do with', msg_obj
+
         # echo_func(connection, address)
     connection.close()
+    # try:
+    #     print 'The message type is[' + inc_data + ']'
+    #     if int(inc_data) == PREPARE_FOR_FETCH:
+    #         print 'Handling a PREPARE_FOR_FETCH'
+    #         # new_host_handler(connection, address)
+    #     elif int(inc_data) == HOST_HOST_FETCH:
+    #         handle_fetch(connection, address)
+    #         print 'I don\'t know what to do with [', inc_data, ']'
+    #         # host_request_cloud(connection, address)
+    #     else:
+    #         print 'I don\'t know what to do with [', inc_data, ']'
+    # except ValueError, e:
+    #     json_string = inc_data
+    #     msg_obj = json.loads(json_string)
+    #     type = msg_obj['type']
+    #     if type == HOST_HOST_FETCH:
+    #         print 'YEP. Successful json messaging.'
+    #     elif type == PREPARE_FOR_FETCH:
+    #         other_id = msg_obj['id']
+    #         cloudname = msg_obj['name']
+    #         incoming_address = msg_obj['name']
+    #         matching_cloud = Cloud.query.filter_by(name=cloudname).first()
+    #         if matching_cloud is None:
+    #             raise Exception(
+    #                 'Remote told me to prepare for cloudname=\'' + cloudname + '\''
+    #                 + ', however, I don\'t have a matching cloud.'
+    #             )
+    #         entry = IncomingHostEntry()
+    #         entry.their_id_from_remote = other_id
+    #         entry.created_on = datetime.utcnow()
+    #         entry.their_address = incoming_address
+    #         db.session.add(entry)
+    #         matching_cloud.incoming_hosts.append(entry)
+    #         db.session.commit()
+    #         print 'successfully prepared for a host from {}'.format(incoming_address)
+    #     # echo_func(connection, address)
+    # connection.close()
 
 
 
@@ -274,27 +279,21 @@ def start(argv):
     network_thread = Thread(target=receive_updates_thread, args=argv)
     local_thread.start()
     network_thread.start()
-    local_thread.join()
-    network_thread.join()
-    print 'Both the local update checking thread and the network thread have joined.'
+    # local_thread.join()
+    # network_thread.join()
+    print 'Both the local update checking thread and the network thread have exited.'
 
 
 commands = {
     'mirror': mirror
-    # 'new-user': new_user
     , 'start': start
-    # , 'create': create
-    # , 'list-users': list_users
     , 'list-clouds': list_clouds
     , 'tree': tree
     , 'db_tree': db_tree
 }
 command_descriptions = {
     'mirror': '\tmirror a remote cloud to this device'
-    # 'new-user': '\tadd a new user to the database'
     , 'start': '\t\tstart the main thread checking for updates'
-    # , 'create': '\t\tcreate a new cloud to track'
-    # , 'list-users': '\tlist all current users'
     , 'list-clouds': '\tlist all current clouds'
     , 'tree': '\tdisplays the file structure of a cloud on this host.'
     , 'db_tree': '\tdisplays the db structure of a cloud on this host.'

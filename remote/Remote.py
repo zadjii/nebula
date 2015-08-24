@@ -23,31 +23,44 @@ __author__ = 'Mike'
 HOST = ''                 # Symbolic name meaning all available interfaces
 PORT = 12345              # Arbitrary non-privileged port
 
+KEY_FILE = 'remote/key'
+CERT_FILE = 'remote/cert'
+# todo this is jank AF
 ###############################################################################
 
 def filter_func(connection, address):
-    inc_data = connection.recv(1024)
-    print 'The message type is[', inc_data, ']'
-    if int(inc_data) == NEW_HOST_MSG:
-        new_host_handler(connection, address)
-    elif int(inc_data) == REQUEST_CLOUD:
-        host_request_cloud(connection, address)
+    msg_obj = decode_msg(connection.recv(1024))
+    msg_type = msg_obj['type']
+    # inc_data = connection.recv(1024)
+    print 'The message is', msg_obj
+    if msg_type == NEW_HOST_MSG:
+        new_host_handler(connection, address, msg_obj)
+    elif msg_type == REQUEST_CLOUD:
+        host_request_cloud(connection, address, msg_obj)
     else:
-        print 'I don\'t know what to do with [', inc_data, ']'
+        print 'I don\'t know what to do with', msg_obj
 
         # echo_func(connection, address)
     connection.close()
 
 
-def host_request_cloud(connection, address):
+def host_request_cloud(connection, address, msg_obj):
 
-    host_id = int(connection.recv(1024))
-    cloudname_length = int(connection.recv(1024))
-    cloudname = connection.recv(cloudname_length)
-    username = connection.recv(1024)
-    password = connection.recv(1024)
-    print('User provided {},{},{},{},{}'.format(
-        host_id, cloudname_length, cloudname, username, password
+    # host_id = int(connection.recv(1024))
+    host_id = msg_obj['id']
+
+    # cloudname_length = int(connection.recv(1024))
+    # cloudname = connection.recv(cloudname_length)
+    cloudname = msg_obj['cname']
+
+    # username = connection.recv(1024)
+    username = msg_obj['uname']
+
+    # password = connection.recv(1024)
+    password = msg_obj['pass']
+
+    print('User provided {},{},{},{}'.format(
+        host_id, cloudname, username, password
     ))
     matching_host = Host.query.get(host_id)
     if matching_host is None:
@@ -58,19 +71,21 @@ def host_request_cloud(connection, address):
         raise Exception('No cloud with name ' + cloudname)
     user = match.owners.filter_by(username=username).first()
     if user is None:
+        print [owner.username for owner in match.owners.all()]
         raise Exception(username + ' is not an owner of ' + cloudname)
+    # todo validate their password
     # Here we've established that they are an owner.
     # print 'Here, they will have successfully been able to mirror?'
     ip = '0'
-    port = '0'
+    port = 0
     rand_host = match.hosts.first()
     if rand_host is not None:
         ip = rand_host.ip
         port = 23456
         print 'rand host is ({},{})'.format(ip, port)
         context = SSL.Context(SSL.SSLv23_METHOD)
-        context.use_privatekey_file('key')
-        context.use_certificate_file('cert')
+        context.use_privatekey_file(KEY_FILE)
+        context.use_certificate_file(CERT_FILE)
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         # s = SSL.Connection(context, s)
@@ -83,20 +98,25 @@ def host_request_cloud(connection, address):
         # s.send(str(cloudname))
         # s.send(str(address[0]))
         # fuck it json everything
-        json_msg = '{"type":'+str(PREPARE_FOR_FETCH)+',"id":'+str(host_id)+',"name":"'+cloudname+'","ip":"'+address[0]+'"}'
-        s.send(json_msg)
+        # json_msg = '{"type":'+str(PREPARE_FOR_FETCH)+',"id":'+str(host_id)+',"name":"'+cloudname+'","ip":"'+address[0]+'"}'
+        prep_for_fetch_msg = make_prepare_for_fetch_json(host_id, cloudname, address[0])
+        s.send(prep_for_fetch_msg)
         print 'nebr completed talking to rand_host'
+        s.close()
 
-    connection.send(str(GO_RETRIEVE_HERE))
-    connection.send(str(ip))
-    connection.send(str(port))  # yolo
+    # connection.send(str(GO_RETRIEVE_HERE))
+    # connection.send(str(ip))
+    # connection.send(str(port))  # yolo
+    connection.send(make_go_retrieve_here_json(0, ip, port))
+    # todo only add the host to the cloud's hosts once they've finished mirroring.
+    # cont  (by sending a MIRROR_COMPLETE message)
     match.hosts.append(matching_host)
     db.session.commit()
     print 'nebr has reached the end of host_request_cloud'
-    connection.close()
 
 
-def new_host_handler(connection, address):
+
+def new_host_handler(connection, address, msg_obj):
     print 'Handling new host'
     host = Host()
     host.ip = address[0]
@@ -105,11 +125,14 @@ def new_host_handler(connection, address):
     # cont till then, I'll just assume its 23456 cause YOLO
     db.session.add(host)
     db.session.commit()
+    connection.send(
+        make_assign_host_id_json(host.id, 'todo_placeholder_key', 'todo_placeholder_cert')
+    )
 
-    connection.send(str(ASSIGN_HOST_ID))
-    connection.send(str(host.id))
-    connection.send(str(address[0]))  # todo: placeholder key
-    connection.send(str(address[1]))  # todo: placeholder cert
+    # connection.send(str(ASSIGN_HOST_ID))
+    # connection.send(str(host.id))
+    # connection.send(str(address[0]))  # todo: placeholder key
+    # connection.send(str(address[1]))  # todo: placeholder cert
 
 
 def echo_func(connection, address):
@@ -135,8 +158,8 @@ def echo_func(connection, address):
 def start(argv):
 
     context = SSL.Context(SSL.SSLv23_METHOD)
-    context.use_privatekey_file('key')
-    context.use_certificate_file('cert')
+    context.use_privatekey_file(KEY_FILE)
+    context.use_certificate_file(CERT_FILE)
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s = SSL.Connection(context, s)
     s.bind((HOST, PORT))
@@ -150,7 +173,10 @@ def start(argv):
         # spawn a new thread to handle this connection
         thread = Thread(target=filter_func, args=[connection, address])
         thread.start()
+        thread.join()
         # echo_func(connection, address)
+        # todo: possible that we might want to thread.join here.
+        # cont  Make it so that each request gets handled before blindly continuing
 
 
 def list_users(argv):

@@ -17,18 +17,21 @@ asdf = User()
 asdf.created_on = datetime.utcnow()
 asdf.email = 'asdf'
 asdf.name = 'asdf'
+asdf.username = 'asdf'
 asdf.password = generate_password_hash('asdf')
 
 mike = User()
 mike.created_on = datetime.utcnow()
 mike.email = 'mike'
 mike.name = 'mike'
+mike.username = 'mike'
 mike.password = generate_password_hash('mike')
 
 admin = User()
 admin.created_on = datetime.utcnow()
 admin.email = 'admin'
 admin.name = 'admin'
+admin.username = 'admin'
 admin.password = generate_password_hash('admin')
 
 remote_db.session.add(asdf)
