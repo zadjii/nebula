@@ -1,9 +1,11 @@
+import host
+import remote
+
 __author__ = 'zadjii'
 
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
-from host import host_db
-from remote import remote_db
+
 
 from host.models.Cloud import Cloud
 from host.models.FileNode import FileNode
@@ -12,6 +14,9 @@ from host.models.IncomingHostEntry import IncomingHostEntry
 from remote.models.Cloud import Cloud
 from remote.models.User import User
 from remote.models.Host import Host
+
+host_db = host.get_db()
+remote_db = remote.get_db()
 
 asdf = User()
 asdf.created_on = datetime.utcnow()

@@ -116,8 +116,8 @@ def recursive_local_modifications_check (directory_path, dir_node, db):
         i += 1
 
 
-def check_local_modifications(cloud):
-    db = get_db()
+def check_local_modifications(cloud, db):
+    # db = get_db()
     # print 'Checking for modifications on', cloud.name
     root = cloud.root_directory
     # fixme this is a dirty fucking hack
@@ -140,10 +140,11 @@ def check_local_modifications(cloud):
 
 
 def local_update_thread():  # todo argv is a placeholder
+    db = get_db()
     print 'Beginning to watch for local modifications'
     while True:
-        for cloud in Cloud.query.all():
-            check_local_modifications(cloud)
+        for cloud in db.session.query(Cloud).all():
+            check_local_modifications(cloud, db)
         time.sleep(1)  # todo: This should be replaced with something
         # cont that actually alerts the process as opposed to just sleep/wake
 
@@ -157,6 +158,7 @@ def receive_updates_thread():
         print 'Connected by', address
         thread = Thread(target=filter_func, args=[connection, address])
         thread.start()
+        thread.join()
         # todo: possible that we might want to thread.join here.
         # cont  Make it so that each request gets handled before blindly continuing
 
@@ -208,7 +210,7 @@ def handle_fetch(connection, address, msg_obj):
             'host came asking for cloudname=\'' + cloudname + '\''
             + ', however, I don\'t have a matching cloud.'
         )
-    their_ip = connection[0]
+    their_ip = address[0]
     matching_entry = db.session.query(IncomingHostEntry).filter_by(their_address=their_ip).first()
     if matching_entry is None:
         connection.send(str(UNPREPARED_HOST_ERROR))
