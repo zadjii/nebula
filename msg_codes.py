@@ -1,4 +1,7 @@
+from _ctypes import sizeof
 import json
+import struct
+import sys
 
 __author__ = 'zadjii'
 UNPREPARED_HOST_ERROR = -3
@@ -19,6 +22,35 @@ MAKE_CLOUD_RESPONSE = 11
 MAKE_USER_REQUEST = 12
 MAKE_USER_RESPONSE = 13
 MIRRORING_COMPLETE = 14
+
+
+def recv_msg(socket):
+    """Gets a json msg from the socket specified, and decodes into a dict
+        for us."""
+    data = socket.recv(8)
+    size = decode_msg_size(data)
+    # todo a while loop to read all the data into a buffer
+    msg = socket.recv(size)
+    return decode_msg(msg)
+
+
+def write_msg(msg_json, socket):
+    socket.write(get_msg_size(msg_json))
+    socket.write(msg_json)
+
+
+def send_msg(msg_json, socket):
+    socket.send(get_msg_size(msg_json))
+    socket.send(msg_json)
+
+
+def get_msg_size(msg_json):
+    size = sys.getsizeof(msg_json)
+    return struct.pack('Q', size)
+
+
+def decode_msg_size(long_long):
+    return struct.unpack('Q', long_long)[0]
 
 
 def make_msg(msg_type):
