@@ -225,7 +225,7 @@ command_descriptions = {
 
 
 def usage():
-    print 'usage: neb-remote <command>'
+    print 'usage: nebr <command>'
     print ''
     print 'The available commands are:'
     for command in command_descriptions.keys():

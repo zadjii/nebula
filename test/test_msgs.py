@@ -50,3 +50,6 @@ def test_msgs():
     # print '_____Making MAKE_USER_RESPONSE[13] json_____'
     # print 'Fuck it, not implemented yet'
 
+    print '_____Making MIRRORING_COMPLETE[14] json_____'
+    print make_mirroring_complete(22, 'fake-cloudname')
+

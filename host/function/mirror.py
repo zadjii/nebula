@@ -41,21 +41,16 @@ def ask_remote_for_id(host, port, db):
     sslSocket.write(make_new_host_json())
 
     data = sslSocket.recv(1024)
-    # print 'Remote responded with a msg-code[', data,']'
+
     msg_obj = decode_msg(data)
 
     check_response(ASSIGN_HOST_ID, msg_obj['type'])
 
-    # my_id = sslSocket.recv(1024)
     my_id = msg_obj['id']
-
     print 'Remote says my id is', my_id
-
     # I have no idea wtf to do with this.
-    # data = sslSocket.recv(1024)
     key = msg_obj['key']
     print 'Remote says my key is', key
-    # data = sslSocket.recv(1024)
     cert = msg_obj['cert']
     print 'Remote says my cert is', cert
 
@@ -66,7 +61,7 @@ def ask_remote_for_id(host, port, db):
     cloud.remote_port = port
     db.session.add(cloud)
     db.session.commit()
-
+    sslSocket.close()
     return (0, cloud)  # returning a status code as well...
     # I've been in kernel land too long, haven't I...
 
@@ -77,12 +72,6 @@ def request_cloud(cloud, db):
     password = getpass.getpass('Enter the password for ' + cloud.name + ':').lower()
     password_hash = generate_password_hash(password)
 
-    # sslSocket.write(str(REQUEST_CLOUD))
-    # sslSocket.write(str(cloud.my_id_from_remote))
-    # sslSocket.write(str(len(cloud.name)))
-    # sslSocket.write(str(cloud.name))
-    # sslSocket.write(username)
-    # sslSocket.write(password_hash)
     sslSocket.write(
         make_request_cloud_json(cloud.my_id_from_remote, cloud.name, username, password_hash)
     )
@@ -90,15 +79,20 @@ def request_cloud(cloud, db):
     msg_obj = decode_msg(sslSocket.recv(1024))
 
     check_response(GO_RETRIEVE_HERE, msg_obj['type'])
-
-    # other_address = sslSocket.recv(1024)
     other_address = msg_obj['ip']
-
-    # other_port = int(sslSocket.recv(1024))
     other_port = msg_obj['port']
 
     if other_address == '0' and other_port == 0:
         print 'No other hosts in cloud'
+        sslSocket.close()
+        # sslSocket.write(
+        #     make_mirroring_complete(cloud.my_id_from_remote, cloud.name)
+        # )
+        new_rem_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
+        new_rem_sock.send(
+            make_mirroring_complete(cloud.my_id_from_remote, cloud.name)
+        )
+        new_rem_sock.close()
         # todo goto code that checks if a nebs.start process is running
         return
 
@@ -109,22 +103,10 @@ def request_cloud(cloud, db):
 
     # host_sock = setup_remote_socket(other_address, other_port)
     # todo initialize our ssl context here
-    # msg = {'type' : HOST_HOST_FETCH
-    #        ,'my_id' : cloud.my_id_from_remote
-    #        ,'cloudname' : cloud.name
-    #        ,'filepath' : '/'}
-    # fuck_it = '{"type":'+str(HOST_HOST_FETCH)+'}'
 
-    # print(json.dumps(msg))
-    # print fuck_it
-    # host_sock.send(json.dumps(msg))
-    host_sock.send(make_host_host_fetch(cloud.my_id_from_remote,cloud.name, '/'))
+    host_sock.send(make_host_host_fetch(cloud.my_id_from_remote, cloud.name, '/'))
     print 'Sent HOST_HOST_FETCH as a mirror request.'
-    # host_sock.send(str(HOST_HOST_FETCH) + '\n')
-    # host_sock.send(str(cloud.my_id_from_remote) + '\n')
-    # host_sock.send(cloud.name + '\n')
-    # host_sock.send('/\n')
-
+    # todo Here we need to recv a whole bunch of files from the host
 
 
 def mirror_usage():

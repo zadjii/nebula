@@ -18,6 +18,7 @@ MAKE_CLOUD_REQUEST = 10
 MAKE_CLOUD_RESPONSE = 11
 MAKE_USER_REQUEST = 12
 MAKE_USER_RESPONSE = 13
+MIRRORING_COMPLETE = 14
 
 
 def make_msg(msg_type):
@@ -72,4 +73,10 @@ def make_host_host_fetch(host_id, cloudname, requested_root):
     msg['id'] = host_id
     msg['cname'] = cloudname
     msg['root'] = requested_root
+    return json.dumps(msg)
+
+def make_mirroring_complete(host_id, cloudname):
+    msg = make_msg(MIRRORING_COMPLETE)
+    msg['id'] = host_id
+    msg['cname'] = cloudname
     return json.dumps(msg)

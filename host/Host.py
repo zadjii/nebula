@@ -297,16 +297,16 @@ commands = {
     , 'db_tree': db_tree
 }
 command_descriptions = {
-    'mirror': '\tmirror a remote cloud to this device'
+    'mirror': '\t\tmirror a remote cloud to this device'
     , 'start': '\t\tstart the main thread checking for updates'
     , 'list-clouds': '\tlist all current clouds'
-    , 'tree': '\tdisplays the file structure of a cloud on this host.'
+    , 'tree': '\t\tdisplays the file structure of a cloud on this host.'
     , 'db_tree': '\tdisplays the db structure of a cloud on this host.'
 }
 
 
 def usage(argv):
-    print 'usage: neb <command>'
+    print 'usage: nebs <command>'
     print ''
     print 'The available commands are:'
     for command in command_descriptions.keys():
