@@ -24,6 +24,16 @@ MAKE_USER_RESPONSE = 13
 MIRRORING_COMPLETE = 14
 
 
+def send_unprepared_host_error_and_close(socket):
+    send_msg(make_msg(UNPREPARED_HOST_ERROR), socket)
+    socket.close()
+
+
+def send_generic_error_and_close(socket):
+    send_msg(make_msg(GENERIC_ERROR), socket)
+    socket.close()
+
+
 def recv_msg(socket):
     """Gets a json msg from the socket specified, and decodes into a dict
         for us."""
@@ -112,3 +122,4 @@ def make_mirroring_complete(host_id, cloudname):
     msg['id'] = host_id
     msg['cname'] = cloudname
     return json.dumps(msg)
+

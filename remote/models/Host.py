@@ -4,6 +4,7 @@ from sqlalchemy.orm import relationship, backref
 
 __author__ = 'Mike'
 
+
 class Host(db.Base):
     __tablename__ = 'host'
 

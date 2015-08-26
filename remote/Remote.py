@@ -29,7 +29,8 @@ CERT_FILE = 'remote/cert'
 ###############################################################################
 
 def filter_func(connection, address):
-    msg_obj = decode_msg(connection.recv(1024))
+    # msg_obj = decode_msg(connection.recv(1024))
+    msg_obj = recv_msg(connection)
     msg_type = msg_obj['type']
     # inc_data = connection.recv(1024)
     print 'The message is', msg_obj
@@ -37,11 +38,33 @@ def filter_func(connection, address):
         new_host_handler(connection, address, msg_obj)
     elif msg_type == REQUEST_CLOUD:
         host_request_cloud(connection, address, msg_obj)
+    elif msg_type == MIRRORING_COMPLETE:
+        mirror_complete(connection, address, msg_obj)
     else:
         print 'I don\'t know what to do with', msg_obj
 
         # echo_func(connection, address)
     connection.close()
+
+
+def mirror_complete(connection, address, msg_obj):
+    db = get_db()
+    host_id = msg_obj['id']
+    cloudname = msg_obj['cname']
+
+    matching_host = db.session.query(Host).get(host_id)
+    if matching_host is None:
+        send_generic_error_and_close(connection)
+        raise Exception('There was no host with the ID[{}], wtf'.format(host_id))
+
+    matching_cloud = db.session.query(Cloud).filter_by(name=cloudname).first()
+    if matching_cloud is None:
+        send_generic_error_and_close(connection)
+        raise Exception('No cloud with name ' + cloudname)
+
+    matching_cloud.hosts.append(matching_host)
+    db.session.commit()
+    print 'Host[{}] finished mirroring cloud \'{}\''.format(host_id, cloudname)
 
 
 def host_request_cloud(connection, address, msg_obj):
@@ -65,16 +88,19 @@ def host_request_cloud(connection, address, msg_obj):
     # matching_host = Host.query.get(host_id)
     matching_host = db.session.query(Host).get(host_id)
     if matching_host is None:
+        send_generic_error_and_close(connection)
         raise Exception('There was no host with the ID[{}], wtf'.format(host_id))
 
     # match = Cloud.query.filter_by(name=cloudname).first()
     match = db.session.query(Cloud).filter_by(name=cloudname).first()
     if match is None:
+        send_generic_error_and_close(connection)
         raise Exception('No cloud with name ' + cloudname)
 
     # user = match.owners.filter_by(username=username).first()
     user = db.session.query(User).filter_by(username=username).first()
     if user is None:
+        send_generic_error_and_close(connection)
         print [owner.username for owner in match.owners.all()]
         raise Exception(username + ' is not an owner of ' + cloudname)
     # todo validate their password
@@ -96,26 +122,17 @@ def host_request_cloud(connection, address, msg_obj):
         # whatever fuck it lets just assume it's good
 
         s.connect((ip, port))
-        # lol wtf does this even work
-        # s.send(str(PREPARE_FOR_FETCH))
-        # s.send(str(host_id))
-        # s.send(str(cloudname))
-        # s.send(str(address[0]))
-        # fuck it json everything
-        # json_msg = '{"type":'+str(PREPARE_FOR_FETCH)+',"id":'+str(host_id)+',"name":"'+cloudname+'","ip":"'+address[0]+'"}'
         prep_for_fetch_msg = make_prepare_for_fetch_json(host_id, cloudname, address[0])
-        s.send(prep_for_fetch_msg)
+        # s.send(prep_for_fetch_msg)
+        send_msg(prep_for_fetch_msg, s)
         print 'nebr completed talking to rand_host'
         s.close()
 
-    # connection.send(str(GO_RETRIEVE_HERE))
-    # connection.send(str(ip))
-    # connection.send(str(port))  # yolo
-    connection.send(make_go_retrieve_here_json(0, ip, port))
+    send_msg(make_go_retrieve_here_json(0, ip, port), connection)
     # todo only add the host to the cloud's hosts once they've finished mirroring.
     # cont  (by sending a MIRROR_COMPLETE message)
-    match.hosts.append(matching_host)
-    db.session.commit()
+    # match.hosts.append(matching_host)
+    # db.session.commit()
     print 'nebr has reached the end of host_request_cloud'
 
 
@@ -130,35 +147,10 @@ def new_host_handler(connection, address, msg_obj):
     # cont till then, I'll just assume its 23456 cause YOLO
     db.session.add(host)
     db.session.commit()
-    connection.send(
+    send_msg(
         make_assign_host_id_json(host.id, 'todo_placeholder_key', 'todo_placeholder_cert')
+        , connection
     )
-
-    # connection.send(str(ASSIGN_HOST_ID))
-    # connection.send(str(host.id))
-    # connection.send(str(address[0]))  # todo: placeholder key
-    # connection.send(str(address[1]))  # todo: placeholder cert
-
-
-def echo_func(connection, address):
-    inc_data = connection.recv(1024)
-    while inc_data:
-        # if not inc_data:
-        #     break
-        print inc_data
-        connection.sendall(inc_data)
-        # break
-        # inc_data = connection.recv(1024)
-
-        try:
-            inc_data = connection.recv(1024)
-        except SysCallError:
-            print '>>There was an exception in Remote.echo_func, receiving data'
-            break
-
-    connection.close()
-    print 'connection to ' + str(address) + ' closed, ayy lmao'
-
 
 def start(argv):
 

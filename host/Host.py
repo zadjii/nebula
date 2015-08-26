@@ -167,13 +167,8 @@ def prepare_for_fetch(connection, address, msg_obj):
     db = get_db()
     # todo I definitely need to confirm that this is
     # cont   the remote responsible for the cloud
-    # other_id = connection.recv(1024)
     other_id = msg_obj['id']
-
-    # cloudname = connection.recv(1024)
     cloudname = msg_obj['cname']
-
-    # incoming_address = connection.recv(1024)
     incoming_address = msg_obj['ip']
 
     matching_cloud = db.session.query(Cloud).filter_by(name=cloudname).first()
@@ -192,20 +187,16 @@ def prepare_for_fetch(connection, address, msg_obj):
     print 'Prepared for arrival from', entry.their_address,\
         'looking for cloud', matching_cloud.name
 
+
 def handle_fetch(connection, address, msg_obj):
     db = get_db()
-    # other_id = connection.recv(1024)
     other_id = msg_obj['id']
-
-    # cloudname = connection.recv(1024)
     cloudname = msg_obj['cname']
-
-    # requested_root = connection.recv(1024)
     requested_root = msg_obj['root']
 
     matching_cloud = db.session.query(Cloud).filter_by(name=cloudname).first()
     if matching_cloud is None:
-        connection.send(str(GENERIC_ERROR))
+        send_generic_error_and_close(connection)
         raise Exception(
             'host came asking for cloudname=\'' + cloudname + '\''
             + ', however, I don\'t have a matching cloud.'
@@ -213,19 +204,21 @@ def handle_fetch(connection, address, msg_obj):
     their_ip = address[0]
     matching_entry = db.session.query(IncomingHostEntry).filter_by(their_address=their_ip).first()
     if matching_entry is None:
-        connection.send(str(UNPREPARED_HOST_ERROR))
+        send_unprepared_host_error_and_close()
         raise Exception(
             'host came asking for cloudname=\'' + cloudname + '\''
             + ', but I was not told to expect them.'
         )
+    # todo: I haven't confirmed their ID yet...
     connection.send('CONGRATULATIONS! You did it!')
     print 'I SUCCESSFULLY TALKED TO ANOTHER HOST!!!!'
     print 'They requested the file', requested_root
 
 
 def filter_func(connection, address):
-    inc_data = connection.recv(1024)
-    msg_obj = decode_msg(inc_data)
+    # inc_data = connection.recv(1024)
+    # msg_obj = decode_msg(inc_data)
+    msg_obj = recv_msg(connection)
     msg_type = msg_obj['type']
     print 'The message is', msg_obj
     # print 'The message is', msg_obj

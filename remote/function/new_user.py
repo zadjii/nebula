@@ -42,4 +42,5 @@ def new_user(argv):
     )
     db.session.add(new_user_instance)
     db.session.commit()
-    print 'There are now ', User.query.count(), 'users'
+    print 'There are now ', db.session.query(User).count(), 'users'
+
