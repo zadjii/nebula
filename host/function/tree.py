@@ -89,7 +89,7 @@ def tree(argv):
     root_dir = match.root_directory
 
     def print_filename(filename, depth):
-        print ('--'*depth) + (filename)
+        print ('--' * depth) + (filename)
 
     walktree(root_dir, 1, print_filename)
 

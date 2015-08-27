@@ -68,6 +68,7 @@ def make_msg(msg_type):
 
 
 def decode_msg(msg):
+    print 'decoding\'{}\''.format(msg)
     return json.loads(msg)
 
 def make_new_host_json():
@@ -123,3 +124,11 @@ def make_mirroring_complete(host_id, cloudname):
     msg['cname'] = cloudname
     return json.dumps(msg)
 
+def make_host_file_transfer(host_id, cloudname, relative_pathname, is_dir, filesize):
+    msg = make_msg(HOST_FILE_TRANSFER)
+    msg['id'] = host_id
+    msg['cname'] = cloudname
+    msg['fpath'] = relative_pathname
+    msg['fsize'] = filesize
+    msg['isdir'] = is_dir
+    return json.dumps(msg)

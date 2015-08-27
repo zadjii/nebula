@@ -49,8 +49,10 @@ def test_msgs():
     print get_msg_size(msg), decode_msg_size(get_msg_size(msg))
     print msg
 
-    # print '_____Making HOST_FILE_TRANSFER[9] json_____'
-    # print 'Fuck it, not implemented yet'
+    print '_____Making HOST_FILE_TRANSFER[9] json_____'
+    msg = make_host_file_transfer(22, 'fake-cloudname', '/foo.file', False, 4000)
+    print get_msg_size(msg), decode_msg_size(get_msg_size(msg))
+    print msg
 
     # print '_____Making MAKE_CLOUD_REQUEST[10] json_____'
     # print 'Fuck it, not implemented yet'
