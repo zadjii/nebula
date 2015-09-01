@@ -39,23 +39,43 @@ def recv_msg(socket):
         for us."""
     data = socket.recv(8)
     size = decode_msg_size(data)
+    print 'decoding msg length {}->{}'.format(data, size)
     # todo a while loop to read all the data into a buffer
-    msg = socket.recv(size)
-    return decode_msg(msg)
+    # buff = ''
+    # buff = memoryview(bytearray(size))
+    # buff = bytearray(size)
+    # socket.recv_into(buff, size)
+    buff = socket.recv(size)
+    # len = socket.recv_into(buff, size)
+    print 'recv\'d into {}B[1]'.format(sys.getsizeof(buff))
+    print 'recv\'d into {}B[2]'.format(len(buff))
+    return decode_msg(buff)
 
 
 def write_msg(msg_json, socket):
+    print 'writing message {}.{}.{}.\'{}\''.format(
+        # sys.getsizeof(msg_json)
+        len(msg_json)
+        , get_msg_size(msg_json)
+        , decode_msg_size(get_msg_size(msg_json))
+        , msg_json)
     socket.write(get_msg_size(msg_json))
     socket.write(msg_json)
 
 
 def send_msg(msg_json, socket):
+    print 'sending message {}.{}.{}.\'{}\''.format(
+        sys.getsizeof(msg_json)
+        , get_msg_size(msg_json)
+        , decode_msg_size(get_msg_size(msg_json))
+        , msg_json)
     socket.send(get_msg_size(msg_json))
     socket.send(msg_json)
 
 
 def get_msg_size(msg_json):
-    size = sys.getsizeof(msg_json)
+    # size = sys.getsizeof(msg_json)
+    size = len(msg_json)
     return struct.pack('Q', size)
 
 
@@ -69,7 +89,12 @@ def make_msg(msg_type):
 
 def decode_msg(msg):
     print 'decoding\'{}\''.format(msg)
-    return json.loads(msg)
+    # todo: probably safer to just check if the last char is \0
+    try:
+        obj = json.loads(msg)
+    except ValueError, e:
+        obj = json.loads(msg[:len(msg)-1])
+    return obj
 
 def make_new_host_json():
     msg = make_msg(NEW_HOST_MSG)
@@ -131,4 +156,4 @@ def make_host_file_transfer(host_id, cloudname, relative_pathname, is_dir, files
     msg['fpath'] = relative_pathname
     msg['fsize'] = filesize
     msg['isdir'] = is_dir
-    return json.dumps(msg)
+    return json.dumps(msg)  # + '\0'

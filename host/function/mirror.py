@@ -107,9 +107,9 @@ def request_cloud(cloud, db):
     # todo Here we need to recv a whole bunch of files from the host
     response = recv_msg(host_sock)
     resp_type = response['type']
-    print 'host_host_fetch response:{}'.format(response)
+    # print 'host_host_fetch response:{}'.format(response)
     check_response(HOST_FILE_TRANSFER, resp_type)
-    while response:  # fixme this is ghetto AF
+    while response['fsize'] is not None:
         handle_file_transfer(response, cloud, host_sock)
         response = recv_msg(host_sock)
 
@@ -122,11 +122,12 @@ def handle_file_transfer(msg, cloud, socket_conn):
     if msg_file_isdir :
         if (not os.path.exists(full_path)):
             os.mkdir(full_path)
+            print 'Created directory {}'.format(full_path)
     else:  # is normal file
         data_buffer = ''  # fixme i'm using a string to buffer this?? LOL
         total_read = 0
         while total_read < msg_file_size:
-            new_data = socket_conn.recv(1024)
+            new_data = socket_conn.recv(min(1024, (msg_file_size-total_read)))  # fixme read only up until end of file
             nbytes = sys.getsizeof(new_data)
             print 'read ({},{})'.format(new_data, nbytes)
             if total_read is None or new_data is None:

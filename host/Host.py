@@ -223,13 +223,22 @@ def handle_fetch(connection, address, msg_obj):
         filepath = os.path.join(matching_cloud.root_directory, requested_root)
     print 'The translated request path was {}'.format(filepath)
     send_file_to_other(other_id, matching_cloud, filepath, connection)
+    complete_sending_files(other_id, matching_cloud, filepath, connection)
+    connection.close()
 
-    #   open the root path
-    # else
-    #   open the root dir path + root
-    # send a file transfer message
-    # while there's file to read: send the file
-    # if there are children nodes, send them too
+
+def complete_sending_files(other_id, cloud, filepath, socket_conn):
+    send_msg(
+        make_host_file_transfer(
+            other_id
+            , cloud.name
+            , None
+            , None
+            , None
+        )
+        , socket_conn
+    )
+
 
 def send_file_to_other(other_id, cloud, filepath, socket_conn):
     """Assumes that the other host was already verified, and the cloud is non-null"""
@@ -272,12 +281,11 @@ def send_file_to_other(other_id, cloud, filepath, socket_conn):
         while l:
             new_data = requested_file.read(1024)
             l = socket_conn.send(new_data)
+            print 'Sent {}B of file data'.format(l)
         requested_file.close()
 
 
 def filter_func(connection, address):
-    # inc_data = connection.recv(1024)
-    # msg_obj = decode_msg(inc_data)
     msg_obj = recv_msg(connection)
     msg_type = msg_obj['type']
     print 'The message is', msg_obj
@@ -288,47 +296,7 @@ def filter_func(connection, address):
         handle_fetch(connection, address, msg_obj)
     else:
         print 'I don\'t know what to do with', msg_obj
-
-        # echo_func(connection, address)
     connection.close()
-    # try:
-    #     print 'The message type is[' + inc_data + ']'
-    #     if int(inc_data) == PREPARE_FOR_FETCH:
-    #         print 'Handling a PREPARE_FOR_FETCH'
-    #         # new_host_handler(connection, address)
-    #     elif int(inc_data) == HOST_HOST_FETCH:
-    #         handle_fetch(connection, address)
-    #         print 'I don\'t know what to do with [', inc_data, ']'
-    #         # host_request_cloud(connection, address)
-    #     else:
-    #         print 'I don\'t know what to do with [', inc_data, ']'
-    # except ValueError, e:
-    #     json_string = inc_data
-    #     msg_obj = json.loads(json_string)
-    #     type = msg_obj['type']
-    #     if type == HOST_HOST_FETCH:
-    #         print 'YEP. Successful json messaging.'
-    #     elif type == PREPARE_FOR_FETCH:
-    #         other_id = msg_obj['id']
-    #         cloudname = msg_obj['name']
-    #         incoming_address = msg_obj['name']
-    #         matching_cloud = Cloud.query.filter_by(name=cloudname).first()
-    #         if matching_cloud is None:
-    #             raise Exception(
-    #                 'Remote told me to prepare for cloudname=\'' + cloudname + '\''
-    #                 + ', however, I don\'t have a matching cloud.'
-    #             )
-    #         entry = IncomingHostEntry()
-    #         entry.their_id_from_remote = other_id
-    #         entry.created_on = datetime.utcnow()
-    #         entry.their_address = incoming_address
-    #         db.session.add(entry)
-    #         matching_cloud.incoming_hosts.append(entry)
-    #         db.session.commit()
-    #         print 'successfully prepared for a host from {}'.format(incoming_address)
-    #     # echo_func(connection, address)
-    # connection.close()
-
 
 
 def start(argv):
@@ -380,64 +348,3 @@ def nebs_main(argv):
 
 if __name__ == '__main__':
     nebs_main(sys.argv)
-
-#
-#
-# if __name__ == '__main__':
-#     root_path = sys.argv[1] if len(sys.argv) > 1 else default_root_path
-#
-#     last_modified = os.stat(default_filename).st_mtime
-#
-#     print last_modified
-#
-#     file_tree_root['last_modified'] = last_modified
-#     file_tree_root['path'] = root_path
-#     file_tree_root['children'] = []
-#
-#     while True:
-#         modified_files = []
-#         dict_walktree(root_path, visit_file, file_tree_root)
-#         if len(modified_files) > 0:
-#             print str(len(modified_files)) + ' file(s) were modified.'
-#         # now_modified = os.stat(default_filename).st_mtime
-#         # if now_modified > last_modified:
-#         #     print default_filename, ' was modified at ', now_modified, ', last ', last_modified
-#         #     last_modified = now_modified
-#             # This socket can either be AF_INET for v4 or AF_INET6 for v6
-#             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#             s.connect((HOST, PORT))
-#             # May want to use:
-#             # socket.create_connection(address[, timeout[, source_address]])
-#             # instead, where address is a (host,port) tuple. It'll try and
-#             # auto-resolve? which would be dope.
-#             sslSocket = ssl.wrap_socket(s)
-#             sslSocket.write(str(-1))  # placeholder message type
-#             num_sent = 0
-#             for file_node in modified_files:
-#                 sslSocket.write(file_node['path'] + ' was modified at ' + str(file_node['last_modified']))
-#                 num_sent += 1
-#             # sslSocket.write(default_filename + ' was modified at ' + str(now_modified))
-#             pulling = True
-#             num_recvd = 0
-#             while pulling and (num_recvd < num_sent):
-#                 data = sslSocket.recv(1024)
-#                 if not data:
-#                     pulling = False
-#                 print 'remote responded['+str(len(data))+']: ' + repr(data)
-#                 num_recvd += 1
-#             # sslSocket.unwrap()
-#             # sslSocket.close()
-#             s.shutdown(socket.SHUT_RDWR)
-#             s.close()
-#         else:
-#             print 'No updates'
-#         time.sleep(1)
-#
-#     # s.connect((HOST, PORT))
-#     #
-#     # sslSocket = ssl.wrap_socket(s)
-#     #
-#     # sslSocket.write('Hello secure socket\n')
-#     # data = sslSocket.recv(4096)
-#     # print repr(data)
-#     # s.close()
