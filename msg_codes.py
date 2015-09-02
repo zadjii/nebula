@@ -39,42 +39,34 @@ def recv_msg(socket):
         for us."""
     data = socket.recv(8)
     size = decode_msg_size(data)
-    print 'decoding msg length {}->{}'.format(data, size)
+    # print 'decoding msg length {}->{}'.format(data, size)
     # todo a while loop to read all the data into a buffer
-    # buff = ''
-    # buff = memoryview(bytearray(size))
-    # buff = bytearray(size)
-    # socket.recv_into(buff, size)
     buff = socket.recv(size)
-    # len = socket.recv_into(buff, size)
-    print 'recv\'d into {}B[1]'.format(sys.getsizeof(buff))
-    print 'recv\'d into {}B[2]'.format(len(buff))
+    # print 'recv\'d into {}B[2]'.format(len(buff))
     return decode_msg(buff)
 
 
 def write_msg(msg_json, socket):
-    print 'writing message {}.{}.{}.\'{}\''.format(
-        # sys.getsizeof(msg_json)
-        len(msg_json)
-        , get_msg_size(msg_json)
-        , decode_msg_size(get_msg_size(msg_json))
-        , msg_json)
+    # print 'writing message {}.{}.{}.\'{}\''.format(
+    #     len(msg_json)
+    #     , get_msg_size(msg_json)
+    #     , decode_msg_size(get_msg_size(msg_json))
+    #     , msg_json)
     socket.write(get_msg_size(msg_json))
     socket.write(msg_json)
 
 
 def send_msg(msg_json, socket):
-    print 'sending message {}.{}.{}.\'{}\''.format(
-        sys.getsizeof(msg_json)
-        , get_msg_size(msg_json)
-        , decode_msg_size(get_msg_size(msg_json))
-        , msg_json)
+    # print 'sending message {}.{}.{}.\'{}\''.format(
+    #     len(msg_json)
+    #     , get_msg_size(msg_json)
+    #     , decode_msg_size(get_msg_size(msg_json))
+    #     , msg_json)
     socket.send(get_msg_size(msg_json))
     socket.send(msg_json)
 
 
 def get_msg_size(msg_json):
-    # size = sys.getsizeof(msg_json)
     size = len(msg_json)
     return struct.pack('Q', size)
 
@@ -88,17 +80,15 @@ def make_msg(msg_type):
 
 
 def decode_msg(msg):
-    print 'decoding\'{}\''.format(msg)
-    # todo: probably safer to just check if the last char is \0
-    try:
-        obj = json.loads(msg)
-    except ValueError, e:
-        obj = json.loads(msg[:len(msg)-1])
+    # print 'decoding\'{}\''.format(msg)
+    obj = json.loads(msg)
     return obj
+
 
 def make_new_host_json():
     msg = make_msg(NEW_HOST_MSG)
     return json.dumps(msg)
+
 
 def make_assign_host_id_json(host_id, key, cert):
     msg = make_msg(ASSIGN_HOST_ID)
@@ -107,12 +97,14 @@ def make_assign_host_id_json(host_id, key, cert):
     msg['cert'] = 'TODO placeholder cert'
     return json.dumps(msg)
 
+
 def make_host_handshake_json(host_id, listening_port, last_update):
     msg = make_msg(HOST_HANDSHAKE)
     msg['id'] = host_id
     msg['port'] = listening_port
     msg['update'] = last_update
     return json.dumps(msg)
+
 
 def make_request_cloud_json(host_id, cloudname, username, password):
     msg = make_msg(REQUEST_CLOUD)
@@ -122,12 +114,14 @@ def make_request_cloud_json(host_id, cloudname, username, password):
     msg['pass'] = password
     return json.dumps(msg)
 
+
 def make_prepare_for_fetch_json(host_id, cloudname, ip):
     msg = make_msg(PREPARE_FOR_FETCH)
     msg['id'] = host_id
     msg['cname'] = cloudname
     msg['ip'] = ip
     return json.dumps(msg)
+
 
 def make_go_retrieve_here_json(host_id, ip, port):
     msg = make_msg(GO_RETRIEVE_HERE)
@@ -136,6 +130,7 @@ def make_go_retrieve_here_json(host_id, ip, port):
     msg['port'] = port
     return json.dumps(msg)
 
+
 def make_host_host_fetch(host_id, cloudname, requested_root):
     msg = make_msg(HOST_HOST_FETCH)
     msg['id'] = host_id
@@ -143,11 +138,13 @@ def make_host_host_fetch(host_id, cloudname, requested_root):
     msg['root'] = requested_root
     return json.dumps(msg)
 
+
 def make_mirroring_complete(host_id, cloudname):
     msg = make_msg(MIRRORING_COMPLETE)
     msg['id'] = host_id
     msg['cname'] = cloudname
     return json.dumps(msg)
+
 
 def make_host_file_transfer(host_id, cloudname, relative_pathname, is_dir, filesize):
     msg = make_msg(HOST_FILE_TRANSFER)

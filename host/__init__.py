@@ -25,3 +25,8 @@ def get_db():
     db.engine.echo = False
     return db
 
+
+REMOTE_HOST = 'localhost'
+REMOTE_PORT = 12345
+HOST_HOST = ''
+HOST_PORT = 23456
