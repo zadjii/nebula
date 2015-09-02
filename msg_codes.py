@@ -22,6 +22,8 @@ MAKE_CLOUD_RESPONSE = 11
 MAKE_USER_REQUEST = 12
 MAKE_USER_RESPONSE = 13
 MIRRORING_COMPLETE = 14
+GET_HOSTS_REQUEST = 15
+GET_HOSTS_RESPONSE = 16
 
 
 def send_unprepared_host_error_and_close(socket):
@@ -76,7 +78,7 @@ def decode_msg_size(long_long):
 
 
 def make_msg(msg_type):
-    return {'type' : msg_type}
+    return {'type': msg_type}
 
 
 def decode_msg(msg):
@@ -85,8 +87,9 @@ def decode_msg(msg):
     return obj
 
 
-def make_new_host_json():
+def make_new_host_json(port):
     msg = make_msg(NEW_HOST_MSG)
+    msg['port'] = port
     return json.dumps(msg)
 
 
@@ -139,13 +142,6 @@ def make_host_host_fetch(host_id, cloudname, requested_root):
     return json.dumps(msg)
 
 
-def make_mirroring_complete(host_id, cloudname):
-    msg = make_msg(MIRRORING_COMPLETE)
-    msg['id'] = host_id
-    msg['cname'] = cloudname
-    return json.dumps(msg)
-
-
 def make_host_file_transfer(host_id, cloudname, relative_pathname, is_dir, filesize):
     msg = make_msg(HOST_FILE_TRANSFER)
     msg['id'] = host_id
@@ -153,4 +149,37 @@ def make_host_file_transfer(host_id, cloudname, relative_pathname, is_dir, files
     msg['fpath'] = relative_pathname
     msg['fsize'] = filesize
     msg['isdir'] = is_dir
-    return json.dumps(msg)  # + '\0'
+    return json.dumps(msg)
+
+
+def make_mirroring_complete(host_id, cloudname):
+    msg = make_msg(MIRRORING_COMPLETE)
+    msg['id'] = host_id
+    msg['cname'] = cloudname
+    return json.dumps(msg)
+
+
+def make_get_hosts_request(host_id, cloudname):
+    msg = make_msg(GET_HOSTS_REQUEST)
+    msg['id'] = host_id
+    msg['cname'] = cloudname
+    return json.dumps(msg)
+
+
+def make_get_hosts_response(host_id, cloud):
+    msg = make_msg(GET_HOSTS_RESPONSE)
+    msg['id'] = host_id
+    msg['cname'] = cloud.name
+    hosts = cloud.hosts.all()
+    host_jsons = []
+    for host in hosts:
+        host_obj = {
+            'ip': host.ip
+            , 'port': host.port
+            , 'update': host.last_update
+            , 'hndshk': host.last_handshake
+        }
+        host_jsons.append(host_obj)
+    msg['hosts'] = host_jsons
+    return json.dumps(msg)
+

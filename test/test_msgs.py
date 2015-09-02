@@ -1,15 +1,16 @@
-__author__ = 'zadjii'
-
+from host import HOST_PORT
 from datetime import datetime
 from msg_codes import *
+from remote import get_db, Cloud
 from werkzeug.security import generate_password_hash
+__author__ = 'zadjii'
 
 def test_msgs():
     print '#' * 80
     print '# Running test_msgs to see json of various message types '
     print '#' * 80
     print '_____Making NEW_HOST_MSG[0] json_____'
-    msg = make_new_host_json()
+    msg = make_new_host_json(HOST_PORT)
     print get_msg_size(msg), decode_msg_size(get_msg_size(msg))
     print msg
 
@@ -68,6 +69,18 @@ def test_msgs():
 
     print '_____Making MIRRORING_COMPLETE[14] json_____'
     msg = make_mirroring_complete(22, 'fake-cloudname')
+    print get_msg_size(msg), decode_msg_size(get_msg_size(msg))
+    print msg
+
+    print '_____Making GET_HOSTS_REQUEST[15] json_____'
+    msg = make_get_hosts_request(22, 'fake-cloudname')
+    print get_msg_size(msg), decode_msg_size(get_msg_size(msg))
+    print msg
+
+    print '_____Making GET_HOSTS_RESPONSE[16] json_____'
+    db = get_db()
+    cloud = db.session.query(Cloud).first()
+    msg = make_get_hosts_response(22, cloud)
     print get_msg_size(msg), decode_msg_size(get_msg_size(msg))
     print msg
 

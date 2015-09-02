@@ -14,8 +14,6 @@ from msg_codes import *
 
 __author__ = 'Mike'
 
-HOST = 'localhost'
-PORT = 12345
 
 def setup_remote_socket(host, port):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -39,7 +37,7 @@ def ask_remote_for_id(host, port, db):
 
     # sslSocket.write(str(NEW_HOST_MSG))  # Host doesn't have an ID yet
     # sslSocket.write(make_new_host_json())
-    write_msg(make_new_host_json(), sslSocket)
+    write_msg(make_new_host_json(host.HOST_PORT), sslSocket)
 
     # data = sslSocket.recv(1024)
     # msg_obj = decode_msg(data)
@@ -172,7 +170,7 @@ def mirror(argv):
     """
     db = get_db()
     host = None
-    port = PORT
+    port = host.REMOTE_PORT
     cloudname = None
     root = '.'
     if len(argv) < 1:
