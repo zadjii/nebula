@@ -26,7 +26,6 @@ def local_file_create(directory_path, dir_node, filename, db):
         # use the directory's node as the new root.
         recursive_local_modifications_check(file_pathname, filenode, db)
         db.session.commit()
-    print 'total file nodes:', db.session.query(FileNode).count()
 
 
 def local_file_update(directory_path, dir_node, filename, filenode, db):
@@ -56,6 +55,7 @@ def recursive_local_modifications_check (directory_path, dir_node, db):
     j = 0
     num_files = len(files)
     num_nodes = len(nodes) if nodes is not None else 0
+    original_total_nodes = db.session.query(FileNode).count()
     # print 'Iterating over (', num_files, num_nodes, '):', files, nodes
     while (i < num_files) and (j < num_nodes):
         # print '\titerating on (file,node)', files[i], nodes[j].name
@@ -75,6 +75,15 @@ def recursive_local_modifications_check (directory_path, dir_node, db):
         # print 'finishing', (num_files-i), 'files'
         local_file_create(directory_path, dir_node, files[i], db)
         i += 1
+    new_num_nodes = db.session.query(FileNode).count()
+    if not new_num_nodes == original_total_nodes:
+        print 'total file nodes:', new_num_nodes
+
+    # todo send updates
+    # cont Any time a file is updated or a node created, append to a list
+    # cont   of updates.
+    # cont Get all of the hosts from the remote.
+    # cont For each host, we send all of those update/create/deletes out
 
 
 def check_local_modifications(cloud, db):

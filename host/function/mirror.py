@@ -1,14 +1,13 @@
 from datetime import datetime
-import json
-import os
 import socket
 import ssl
 import getpass
 
 from werkzeug.security import generate_password_hash
 
-from host import Cloud
+from host import Cloud, REMOTE_PORT, HOST_PORT
 from host import get_db
+from host.function.recv_files import recv_file_tree
 from host.util import check_response
 from msg_codes import *
 
@@ -35,12 +34,8 @@ def ask_remote_for_id(host, port, db):
      """
     sslSocket = setup_remote_socket(host, port)
 
-    # sslSocket.write(str(NEW_HOST_MSG))  # Host doesn't have an ID yet
-    # sslSocket.write(make_new_host_json())
-    write_msg(make_new_host_json(host.HOST_PORT), sslSocket)
+    write_msg(make_new_host_json(HOST_PORT), sslSocket)
 
-    # data = sslSocket.recv(1024)
-    # msg_obj = decode_msg(data)
     msg_obj = recv_msg(sslSocket)
 
     check_response(ASSIGN_HOST_ID, msg_obj['type'])
@@ -77,7 +72,6 @@ def request_cloud(cloud, db):
         , sslSocket
     )
 
-    # msg_obj = decode_msg(sslSocket.recv(1024))
     msg_obj = recv_msg(sslSocket)
 
     check_response(GO_RETRIEVE_HERE, msg_obj['type'])
@@ -102,52 +96,13 @@ def request_cloud(cloud, db):
     send_msg(make_host_host_fetch(cloud.my_id_from_remote, cloud.name, '/'),
              host_sock)
     print 'Sent HOST_HOST_FETCH as a mirror request.'
-    # todo Here we need to recv a whole bunch of files from the host
+
+    # Here we recv a whole bunch of files from the host
     response = recv_msg(host_sock)
     resp_type = response['type']
     # print 'host_host_fetch response:{}'.format(response)
     check_response(HOST_FILE_TRANSFER, resp_type)
-    while response['fsize'] is not None:
-        handle_file_transfer(response, cloud, host_sock)
-        response = recv_msg(host_sock)
-
-
-def handle_file_transfer(msg, cloud, socket_conn):
-    msg_file_isdir = msg['isdir']
-    msg_file_size = msg['fsize']
-    msg_rel_path = msg['fpath']
-    full_path = os.path.join(cloud.root_directory, msg_rel_path)
-    if msg_file_isdir :
-        if (not os.path.exists(full_path)):
-            os.mkdir(full_path)
-            print 'Created directory {}'.format(full_path)
-    else:  # is normal file
-        data_buffer = ''  # fixme i'm using a string to buffer this?? LOL
-        total_read = 0
-        while total_read < msg_file_size:
-            new_data = socket_conn.recv(min(1024, (msg_file_size-total_read)))  # fixme read only up until end of file
-            nbytes = sys.getsizeof(new_data)
-            print 'read ({},{})'.format(new_data, nbytes)
-            if total_read is None or new_data is None:
-                print 'I know I should have broke AND I JUST DIDN\'T ANYWAYS'
-                break
-            total_read += nbytes
-            data_buffer += new_data
-            print '<{}>read:{}B, total:{}B, expected total:{}B'.format(
-                msg_rel_path, nbytes, total_read, msg_file_size
-            )
-        print 'complete file data \'{}\''.format(data_buffer)
-        file_handle = open(full_path, mode='wb')
-        done = False
-        total_written = 0
-        while not done:
-            nbytes_written = file_handle.write(data_buffer[total_written:])
-            if nbytes_written is None:
-                break
-            total_written += nbytes_written
-            done = total_written <= 0
-        file_handle.close()
-        print 'I think I wrote the file to {}'.format(full_path)
+    recv_file_tree(response, cloud, host_sock)
 
 
 def mirror_usage():
@@ -170,7 +125,7 @@ def mirror(argv):
     """
     db = get_db()
     host = None
-    port = host.REMOTE_PORT
+    port = REMOTE_PORT
     cloudname = None
     root = '.'
     if len(argv) < 1:

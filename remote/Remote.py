@@ -13,10 +13,8 @@ from msg_codes import *
 
 
 from remote import User, Cloud, Host, get_db
-# from remote import remote_db as db
 
 __author__ = 'Mike'
-###############################################################################
 
 ###############################################################################
 
@@ -39,9 +37,31 @@ def filter_func(connection, address):
         host_request_cloud(connection, address, msg_obj)
     elif msg_type == MIRRORING_COMPLETE:
         mirror_complete(connection, address, msg_obj)
+    elif msg_type == GET_HOSTS_REQUEST:
+        respond_to_get_hosts_request(connection, address, msg_obj)
     else:
         print 'I don\'t know what to do with', msg_obj
     connection.close()
+
+
+def respond_to_get_hosts_request(connection, address, msg_obj):
+    db = get_db()
+    host_id = msg_obj['id']
+    cloudname = msg_obj['cname']
+
+    matching_host = db.session.query(Host).get(host_id)
+    if matching_host is None:
+        send_generic_error_and_close(connection)
+        raise Exception('There was no host with the ID[{}], wtf'.format(host_id))
+
+    matching_cloud = db.session.query(Cloud).filter_by(name=cloudname).first()
+    if matching_cloud is None:
+        send_generic_error_and_close(connection)
+        raise Exception('No cloud with name ' + cloudname)
+
+    send_msg(make_get_hosts_response(matching_cloud), connection)
+    print 'responded to Host[{}] asking for hosts of \'{}\''\
+        .format(host_id, cloudname)
 
 
 def mirror_complete(connection, address, msg_obj):

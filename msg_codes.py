@@ -163,12 +163,13 @@ def make_get_hosts_request(host_id, cloudname):
     msg = make_msg(GET_HOSTS_REQUEST)
     msg['id'] = host_id
     msg['cname'] = cloudname
+    # todo needs uniquely identifying info, so that not just anyone
+    # cont can get all the other hosts ip/ports
     return json.dumps(msg)
 
 
-def make_get_hosts_response(host_id, cloud):
+def make_get_hosts_response(cloud):
     msg = make_msg(GET_HOSTS_RESPONSE)
-    msg['id'] = host_id
     msg['cname'] = cloud.name
     hosts = cloud.hosts.all()
     host_jsons = []
