@@ -25,7 +25,7 @@ def send_updates(cloud, updates, db):
             continue
         update_peer(cloud, host, updates)
         updated_peers += 1
-    print '[{}] updated {} peers'.format(cloud.my_id_from_remote, updated_peers)
+    mylog('[{}] updated {} peers'.format(cloud.my_id_from_remote, updated_peers))
 
 
 def update_peer(cloud, host, updates):
@@ -78,24 +78,11 @@ def local_file_create(directory_path, dir_node, filename, db):
 
 def local_file_update(directory_path, dir_node, filename, filenode, db):
     file_pathname = os.path.join(directory_path, filename)
-    # pathname = os.path.join(dir_node.name, files[i])
-    # todo I think ^this is probably wrong. I think I need the whole path
-    # cont and I think I need to build it traversing all the way up...
-    # cont OR I could keep it in my DB. Both are bad :/
     file_stat = os.stat(file_pathname)
     file_modified = datetime.fromtimestamp( file_stat.st_mtime)
     mode = file_stat.st_mode
     updates = []
     if file_modified > filenode.last_modified:
-        mylog('<{}>:[<{}>,{}] has been modified,\n\t  {}\n\t> {}[{:4},{:4}]'
-              .format(file_pathname
-                      , dir_node.name
-                      , dir_node.id
-                      , file_modified
-                      , filenode.last_modified
-                      , filenode.parent_id
-                      , filenode.cloud_id
-                      ))
         filenode.last_modified = file_modified
         updates.append((FILE_UPDATE, file_pathname))
     if S_ISDIR(mode):  # It's a directory, recurse into it
@@ -111,31 +98,24 @@ FILE_UPDATE = 1
 FILE_DELETE = 2
 
 def recursive_local_modifications_check(directory_path, dir_node, db):
-    mylog('RLM [{:3}]'.format(dir_node.id))
     files = sorted(os.listdir(directory_path), key=lambda filename: filename, reverse=False)
     nodes = dir_node.children.all()
     nodes = sorted(nodes, key=lambda node: node.name, reverse=False)
-    mylog('\t_rlm_{}'.format([node.name for node in nodes]))
+
     i = j = 0
     num_files = len(files)
     num_nodes = len(nodes) if nodes is not None else 0
     original_total_nodes = db.session.query(FileNode).count()
     updates = []
-    # print 'Iterating over (', num_files, num_nodes, '):', files, nodes
     while (i < num_files) and (j < num_nodes):
-        # print '\titerating on (file,node)', files[i], nodes[j].name
         if files[i] == nodes[j].name:
-            # print '\tfiles were the same'
             update_updates = local_file_update(directory_path, dir_node, files[i], nodes[j], db)
-            # updates.append((FILE_UPDATE, files[i]))
             updates.extend(update_updates)
             i += 1
             j += 1
         elif files[i] < nodes[j].name:
-            # print '\t', files[i], 'was less than', nodes[j].name
             create_updates = local_file_create(directory_path, dir_node, files[i], db)
             updates.extend(create_updates)
-            # updates.append((FILE_CREATE, files[i]))
             i += 1
         elif files[i] > nodes[j].name:  # redundant if clause, there for clarity
             # todo handle file deletes, moves.
@@ -145,7 +125,6 @@ def recursive_local_modifications_check(directory_path, dir_node, db):
         # print 'finishing', (num_files-i), 'files'
         create_updates = local_file_create(directory_path, dir_node, files[i], db)
         updates.extend(create_updates)
-        # updates.append((FILE_CREATE, files[i]))
         i += 1
     # todo handle j < num_nodes, bulk end deletes
     new_num_nodes = db.session.query(FileNode).count()
@@ -156,48 +135,11 @@ def recursive_local_modifications_check(directory_path, dir_node, db):
 
 
 def check_local_modifications(cloud, db):
-    # db = get_db()
-    # print 'Checking for modifications on', cloud.name
     root = cloud.root_directory
-    ##########
-    # fixme this is a dirty fucking hack
-    # fake_root_node = FileNode()
-    # fake_root_node.children = cloud.files
-    # fake_root_node.name = root
-    # db.session.add(fake_root_node)
-    # # print 'started with', [node.name for node in cloud.files.all()]
-    # # for file in os.listdir(root):
-    # mylog('clm {}-{}-[{}]-{}'.format(fake_root_node, fake_root_node.children, cloud.my_id_from_remote, [(node.id, node.name) for node in fake_root_node.children]))
-    # updates = recursive_local_modifications_check(root, fake_root_node, db)
-    # # print 'updates={}'.format(updates)
-    # if len(updates) > 0:
-    #     send_updates(cloud, updates, db)
-    #
-    # # cloud.files = fake_root_node.children
-    # all_files = cloud.files
-    # for child in fake_root_node.children.all():
-    #     if child not in all_files:
-    #         cloud.files.append(child)
-    #         child.parent_id = None
-    #         mylog('\t\tadded <{}> to [{}]'.format(child.name, cloud.my_id_from_remote))
-    # # fake_root_node.children[:] = []
-    # db.session.delete(fake_root_node)
-    # db.session.commit()
-    ###########
     updates = recursive_local_modifications_check(root, cloud, db)
     if len(updates) > 0:
         send_updates(cloud, updates, db)
 
-    # print 'ended with',[node.name for node in cloud.files.all()]
-    # todo send updates
-    # cont Any time a file is updated or a node created, append to a list
-    # cont   of updates.
-    # cont Get all of the hosts from the remote.
-    # cont For each host, we send all of those update/create/deletes out
-    # cont We COULD be super contrived here, and just send a COME_FETCH msg,
-    # cont   that tells them to fetch the file from us instead of pushing the
-    # cont   file. Puts the work on the network thread.
-    # cont   Eh, for ease, that's how we'll do it.
 
 def local_update_thread():  # todo argv is a placeholder
     db = get_db()

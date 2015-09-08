@@ -1,4 +1,4 @@
-from host import get_db, FileNode
+from host.function.dbg_nodes import dbg_nodes
 
 __author__ = 'Mike'
 from threading import Thread
@@ -9,24 +9,6 @@ from host.function.list_clouds import list_clouds
 from host.function.local_updates import local_update_thread
 from host.function.network_updates import receive_updates_thread
 from msg_codes import *
-
-def dbg_nodes(argv):
-    db = get_db()
-    nodes = db.session.query(FileNode).all()
-    for node in nodes:
-        print(
-            '[{:3}]<{}>{}({},{})\t[{:4},{:4}]\t{}'
-            .format(
-                node.id
-                , node.name
-                , ' ' * (16 - len(node.name))
-                , node.created_on
-                , node.last_modified
-                , node.parent_id
-                , node.cloud_id
-                , [child.id for child in node.children.all()]
-            )
-        )
 
 
 def start(argv):

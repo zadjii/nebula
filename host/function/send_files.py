@@ -16,7 +16,7 @@ def send_tree(other_id, cloud, requested_root, connection):
         filepath = cloud.root_directory
     else:
         filepath = os.path.join(cloud.root_directory, requested_root)
-    print 'The translated request path was {}'.format(filepath)
+    mylog('The translated request path was {}'.format(filepath))
     send_file_to_other(other_id, cloud, filepath, connection)
     complete_sending_files(other_id, cloud, filepath, connection)
     connection.close()

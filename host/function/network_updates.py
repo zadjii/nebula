@@ -56,7 +56,6 @@ def handle_fetch(connection, address, msg_obj):
     other_id = msg_obj['id']
     cloudname = msg_obj['cname']
     requested_root = msg_obj['root']
-    # todo: I haven't confirmed their ID yet...
     matching_id_clouds = db.session.query(Cloud)\
         .filter(Cloud.my_id_from_remote != other_id)\
         .filter_by(completed_mirroring=True)
@@ -77,6 +76,9 @@ def handle_fetch(connection, address, msg_obj):
         )
     their_ip = address[0]
     matching_entry = db.session.query(IncomingHostEntry).filter_by(their_address=their_ip).first()
+
+    # todo: I haven't confirmed their ID yet...
+    # cont just that I have a cloud that DOESNT have that id
     if matching_entry is None:
         send_unprepared_host_error_and_close(connection)
         raise Exception(
@@ -128,58 +130,6 @@ def handle_recv_file(connection, address, msg_obj):
     recv_file_tree(response, matching_cloud, connection, db)
     mylog('[{}]bottom of handle_recv_file(...,{})'
           .format(my_id, msg_obj))
-#
-# def handle_come_fetch(connection, address, msg_obj):
-#     db = get_db()
-#     my_id = msg_obj['id']
-#     cloudname = msg_obj['cname']
-#     updated_file = msg_obj['root']
-#     their_ip = address[0]
-#     their_port = msg_obj['port']
-#     print 'Handling come_fetch from ({},{}) for <{}> in cloud \'{}\''.format(
-#         their_ip, their_port, updated_file, cloudname
-#     )
-#     # todo: I haven't confirmed my ID yet...
-#     matching_id_clouds = db.session.query(Cloud).filter_by(my_id_from_remote=my_id)
-#     if matching_id_clouds.count() <= 0:
-#         send_generic_error_and_close(connection)
-#         raise Exception(
-#             'Received a message intended for id={},'
-#             ' but I don\'t have any clouds with that id'
-#             .format(my_id)
-#         )
-#
-#     matching_cloud = matching_id_clouds.filter_by(name=cloudname).first()
-#     if matching_cloud is None:
-#         send_generic_error_and_close(connection)
-#         raise Exception(
-#             'host came asking for cloudname=\'' + cloudname + '\''
-#             + ', however, I don\'t have a matching cloud.'
-#         )
-#
-#     # matching_entry = db.session.query(IncomingHostEntry).filter_by(their_address=their_ip).first()
-#     # if matching_entry is None:
-#     #     send_unprepared_host_error_and_close(connection)
-#     #     raise Exception(
-#     #         'host came asking for cloudname=\'' + cloudname + '\''
-#     #         + ', but I was not told to expect them.'
-#     #     )
-#     connection.close()
-#     # Send a HOST_HOST_FETCH back to sender
-#     host_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#     host_sock.connect((their_ip, their_port))
-#     send_msg(
-#         make_host_host_fetch(
-#             matching_cloud.my_id_from_remote
-#             , matching_cloud.name
-#             , updated_file),
-#         host_sock)
-#     print '[{}] sent a HHF for <{}>'.format(matching_cloud.my_id_from_remote, updated_file)
-#     response = recv_msg(host_sock)
-#     resp_type = response['type']
-#     check_response(HOST_FILE_TRANSFER, resp_type)
-#     # NOPE just want to recv one singular file
-#     handle_file_transfer(response, matching_cloud, host_sock, db)
 
 def filter_func(connection, address):
     msg_obj = recv_msg(connection)

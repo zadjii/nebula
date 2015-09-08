@@ -19,15 +19,14 @@ def recv_file_transfer(msg, cloud, socket_conn, db):
     mylog('[{}] is recv\'ing <{}>'.format(cloud.my_id_from_remote, msg_rel_path))
     full_path = os.path.join(cloud.root_directory, msg_rel_path)
     if msg_file_isdir :
-        if (not os.path.exists(full_path)):
+        if not os.path.exists(full_path):
             os.mkdir(full_path)
             print 'Created directory {}'.format(full_path)
     else:  # is normal file
         data_buffer = ''  # fixme i'm using a string to buffer this?? LOL
         total_read = 0
         while total_read < msg_file_size:
-            new_data = socket_conn.recv(min(1024, (msg_file_size-total_read)))  # fixme read only up until end of file
-            # nbytes = sys.getsizeof(new_data)
+            new_data = socket_conn.recv(min(1024, (msg_file_size - total_read)))
             nbytes = len(new_data)
             # print 'read ({},{})'.format(new_data, nbytes)
             if total_read is None or new_data is None:
@@ -52,4 +51,4 @@ def recv_file_transfer(msg, cloud, socket_conn, db):
         mylog('[{}]I think I wrote the file to {}'.format(cloud.my_id_from_remote, full_path))
     cloud.create_or_update_node(msg_rel_path, msg, db)
     new_num_nodes = db.session.query(FileNode).count()
-    print 'RFT:total file nodes:', new_num_nodes
+    mylog('RFT:total file nodes:'.format(new_num_nodes))
