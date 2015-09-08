@@ -1,6 +1,5 @@
 from datetime import datetime
 import socket
-import ssl
 import getpass
 
 from werkzeug.security import generate_password_hash
@@ -8,22 +7,10 @@ from werkzeug.security import generate_password_hash
 from host import Cloud, REMOTE_PORT, HOST_PORT
 from host import get_db
 from host.function.recv_files import recv_file_tree
-from host.util import check_response
+from host.util import check_response, setup_remote_socket, mylog
 from msg_codes import *
 
 __author__ = 'Mike'
-
-
-def setup_remote_socket(host, port):
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect((host, port))
-    # s.create_connection((host, port))
-    # TODO May want to use:
-    # socket.create_connection(address[, timeout[, source_address]])
-    # cont  instead, where address is a (host,port) tuple. It'll try and
-    # cont  auto-resolve? which would be dope.
-    sslSocket = ssl.wrap_socket(s)
-    return sslSocket
 
 
 def ask_remote_for_id(host, port, db):
@@ -77,7 +64,7 @@ def request_cloud(cloud, db):
     check_response(GO_RETRIEVE_HERE, msg_obj['type'])
     other_address = msg_obj['ip']
     other_port = msg_obj['port']
-
+    other_id = msg_obj['id']
     if other_address == '0' and other_port == 0:
         print 'No other hosts in cloud'
         sslSocket.close()
@@ -85,7 +72,7 @@ def request_cloud(cloud, db):
         #       sends the MIRRORING_COMPLETE message.
         return
 
-    print 'requesting host at ({},{})'.format(other_address, other_port)
+    print 'requesting host at [{}]({},{})'.format(other_id, other_address, other_port)
 
     host_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     host_sock.connect((other_address, other_port))
@@ -102,7 +89,7 @@ def request_cloud(cloud, db):
     resp_type = response['type']
     # print 'host_host_fetch response:{}'.format(response)
     check_response(HOST_FILE_TRANSFER, resp_type)
-    recv_file_tree(response, cloud, host_sock)
+    recv_file_tree(response, cloud, host_sock, db)
 
 
 def mirror_usage():
@@ -176,15 +163,17 @@ def mirror(argv):
     cloud.name = cloudname
     db.session.commit()
     request_cloud(cloud, db)
-    print 'finished requesting cloud'
+    mylog('finished requesting cloud')
     new_rem_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
     send_msg(
         make_mirroring_complete(cloud.my_id_from_remote, cloud.name)
         , new_rem_sock
     )
+    cloud.completed_mirroring = True
+    db.session.commit()
 
     new_rem_sock.close()
     # todo goto code that checks if a nebs.start process is running
 
-    print 'nebs reached bottom of mirror()'
+    mylog('nebs reached bottom of mirror()')
 

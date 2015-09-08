@@ -24,15 +24,18 @@ MAKE_USER_RESPONSE = 13
 MIRRORING_COMPLETE = 14
 GET_HOSTS_REQUEST = 15
 GET_HOSTS_RESPONSE = 16
+COME_FETCH = 17
+REMOVE_FILE = 18
+HOST_FILE_PUSH = 19
 
 
 def send_unprepared_host_error_and_close(socket):
-    send_msg(make_msg(UNPREPARED_HOST_ERROR), socket)
+    send_msg(json.dumps(make_msg(UNPREPARED_HOST_ERROR)), socket)
     socket.close()
 
 
 def send_generic_error_and_close(socket):
-    send_msg(make_msg(GENERIC_ERROR), socket)
+    send_msg(json.dumps(make_msg(GENERIC_ERROR)), socket)
     socket.close()
 
 
@@ -177,10 +180,38 @@ def make_get_hosts_response(cloud):
         host_obj = {
             'ip': host.ip
             , 'port': host.port
+            , 'id': host.id
             , 'update': host.last_update
             , 'hndshk': host.last_handshake
         }
         host_jsons.append(host_obj)
     msg['hosts'] = host_jsons
     return json.dumps(msg)
+
+#
+# def make_come_fetch(host_id, port, cloudname, updated_file):
+#     msg = make_msg(COME_FETCH)
+#     msg['id'] = host_id  # The id of the recipient
+#     msg['port'] = port  # my address, don't need ip, they'll get that from the connection
+#     msg['cname'] = cloudname
+#     msg['root'] = updated_file
+#     return json.dumps(msg)
+
+
+def make_remove_file(host_id, cloudname, updated_file):
+    msg = make_msg(REMOVE_FILE)
+    msg['id'] = host_id  # The id of the recipient
+    msg['cname'] = cloudname
+    msg['root'] = updated_file
+    return json.dumps(msg)
+
+
+
+def make_host_file_push(tgt_host_id, cloudname, updated_file):
+    msg = make_msg(HOST_FILE_PUSH)
+    msg['tid'] = tgt_host_id
+    msg['cname'] = cloudname
+    msg['fpath'] = updated_file
+    return json.dumps(msg)
+
 

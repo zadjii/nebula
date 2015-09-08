@@ -42,19 +42,23 @@ def db_tree(argv):
         argv = argv[args_eaten:]
     if cloudname is None:
         raise Exception('Must specify a cloud name to mirror')
-    match = db.session.query(Cloud).filter_by(name=cloudname).first()
-    if match is None:
-        raise Exception('No cloud on this host with name', cloudname)
+    # match = db.session.query(Cloud).filter_by(name=cloudname).first()
+    matches = db.session.query(Cloud).filter_by(name=cloudname).all()
+    if len(matches) == 0:
+        raise Exception('No clouds on this host with name', cloudname)
 
     def print_filename(file_node, depth):
-        print ('--'*depth) + (file_node.name)
+        print ('--' * depth) + (file_node.name)
 
     def walk_db_recursive(file_node, depth, callback):
         callback(file_node, depth)
         for child in file_node.children.all():
             walk_db_recursive(child, depth+1, print_filename)
-    for top_level_node in match.files.all():
-        walk_db_recursive(top_level_node, 1, print_filename)
+
+    for match in matches:
+        print 'db-tree for {}[{}]<{}>'.format(match.name, match.my_id_from_remote, match.root_directory)
+        for top_level_node in match.files.all():
+            walk_db_recursive(top_level_node, 1, print_filename)
 
 
 def tree(argv):
@@ -83,15 +87,18 @@ def tree(argv):
         argv = argv[args_eaten:]
     if cloudname is None:
         raise Exception('Must specify a cloud name to mirror')
-    match = db.session.query(Cloud).filter_by(name=cloudname).first()
-    if match is None:
-        raise Exception('No cloud on this host with name', cloudname)
-    root_dir = match.root_directory
+    # match = db.session.query(Cloud).filter_by(name=cloudname).first()
+    matches = db.session.query(Cloud).filter_by(name=cloudname).all()
+    if len(matches) == 0:
+        raise Exception('No clouds on this host with name', cloudname)
 
     def print_filename(filename, depth):
         print ('--' * depth) + (filename)
 
-    walktree(root_dir, 1, print_filename)
+    for match in matches:
+        print 'tree for {}[{}]<{}>'.format(match.name, match.my_id_from_remote, match.root_directory)
+        root_dir = match.root_directory
+        walktree(root_dir, 1, print_filename)
 
 
 def walktree(top,depth, callback):

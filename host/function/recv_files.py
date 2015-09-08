@@ -1,19 +1,22 @@
 import os
+from host import get_db, FileNode
+from host.util import mylog
 from msg_codes import recv_msg
 
 __author__ = 'Mike'
 
 
-def recv_file_tree(msg, cloud, socket_conn):
+def recv_file_tree(msg, cloud, socket_conn, db):
     while msg['fsize'] is not None:
-        handle_file_transfer(msg, cloud, socket_conn)
+        recv_file_transfer(msg, cloud, socket_conn, db)
         msg = recv_msg(socket_conn)
 
 
-def handle_file_transfer(msg, cloud, socket_conn):
+def recv_file_transfer(msg, cloud, socket_conn, db):
     msg_file_isdir = msg['isdir']
     msg_file_size = msg['fsize']
     msg_rel_path = msg['fpath']
+    mylog('[{}] is recv\'ing <{}>'.format(cloud.my_id_from_remote, msg_rel_path))
     full_path = os.path.join(cloud.root_directory, msg_rel_path)
     if msg_file_isdir :
         if (not os.path.exists(full_path)):
@@ -26,16 +29,16 @@ def handle_file_transfer(msg, cloud, socket_conn):
             new_data = socket_conn.recv(min(1024, (msg_file_size-total_read)))  # fixme read only up until end of file
             # nbytes = sys.getsizeof(new_data)
             nbytes = len(new_data)
-            print 'read ({},{})'.format(new_data, nbytes)
+            # print 'read ({},{})'.format(new_data, nbytes)
             if total_read is None or new_data is None:
                 print 'I know I should have broke AND I JUST DIDN\'T ANYWAYS'
                 break
             total_read += nbytes
             data_buffer += new_data
-            print '<{}>read:{}B, total:{}B, expected total:{}B'.format(
-                msg_rel_path, nbytes, total_read, msg_file_size
-            )
-        print 'complete file data \'{}\''.format(data_buffer)
+            # print '<{}>read:{}B, total:{}B, expected total:{}B'.format(
+            #     msg_rel_path, nbytes, total_read, msg_file_size
+            # )
+        # print 'complete file data \'{}\''.format(data_buffer)
         file_handle = open(full_path, mode='wb')
         done = False
         total_written = 0
@@ -46,4 +49,7 @@ def handle_file_transfer(msg, cloud, socket_conn):
             total_written += nbytes_written
             done = total_written <= 0
         file_handle.close()
-        print 'I think I wrote the file to {}'.format(full_path)
+        mylog('[{}]I think I wrote the file to {}'.format(cloud.my_id_from_remote, full_path))
+    cloud.create_or_update_node(msg_rel_path, msg, db)
+    new_num_nodes = db.session.query(FileNode).count()
+    print 'RFT:total file nodes:', new_num_nodes

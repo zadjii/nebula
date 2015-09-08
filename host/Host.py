@@ -1,3 +1,5 @@
+from host import get_db, FileNode
+
 __author__ = 'Mike'
 from threading import Thread
 
@@ -8,13 +10,32 @@ from host.function.local_updates import local_update_thread
 from host.function.network_updates import receive_updates_thread
 from msg_codes import *
 
+def dbg_nodes(argv):
+    db = get_db()
+    nodes = db.session.query(FileNode).all()
+    for node in nodes:
+        print(
+            '[{:3}]<{}>{}({},{})\t[{:4},{:4}]\t{}'
+            .format(
+                node.id
+                , node.name
+                , ' ' * (16 - len(node.name))
+                , node.created_on
+                , node.last_modified
+                , node.parent_id
+                , node.cloud_id
+                , [child.id for child in node.children.all()]
+            )
+        )
+
 
 def start(argv):
     # todo process start() args here
-    local_thread = Thread(target=local_update_thread, args=argv)
+    # local_thread = Thread(target=local_update_thread, args=argv)
     network_thread = Thread(target=receive_updates_thread, args=argv)
-    local_thread.start()
+    # local_thread.start()
     network_thread.start()
+    local_update_thread()
     # local_thread.join()
     # network_thread.join()
     print 'Both the local update checking thread and the network thread have exited.'
@@ -26,6 +47,7 @@ commands = {
     , 'list-clouds': list_clouds
     , 'tree': tree
     , 'db-tree': db_tree
+    , 'dbg-nodes': dbg_nodes
 }
 command_descriptions = {
     'mirror': '\t\tmirror a remote cloud to this device'

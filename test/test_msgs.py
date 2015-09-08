@@ -80,7 +80,22 @@ def test_msgs():
     print '_____Making GET_HOSTS_RESPONSE[16] json_____'
     db = get_db()
     cloud = db.session.query(Cloud).first()
-    msg = make_get_hosts_response(22, cloud)
+    msg = make_get_hosts_response(cloud)
+    print get_msg_size(msg), decode_msg_size(get_msg_size(msg))
+    print msg
+    #
+    # print '_____Making COME_FETCH[17] json_____'
+    # msg = make_come_fetch(22, 23456, 'fake-cloudname', '/foo.file')
+    # print get_msg_size(msg), decode_msg_size(get_msg_size(msg))
+    # print msg
+
+    print '_____Making REMOVE_FILE[18] json_____'
+    msg = make_remove_file(22, 'fake-cloudname', '/foo.file')
+    print get_msg_size(msg), decode_msg_size(get_msg_size(msg))
+    print msg
+
+    print '_____Making HOST_FILE_PUSH[19] json_____'
+    msg = make_host_file_push(22, 'fake-cloudname', '/foo.txt')
     print get_msg_size(msg), decode_msg_size(get_msg_size(msg))
     print msg
 
