@@ -82,9 +82,19 @@ def local_file_update(directory_path, dir_node, filename, filenode, db):
     file_modified = datetime.fromtimestamp( file_stat.st_mtime)
     mode = file_stat.st_mode
     updates = []
+    # mylog('[{}]\n\t{}\n\t{}'
+    #       .format(filenode.id, file_modified, filenode.last_modified))
+    # todo at least on Windows: doesn't account for the timezone when I'm using
+    # cont   UTC times. Probably *nix as well. Need to convert them to UTC.
+    # todo Should also store the current UTC offset when we notice a change.
+    # cont   and use that, because computers move around.
+    # note I fucking hate timezones.
     if file_modified > filenode.last_modified:
         filenode.last_modified = file_modified
         updates.append((FILE_UPDATE, file_pathname))
+        mylog('<{}> was changed since {}'.format(filenode.name, filenode.last_modified))
+    # else:
+        # mylog('[{}]<{}> wasnt updated'.format(filenode.id, file_pathname))
     if S_ISDIR(mode):  # It's a directory, recurse into it
         # use the directory's node as the new root.
         rec_updates = recursive_local_modifications_check(file_pathname, filenode, db)
