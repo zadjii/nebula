@@ -63,8 +63,8 @@ def local_file_create(directory_path, dir_node, filename, db):
     filenode = FileNode()
     db.session.add(filenode)
     filenode.name = filename
-    filenode.created_on = datetime.fromtimestamp( file_created )
-    filenode.last_modified = datetime.fromtimestamp( file_modified )
+    filenode.created_on = datetime.utcfromtimestamp( file_created )
+    filenode.last_modified = datetime.utcfromtimestamp( file_modified )
     dir_node.children.append(filenode)
     db.session.commit()
     updates = [(FILE_CREATE, file_pathname)]
@@ -79,7 +79,7 @@ def local_file_create(directory_path, dir_node, filename, db):
 def local_file_update(directory_path, dir_node, filename, filenode, db):
     file_pathname = os.path.join(directory_path, filename)
     file_stat = os.stat(file_pathname)
-    file_modified = datetime.fromtimestamp( file_stat.st_mtime)
+    file_modified = datetime.utcfromtimestamp( file_stat.st_mtime)
     mode = file_stat.st_mode
     updates = []
     # mylog('[{}]\n\t{}\n\t{}'

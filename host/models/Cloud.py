@@ -67,6 +67,8 @@ class Cloud(db.Base):
             curr_parent_node = child
             curr_children = child.children
             dirs.pop(0)
+        #at this point, the curr_parent_node is the node that is the file we created
+        return curr_parent_node
 
 
 
