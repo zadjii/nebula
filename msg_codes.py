@@ -28,6 +28,10 @@ COME_FETCH = 17
 REMOVE_FILE = 18
 HOST_FILE_PUSH = 19
 
+CLIENT_SESSION_REQUEST = 26  # C->R
+CLIENT_SESSION_ALERT = 27  # R->H
+CLIENT_SESSION_RESPONSE = 28  # R->C
+
 
 def send_unprepared_host_error_and_close(socket):
     send_msg(json.dumps(make_msg(UNPREPARED_HOST_ERROR)), socket)
@@ -214,4 +218,29 @@ def make_host_file_push(tgt_host_id, cloudname, updated_file):
     msg['fpath'] = updated_file
     return json.dumps(msg)
 
+
+def make_client_session_request(cloudname, username, password):
+    msg = make_msg(CLIENT_SESSION_REQUEST)
+    msg['cname'] = cloudname
+    msg['uname'] = username
+    msg['pass'] = password
+    # msg['ip'] = ip  # this we will get from connection
+    return json.dumps(msg)
+
+
+def make_client_session_alert(cloudname, user_id, session_id, ip):
+    msg = make_msg(CLIENT_SESSION_ALERT)
+    msg['cname'] = cloudname
+    msg['uid'] = user_id
+    msg['sid'] = session_id
+    msg['ip'] = ip
+    return json.dumps(msg)
+
+
+def make_client_session_response(cloudname, session_id, nebs_ip):
+    msg = make_msg(CLIENT_SESSION_ALERT)
+    msg['cname'] = cloudname
+    msg['sid'] = session_id
+    msg['ip'] = nebs_ip
+    return json.dumps(msg)
 
