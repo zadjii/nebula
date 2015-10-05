@@ -49,11 +49,12 @@ def ask_remote_for_id(host, port, db):
 
 def request_cloud(cloud, db):
     sslSocket = setup_remote_socket(cloud.remote_host, cloud.remote_port)
-    username = raw_input('Enter the username for ' + cloud.name + ':').lower()
+    # username = raw_input('Enter the username for ' + cloud.name + ':').lower()
     print('Enter the password for ' + cloud.name + ':')
-    password = getpass.getpass().lower()
-    password_hash = generate_password_hash(password)
-
+    # password = getpass.getpass().lower()
+    # password_hash = generate_password_hash(password)
+    username = 'asdf'  # fixme
+    password_hash = 'asdf' # fixme
     write_msg(
         make_request_cloud_json(cloud.my_id_from_remote, cloud.name, username, password_hash)
         , sslSocket
