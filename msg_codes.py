@@ -1,5 +1,6 @@
 from _ctypes import sizeof
 import json
+import os
 import struct
 import sys
 
@@ -27,6 +28,12 @@ GET_HOSTS_RESPONSE = 16
 COME_FETCH = 17
 REMOVE_FILE = 18
 HOST_FILE_PUSH = 19
+STAT_FILE_REQUEST = 20
+STAT_FILE_RESPONSE = 21
+LIST_FILES_REQUEST = 22
+LIST_FILES_RESPONSE = 23
+READ_FILE_REQUEST = 24
+READ_FILE_RESPONSE = 25
 
 CLIENT_SESSION_REQUEST = 26  # C->R
 CLIENT_SESSION_ALERT = 27  # R->H
@@ -217,7 +224,6 @@ def make_remove_file(host_id, cloudname, updated_file):
     return json.dumps(msg)
 
 
-
 def make_host_file_push(tgt_host_id, cloudname, updated_file):
     msg = make_msg(HOST_FILE_PUSH)
     msg['tid'] = tgt_host_id
@@ -245,5 +251,73 @@ def make_client_session_alert(cloudname, user_id, session_id, ip):
 def make_client_session_response(cloudname, session_id, nebs_ip):
     msg = make_session_msg(CLIENT_SESSION_RESPONSE, cloudname, session_id)
     msg['ip'] = nebs_ip
+    return json.dumps(msg)
+
+
+def make_stat_dict(file_path):
+    """You should make sure file exists before calling this."""
+    if file_path is None:
+        return None
+    if not os.path.exists(file_path):
+        return None
+    file_path = os.path.normpath(file_path)
+    file_stat = os.stat(file_path)
+    stat_dict = {
+        'atime': file_stat.st_atime
+        , 'mtime': file_stat.st_mtime
+        , 'ctime': file_stat.st_ctime
+        , 'inode': file_stat.st_ino
+        , 'mode': file_stat.st_mode
+        , 'dev': file_stat.st_dev
+        , 'nlink': file_stat.st_nlink
+        , 'uid': file_stat.st_uid
+        , 'gid': file_stat.st_gid
+        , 'size': file_stat.st_size
+        , 'name': os.path.basename(file_path)
+    }
+    return stat_dict
+
+
+def make_stat_request(cloudname, rel_path):
+    msg = make_msg(STAT_FILE_REQUEST)
+    msg['cname'] = cloudname
+    msg['fpath'] = rel_path
+    return json.dumps(msg)
+
+
+def make_stat_response(cloudname, rel_path, file_path):
+    msg = make_msg(STAT_FILE_RESPONSE)
+    msg['cname'] = cloudname
+    msg['fpath'] = rel_path
+    msg['stat'] = make_stat_dict(file_path)
+    return json.dumps(msg)
+
+
+def make_ls_array(file_path):
+    """You should make sure file exists before calling this."""
+    if file_path is None:
+        return None
+    if not os.path.exists(file_path):
+        return None
+    file_path = os.path.normpath(file_path)
+    subdirs = []
+    for f in os.listdir(file_path):
+        subdirs.append(make_stat_dict(f))
+    return subdirs
+
+
+def make_list_files_request(cloudname, rel_path):
+    msg = make_msg(LIST_FILES_REQUEST)
+    msg['cname'] = cloudname
+    msg['fpath'] = rel_path
+    return json.dumps(msg)
+
+
+def make_list_files_response(cloudname, rel_path, file_path):
+    msg = make_msg(LIST_FILES_RESPONSE)
+    msg['cname'] = cloudname
+    msg['fpath'] = rel_path
+    msg['stat'] = make_stat_dict(file_path)
+    msg['ls'] = make_ls_array(file_path)
     return json.dumps(msg)
 
