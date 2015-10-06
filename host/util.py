@@ -20,6 +20,16 @@ def setup_remote_socket(host, port):
     sslSocket = ssl.wrap_socket(s)
     return sslSocket
 
+mylog_name = None
+
+
+def set_mylog_name(name):
+    global mylog_name
+    mylog_name = name
+
 
 def mylog(message):
-    print '{}| {}'.format(datetime.utcnow(), message)
+    if mylog_name is not None:
+        print '{}|[{}] {}'.format(datetime.utcnow(), mylog_name, message)
+    else:
+        print '{}| {}'.format(datetime.utcnow(), message)

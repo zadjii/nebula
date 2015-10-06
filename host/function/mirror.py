@@ -1,6 +1,7 @@
 from datetime import datetime
 import socket
 import getpass
+from sys import stdin
 
 from werkzeug.security import generate_password_hash
 
@@ -47,16 +48,26 @@ def ask_remote_for_id(host, port, db):
     # I've been in kernel land too long, haven't I...
 
 
-def request_cloud(cloud, db):
+def request_cloud(cloud, test_enabled, db):
     sslSocket = setup_remote_socket(cloud.remote_host, cloud.remote_port)
-    # username = raw_input('Enter the username for ' + cloud.name + ':').lower()
-    print('Enter the password for ' + cloud.name + ':')
-    # password = getpass.getpass().lower()
+    if test_enabled:
+        print('please enter username for {}:'.format(cloud.name))
+        username = stdin.readline()[:-1]
+        print('Enter the password for ' + cloud.name + ':')
+        password = stdin.readline()[:-1] # todo this is yea, bad.
+    else:
+        username = raw_input('Enter the username for ' + cloud.name + ':').lower()
+        # print('please enter username for {}:'.format(cloud.name))
+        # username = stdin.readline()[:-1]
+        print('Enter the password for ' + cloud.name + ':')
+        password = getpass.getpass()
+        # password = stdin.readline()[:-1] # todo this is yea, bad.
+
     # password_hash = generate_password_hash(password)
-    username = 'asdf'  # fixme
-    password_hash = 'asdf' # fixme
+    # username = 'asdf'  # fixme
+    # password_hash = 'asdf' # fixme
     write_msg(
-        make_request_cloud_json(cloud.my_id_from_remote, cloud.name, username, password_hash)
+        make_request_cloud_json(cloud.my_id_from_remote, cloud.name, username, password)
         , sslSocket
     )
 
@@ -116,6 +127,7 @@ def mirror(argv):
     port = REMOTE_PORT
     cloudname = None
     root = '.'
+    test_enabled = False
     if len(argv) < 1:
         mirror_usage()
         return
@@ -142,6 +154,9 @@ def mirror(argv):
                 raise Exception('not enough args supplied to mirror')
             root = argv[1]
             args_eaten = 2
+        elif arg == '--test':
+            test_enabled = True
+            args_eaten = 1
         else:
             cloudname = arg
             args_eaten = 1
@@ -163,7 +178,7 @@ def mirror(argv):
     cloud.root_directory = root
     cloud.name = cloudname
     db.session.commit()
-    request_cloud(cloud, db)
+    request_cloud(cloud, test_enabled, db)
     mylog('finished requesting cloud')
     new_rem_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
     send_msg(

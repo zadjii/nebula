@@ -6,6 +6,7 @@ import socket
 from threading import Thread
 from OpenSSL.SSL import SysCallError
 from OpenSSL import SSL
+from host.util import set_mylog_name, mylog
 from remote.function.client_session_setup import setup_client_session
 from remote.function.new_user import new_user
 from remote.function.create import create
@@ -31,7 +32,7 @@ CERT_FILE = 'remote/cert'
 def filter_func(connection, address):
     msg_obj = recv_msg(connection)
     msg_type = msg_obj['type']
-    print 'The message is', msg_obj
+    # print 'The message is', msg_obj
     if msg_type == NEW_HOST_MSG:
         new_host_handler(connection, address, msg_obj)
     elif msg_type == REQUEST_CLOUD:
@@ -157,19 +158,20 @@ def new_host_handler(connection, address, msg_obj):
 
 
 def start(argv):
+    set_mylog_name('nebr')
     context = SSL.Context(SSL.SSLv23_METHOD)
     context.use_privatekey_file(KEY_FILE)
     context.use_certificate_file(CERT_FILE)
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s = SSL.Connection(context, s)
     s.bind((HOST, PORT))
-    print 'Listening on ({},{})'.format(HOST, PORT)
+    mylog('Listening on ({},{})'.format(HOST, PORT))
 
     s.listen(5)
     while True:
         (connection, address) = s.accept()
 
-        print 'Connected by', address
+        mylog('Connected by {}'.format(address))
         # spawn a new thread to handle this connection
         thread = Thread(target=filter_func, args=[connection, address])
         thread.start()

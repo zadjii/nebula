@@ -58,7 +58,10 @@ def setup_client_session(connection, address, msg_obj):
     session.cloud = cloud
     session.user = user
     session.host = host
-    session.uuid = uuid4().__str__()  # todo this is probably bad.
+    sess_uuid = str(uuid4())
+    # sess_uuid = str(uuid4().int)
+    # print 'uuid={}'.format(sess_uuid)
+    session.uuid = sess_uuid  # todo this is probably bad.
     db.session.commit()
     # tell host
     host.send_msg(make_client_session_alert(
@@ -73,5 +76,4 @@ def setup_client_session(connection, address, msg_obj):
     )
 
     print 'I think i setup the session'
-
 

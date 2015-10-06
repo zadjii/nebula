@@ -14,11 +14,11 @@ __author__ = 'Mike'
 def receive_updates_thread():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.bind((HOST_HOST, HOST_PORT))
-    print 'Listening on ({},{})'.format(HOST_HOST, HOST_PORT)
+    mylog('Listening on ({},{})'.format(HOST_HOST, HOST_PORT))
     s.listen(5)
     while True:
         (connection, address) = s.accept()
-        print 'Connected by', address
+        mylog('Connected by {}'.format(address))
         thread = Thread(target=filter_func, args=[connection, address])
         thread.start()
         thread.join()
@@ -135,6 +135,8 @@ def filter_func(connection, address):
     msg_obj = recv_msg(connection)
     msg_type = msg_obj['type']
     print 'The message is', msg_obj
+    # todo we should make sure the connection was from the remote or a client
+    # cont   that we were told about here, before doing ANY processing.
     if msg_type == PREPARE_FOR_FETCH:
         prepare_for_fetch(connection, address, msg_obj)
     elif msg_type == HOST_HOST_FETCH:

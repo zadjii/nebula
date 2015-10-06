@@ -88,6 +88,13 @@ def make_msg(msg_type):
     return {'type': msg_type}
 
 
+def make_session_msg(msg_type, cloudname, session_uuid):
+    msg = make_msg(msg_type)
+    msg['sid'] = session_uuid
+    msg['cname'] = cloudname
+    return msg
+
+
 def decode_msg(msg):
     # print 'decoding\'{}\''.format(msg)
     obj = json.loads(msg)
@@ -229,18 +236,14 @@ def make_client_session_request(cloudname, username, password):
 
 
 def make_client_session_alert(cloudname, user_id, session_id, ip):
-    msg = make_msg(CLIENT_SESSION_ALERT)
-    msg['cname'] = cloudname
+    msg = make_session_msg(CLIENT_SESSION_ALERT, cloudname, session_id)
     msg['uid'] = user_id
-    msg['sid'] = session_id
     msg['ip'] = ip
     return json.dumps(msg)
 
 
 def make_client_session_response(cloudname, session_id, nebs_ip):
-    msg = make_msg(CLIENT_SESSION_ALERT)
-    msg['cname'] = cloudname
-    msg['sid'] = session_id
+    msg = make_session_msg(CLIENT_SESSION_RESPONSE, cloudname, session_id)
     msg['ip'] = nebs_ip
     return json.dumps(msg)
 
