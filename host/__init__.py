@@ -9,6 +9,7 @@ _host_db.engine.echo = False
 from models.Cloud import Cloud
 from models.FileNode import FileNode
 from models.IncomingHostEntry import IncomingHostEntry
+from models.Session import Session
 
 # Cloud.query = host_db.session.query(Cloud)
 # FileNode.query = host_db.session.query(FileNode)
