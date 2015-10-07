@@ -68,10 +68,9 @@ def setup_client_session(connection, address, msg_obj):
         cloudname, user.id, session.uuid, address[0])
     )
 
-
     # tell client
     send_msg(
-        make_client_session_response(cloudname, session.uuid, host.ip)
+        make_client_session_response(cloudname, session.uuid, host.ip,host.port)
         , connection
     )
 

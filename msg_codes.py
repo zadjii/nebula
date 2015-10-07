@@ -248,9 +248,10 @@ def make_client_session_alert(cloudname, user_id, session_id, ip):
     return json.dumps(msg)
 
 
-def make_client_session_response(cloudname, session_id, nebs_ip):
+def make_client_session_response(cloudname, session_id, nebs_ip, nebs_port):
     msg = make_session_msg(CLIENT_SESSION_RESPONSE, cloudname, session_id)
     msg['ip'] = nebs_ip
+    msg['port'] = nebs_port
     return json.dumps(msg)
 
 
@@ -278,9 +279,8 @@ def make_stat_dict(file_path):
     return stat_dict
 
 
-def make_stat_request(cloudname, rel_path):
-    msg = make_msg(STAT_FILE_REQUEST)
-    msg['cname'] = cloudname
+def make_stat_request(cloudname, session_id, rel_path):
+    msg = make_session_msg(STAT_FILE_REQUEST,cloudname, session_id)
     msg['fpath'] = rel_path
     return json.dumps(msg)
 
@@ -306,9 +306,8 @@ def make_ls_array(file_path):
     return subdirs
 
 
-def make_list_files_request(cloudname, rel_path):
-    msg = make_msg(LIST_FILES_REQUEST)
-    msg['cname'] = cloudname
+def make_list_files_request(cloudname, session_id, rel_path):
+    msg = make_session_msg(LIST_FILES_REQUEST,cloudname, session_id)
     msg['fpath'] = rel_path
     return json.dumps(msg)
 

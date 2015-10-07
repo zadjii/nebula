@@ -1,3 +1,4 @@
+import socket
 from subprocess import Popen, call, PIPE
 from host import REMOTE_HOST, REMOTE_PORT
 from host.util import setup_remote_socket
@@ -47,6 +48,21 @@ def client_setup_test():
     print '__ msg:{}__'.format(request)
     response = recv_msg(rem_sock)
     print '__ resp:{}__'.format(response)
+
+    if not (response['type'] == CLIENT_SESSION_RESPONSE):
+        raise Exception('remote did not respond with success')
+    session_id = response['sid']
+    tgt_host_ip = response['ip']
+    tgt_host_port = response['port']
+
+    host_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    host_sock.connect((tgt_host_ip, tgt_host_port))
+    print '__ setup host socket __'
+    send_msg(
+        make_list_files_request('qwer', session_id, '/')
+        , host_sock
+    )
+    response = recv_msg(host_sock)
     sleep(5)
 
     # rem_out = remote_proc.stdout.readall()

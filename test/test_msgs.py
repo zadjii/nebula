@@ -100,7 +100,7 @@ def test_msgs():
     print msg
 
     print '_____Making STAT_FILE_REQUEST[20] json_____'
-    msg = make_stat_request('fake-cloudname', './test_msgs')
+    msg = make_stat_request('fake-cloudname', 'fake-sid', './test_msgs')
     print get_msg_size(msg), decode_msg_size(get_msg_size(msg))
     print msg
 
@@ -124,7 +124,7 @@ def test_msgs():
     print msg
 
     print '_____Making LIST_FILES_REQUEST[22] json_____'
-    msg = make_list_files_request('fake-cloudname', './test_msgs')
+    msg = make_list_files_request('fake-cloudname', 'fake-sid', './test_msgs')
     print get_msg_size(msg), decode_msg_size(get_msg_size(msg))
     print msg
 
