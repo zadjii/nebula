@@ -15,3 +15,30 @@ openssl req -new -x509 -nodes -sha1 -days 365 -key key > cert
 ```
 
 TODO: Find out how do do this w/in python.
+
+To populate the db:
+```
+sh repop.sh
+```
+
+
+To run a remote:
+
+```
+./nebr start
+```
+
+Open a new window and config a host to point to a local directory:
+```
+./nebs mirror -r <remote location> -d <root dir location> <cloudname>
+```
+
+Open a new window to be consumed by host server communications:
+```
+./nebs start
+```
+
+Default remote location is localhost.
+Default cloudname is qwer.
+User/pass is asdf asdf.
+
