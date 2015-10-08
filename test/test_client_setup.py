@@ -1,19 +1,23 @@
 import socket
-from subprocess import Popen, call, PIPE
+
 from host import REMOTE_HOST, REMOTE_PORT
 from host.util import setup_remote_socket
 from test.repop_dbs import repop_dbs
+from test.util import start_nebs_and_nebr, teardown_children
 
 __author__ = 'Mike'
 
-from datetime import datetime
 from time import sleep
 from msg_codes import *
 
-def verify_type_or_teardown(msg, type, remote_proc, host_proc):
+
+remote_proc, host_proc = None, None
+
+
+def verify_type_or_teardown(msg, type):
     if msg['type'] != type:
         print '__that\'s bad, mmkay?__'
-        teardown(remote_proc, host_proc)
+        teardown()
         raise Exception()
 
 
@@ -25,10 +29,7 @@ def create_sock_msg_get_response(ip, port, msg):
 
 
 def create_sock_and_send(ip, port, msg):
-    # print 'i\'m dumb? {} {} {}'.format(msg, ip, port)
     host_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # host_sock.connect((ip, port))
-    # host_sock.connect((str(ip), port))
     host_sock.connect((ip, port))
     send_msg(msg, host_sock)
     return host_sock
@@ -37,30 +38,9 @@ def client_setup_test():
     print '#' * 80
     print '# testing setting up a client session'
     print '#' * 80
+    global host_proc, remote_proc
 
-    remote_proc = Popen('python nebr.py start', shell=True)
-    # remote_proc = call('python nebr.py start')
-    sleep(1)
-    print 'remote pid: {}'.format(remote_proc.pid)
-    sleep(1)
-    host_proc = Popen('python nebs.py mirror --test -r localhost -d test_out/tmp0 qwer', stdin=PIPE, shell=True)
-    print 'host1 pid: {}'.format(host_proc.pid)
-    sleep(1)
-    host_proc.communicate('asdf\nasdf\n')
-    # sleep(1)
-    # host_proc.communicate('asdf')
-    sleep(1)
-
-    print '__ sent asdf asdf __'
-    host_proc.wait()
-    print '__ first host finished __'
-
-    sleep(2)
-    host_proc = Popen('python nebs.py start', shell=True)
-    # remote_proc = call('python nebr.py start')
-    sleep(1)
-    print 'host2 pid: {}'.format(host_proc.pid)
-    # sleep(1)
+    host_proc, remote_proc = start_nebs_and_nebr()
 
     rem_sock = setup_remote_socket(REMOTE_HOST, REMOTE_PORT)
     print '__ setup remote socket __'
@@ -84,16 +64,9 @@ def client_setup_test():
         , tgt_host_port
         , make_list_files_request('qwer', session_id, '.')
     )
-    # host_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # host_sock.connect((tgt_host_ip, tgt_host_port))
-    # print '__ setup host socket __'
-    # send_msg(
-    #     make_list_files_request('qwer', session_id, '.')
-    #     , host_sock
-    # )
-    # response = recv_msg(host_sock)
+
     print response
-    verify_type_or_teardown(response, LIST_FILES_RESPONSE, remote_proc, host_proc)
+    verify_type_or_teardown(response, LIST_FILES_RESPONSE)
 
     resp0 = response
     ls0 = resp0['ls']
@@ -124,7 +97,7 @@ def client_setup_test():
         , make_list_files_request('qwer', session_id, '.')
     )
     print response
-    verify_type_or_teardown(response, LIST_FILES_RESPONSE, remote_proc, host_proc)
+    verify_type_or_teardown(response, LIST_FILES_RESPONSE)
 
     resp1 = response
     ls1 = resp1['ls']
@@ -132,34 +105,31 @@ def client_setup_test():
         len(ls0), len(ls1)
     )
 
-    ls_path(host_proc, remote_proc, session_id, tgt_host_ip, tgt_host_port, './')
-    ls_path(host_proc, remote_proc, session_id, tgt_host_ip, tgt_host_port, './asdf')
-    ls_path(host_proc, remote_proc, session_id, tgt_host_ip, tgt_host_port, './tmp0')
+    ls_path(session_id, tgt_host_ip, tgt_host_port, './')
+    ls_path(session_id, tgt_host_ip, tgt_host_port, './asdf')
+    ls_path(session_id, tgt_host_ip, tgt_host_port, './tmp0')
 
     sleep(5)
-    teardown(remote_proc, host_proc)
+    teardown()
 
 
-def ls_path(host_proc, remote_proc, session_id, tgt_host_ip, tgt_host_port, path):
+def ls_path(session_id, tgt_host_ip, tgt_host_port, path):
     print '__ setting up host socket for ls {}__'.format(path)
     response = create_sock_msg_get_response(
         tgt_host_ip
         , tgt_host_port
         , make_list_files_request('qwer', session_id, path)
     )
-    print '__ {} response={}'.format(path, response)
-    verify_type_or_teardown(response, LIST_FILES_RESPONSE, remote_proc, host_proc)
-    print '__{} contents={}__'.format(path, response['ls'])
+    print '__ ls {} response=({})'.format(path, response)
+    verify_type_or_teardown(response, LIST_FILES_RESPONSE)
+    print '__ {} ls contents=({})'.format(path, response['ls'])
 
-
-def teardown(remote_proc, host_proc):
-    remote_proc.kill()
-    host_proc.kill()
+def teardown():
+    teardown_children([remote_proc, host_proc])
     print '#' * 80
     print '# </CLIENT SETUP TEST>'
     print '#' * 80
-    # print rem_out
-    # sleep(1)
+
 
 if __name__ == '__main__':
     repop_dbs()
