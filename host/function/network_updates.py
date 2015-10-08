@@ -2,8 +2,12 @@ from datetime import datetime
 import socket
 from threading import Thread
 
-from host import get_db, Cloud, IncomingHostEntry, HOST_HOST, HOST_PORT
-from host.function.recv_files import recv_file_tree, recv_file_transfer
+from host import get_db, Cloud, IncomingHostEntry
+from host import HOST_HOST, HOST_PORT
+from host.function.network.client_session_alert import \
+    handle_client_session_alert
+from host.function.network.ls_handler import list_files_handler
+from host.function.recv_files import recv_file_tree
 from host.function.send_files import send_tree
 from host.util import check_response, mylog
 from msg_codes import *
@@ -14,12 +18,12 @@ __author__ = 'Mike'
 def receive_updates_thread():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.bind((HOST_HOST, HOST_PORT))
-    print 'Listening on ({},{})'.format(HOST_HOST, HOST_PORT)
+    mylog('Listening on ({},{})'.format(HOST_HOST, HOST_PORT))
     s.listen(5)
     while True:
         (connection, address) = s.accept()
-        print 'Connected by', address
-        thread = Thread(target=filter_func, args=[connection, address])
+        mylog('Connected by {}'.format(address))
+        thread = Thread(target=filter_func  , args=[connection, address])
         thread.start()
         thread.join()
         # todo: possible that we might want to thread.join here.
@@ -131,10 +135,14 @@ def handle_recv_file(connection, address, msg_obj):
     mylog('[{}]bottom of handle_recv_file(...,{})'
           .format(my_id, msg_obj))
 
+
 def filter_func(connection, address):
+
     msg_obj = recv_msg(connection)
     msg_type = msg_obj['type']
-    print 'The message is', msg_obj
+    # print 'The message is', msg_obj
+    # todo we should make sure the connection was from the remote or a client
+    # cont   that we were told about here, before doing ANY processing.
     if msg_type == PREPARE_FOR_FETCH:
         prepare_for_fetch(connection, address, msg_obj)
     elif msg_type == HOST_HOST_FETCH:
@@ -144,7 +152,52 @@ def filter_func(connection, address):
         print 'COME_FETCH was a really fucking stupid idea.'
     elif msg_type == HOST_FILE_PUSH:
         handle_recv_file(connection, address, msg_obj)
+    elif msg_type == CLIENT_SESSION_ALERT:
+        handle_client_session_alert(connection, address, msg_obj)
+    elif msg_type == STAT_FILE_REQUEST:
+        # fixme
+        pass
+        # handle_recv_file(connection, address, msg_obj)
+    elif msg_type == LIST_FILES_REQUEST:
+        list_files_handler(connection, address, msg_obj)
     else:
         print 'I don\'t know what to do with', msg_obj
     connection.close()
+
+# todo make this work... later
+def filter_func2(connection, address):
+    dont_close = True
+    while dont_close:
+        # keep connection alive and keep processing msgs until reaching an endstate
+        # mostly used for client session type messages
+        msg_obj = recv_msg(connection)
+        msg_type = msg_obj['type']
+        # print 'The message is', msg_obj
+        # todo we should make sure the connection was from the remote or a client
+        # cont   that we were told about here, before doing ANY processing.
+        if msg_type == PREPARE_FOR_FETCH:
+            prepare_for_fetch(connection, address, msg_obj)
+            dont_close = False
+        elif msg_type == HOST_HOST_FETCH:
+            handle_fetch(connection, address, msg_obj)
+            dont_close = False
+        elif msg_type == COME_FETCH:
+            # handle_come_fetch(connection, address, msg_obj)
+            print 'COME_FETCH was a really fucking stupid idea.'
+        elif msg_type == HOST_FILE_PUSH:
+            handle_recv_file(connection, address, msg_obj)
+            dont_close = False
+        elif msg_type == CLIENT_SESSION_ALERT:
+            handle_client_session_alert(connection, address, msg_obj)
+        elif msg_type == STAT_FILE_REQUEST:
+            # fixme
+            pass
+            # handle_recv_file(connection, address, msg_obj)
+        elif msg_type == LIST_FILES_REQUEST:
+            list_files_handler(connection, address, msg_obj)
+        else:
+            print 'I don\'t know what to do with', msg_obj
+            dont_close = False
+    connection.close()
+
 

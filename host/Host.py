@@ -1,4 +1,5 @@
 from host.function.dbg_nodes import dbg_nodes
+from host.util import set_mylog_name
 
 __author__ = 'Mike'
 from threading import Thread
@@ -12,6 +13,7 @@ from msg_codes import *
 
 
 def start(argv):
+    set_mylog_name('nebs')
     # todo process start() args here
     # local_thread = Thread(target=local_update_thread, args=argv)
     network_thread = Thread(target=receive_updates_thread, args=argv)

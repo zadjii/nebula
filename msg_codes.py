@@ -1,5 +1,6 @@
 from _ctypes import sizeof
 import json
+import os
 import struct
 import sys
 
@@ -27,6 +28,16 @@ GET_HOSTS_RESPONSE = 16
 COME_FETCH = 17
 REMOVE_FILE = 18
 HOST_FILE_PUSH = 19
+STAT_FILE_REQUEST = 20
+STAT_FILE_RESPONSE = 21
+LIST_FILES_REQUEST = 22
+LIST_FILES_RESPONSE = 23
+READ_FILE_REQUEST = 24
+READ_FILE_RESPONSE = 25
+
+CLIENT_SESSION_REQUEST = 26  # C->R
+CLIENT_SESSION_ALERT = 27  # R->H
+CLIENT_SESSION_RESPONSE = 28  # R->C
 
 
 def send_unprepared_host_error_and_close(socket):
@@ -42,7 +53,12 @@ def send_generic_error_and_close(socket):
 def recv_msg(socket):
     """Gets a json msg from the socket specified, and decodes into a dict
         for us."""
+    # data = memoryview(bytearray(b" " * 8))
     data = socket.recv(8)
+    # size = 0
+    # while size < 8:
+    #     size = size + socket.recv_into(data[size:], 8 - size)
+
     size = decode_msg_size(data)
     # print 'decoding msg length {}->{}'.format(data, size)
     # todo a while loop to read all the data into a buffer
@@ -82,6 +98,13 @@ def decode_msg_size(long_long):
 
 def make_msg(msg_type):
     return {'type': msg_type}
+
+
+def make_session_msg(msg_type, cloudname, session_uuid):
+    msg = make_msg(msg_type)
+    msg['sid'] = session_uuid
+    msg['cname'] = cloudname
+    return msg
 
 
 def decode_msg(msg):
@@ -206,7 +229,6 @@ def make_remove_file(host_id, cloudname, updated_file):
     return json.dumps(msg)
 
 
-
 def make_host_file_push(tgt_host_id, cloudname, updated_file):
     msg = make_msg(HOST_FILE_PUSH)
     msg['tid'] = tgt_host_id
@@ -214,4 +236,94 @@ def make_host_file_push(tgt_host_id, cloudname, updated_file):
     msg['fpath'] = updated_file
     return json.dumps(msg)
 
+
+def make_client_session_request(cloudname, username, password):
+    msg = make_msg(CLIENT_SESSION_REQUEST)
+    msg['cname'] = cloudname
+    msg['uname'] = username
+    msg['pass'] = password
+    # msg['ip'] = ip  # this we will get from connection
+    return json.dumps(msg)
+
+
+def make_client_session_alert(cloudname, user_id, session_id, ip):
+    msg = make_session_msg(CLIENT_SESSION_ALERT, cloudname, session_id)
+    msg['uid'] = user_id
+    msg['ip'] = ip
+    return json.dumps(msg)
+
+
+def make_client_session_response(cloudname, session_id, nebs_ip, nebs_port):
+    msg = make_session_msg(CLIENT_SESSION_RESPONSE, cloudname, session_id)
+    msg['ip'] = nebs_ip
+    msg['port'] = nebs_port
+    return json.dumps(msg)
+
+
+def make_stat_dict(file_path):
+    """You should make sure file exists before calling this."""
+    if file_path is None:
+        return None
+    if not os.path.exists(file_path):
+        return None
+    file_path = os.path.normpath(file_path)
+    file_stat = os.stat(file_path)
+    stat_dict = {
+        'atime': file_stat.st_atime
+        , 'mtime': file_stat.st_mtime
+        , 'ctime': file_stat.st_ctime
+        , 'inode': file_stat.st_ino
+        , 'mode': file_stat.st_mode
+        , 'dev': file_stat.st_dev
+        , 'nlink': file_stat.st_nlink
+        , 'uid': file_stat.st_uid
+        , 'gid': file_stat.st_gid
+        , 'size': file_stat.st_size
+        , 'name': os.path.basename(file_path)
+    }
+    return stat_dict
+
+
+def make_stat_request(cloudname, session_id, rel_path):
+    msg = make_session_msg(STAT_FILE_REQUEST,cloudname, session_id)
+    msg['fpath'] = rel_path
+    return json.dumps(msg)
+
+
+def make_stat_response(cloudname, rel_path, file_path):
+    msg = make_msg(STAT_FILE_RESPONSE)
+    msg['cname'] = cloudname
+    msg['fpath'] = rel_path
+    msg['stat'] = make_stat_dict(file_path)
+    return json.dumps(msg)
+
+
+def make_ls_array(file_path):
+    """You should make sure file exists before calling this."""
+    if file_path is None:
+        return None
+    if not os.path.exists(file_path):
+        return None
+    file_path = os.path.normpath(file_path)
+    subdirs = []
+    subfiles_list = os.listdir(file_path)
+    # print subfiles_list
+    for f in subfiles_list:
+        subdirs.append(make_stat_dict(os.path.join(file_path, f)))
+    return subdirs
+
+
+def make_list_files_request(cloudname, session_id, rel_path):
+    msg = make_session_msg(LIST_FILES_REQUEST,cloudname, session_id)
+    msg['fpath'] = rel_path
+    return json.dumps(msg)
+
+
+def make_list_files_response(cloudname, rel_path, file_path):
+    msg = make_msg(LIST_FILES_RESPONSE)
+    msg['cname'] = cloudname
+    msg['fpath'] = rel_path
+    msg['stat'] = make_stat_dict(file_path)
+    msg['ls'] = make_ls_array(file_path)
+    return json.dumps(msg)
 

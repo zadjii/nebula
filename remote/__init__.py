@@ -11,6 +11,7 @@ _remote_db.engine.echo = False
 from models.User import User
 from models.Cloud import Cloud
 from models.Host import Host
+from models.Session import Session
 # User.query = remote_db.session.query(User)
 # Cloud.query = remote_db.session.query(Cloud)
 # Host.query = remote_db.session.query(Host)

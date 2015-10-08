@@ -99,3 +99,50 @@ def test_msgs():
     print get_msg_size(msg), decode_msg_size(get_msg_size(msg))
     print msg
 
+    print '_____Making STAT_FILE_REQUEST[20] json_____'
+    msg = make_stat_request('fake-cloudname', 'fake-sid', './test_msgs')
+    print get_msg_size(msg), decode_msg_size(get_msg_size(msg))
+    print msg
+
+    print '_____Making STAT_FILE_RESPONSE[21] json_____'
+    path = os.path.join(sys.path[0], 'run_tests.py')
+    print path
+    msg = make_stat_response('fake-cloudname', './run_tests.py', path)
+    print get_msg_size(msg), decode_msg_size(get_msg_size(msg))
+    print msg
+
+    path = sys.path[0]  # os.path.join(sys.path[0], '.')
+    print path
+    msg = make_stat_response('fake-cloudname', '.', path)
+    print get_msg_size(msg), decode_msg_size(get_msg_size(msg))
+    print msg
+
+    path = os.path.join(sys.path[0], '..')
+    print path
+    msg = make_stat_response('fake-cloudname', '..', path)
+    print get_msg_size(msg), decode_msg_size(get_msg_size(msg))
+    print msg
+
+    print '_____Making LIST_FILES_REQUEST[22] json_____'
+    msg = make_list_files_request('fake-cloudname', 'fake-sid', './test_msgs')
+    print get_msg_size(msg), decode_msg_size(get_msg_size(msg))
+    print msg
+
+    print '_____Making LIST_FILES_RESPONSE[23] json_____'
+    path = os.path.join(sys.path[0], 'run_tests.py')
+    print path
+    # msg = make_list_files_response('fake-cloudname', './run_tests.py', path)
+    print get_msg_size(msg), decode_msg_size(get_msg_size(msg))
+    print msg
+
+    path = sys.path[0]  # os.path.join(sys.path[0], '.')
+    print path
+    msg = make_list_files_response('fake-cloudname', '.', path)
+    print get_msg_size(msg), decode_msg_size(get_msg_size(msg))
+    print msg
+
+    path = os.path.join(sys.path[0], '..')
+    print path
+    msg = make_list_files_response('fake-cloudname', '..', path)
+    print get_msg_size(msg), decode_msg_size(get_msg_size(msg))
+    print msg

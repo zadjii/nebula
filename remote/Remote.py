@@ -6,6 +6,8 @@ import socket
 from threading import Thread
 from OpenSSL.SSL import SysCallError
 from OpenSSL import SSL
+from host.util import set_mylog_name, mylog
+from remote.function.client_session_setup import setup_client_session
 from remote.function.new_user import new_user
 from remote.function.create import create
 
@@ -30,7 +32,7 @@ CERT_FILE = 'remote/cert'
 def filter_func(connection, address):
     msg_obj = recv_msg(connection)
     msg_type = msg_obj['type']
-    print 'The message is', msg_obj
+    # print 'The message is', msg_obj
     if msg_type == NEW_HOST_MSG:
         new_host_handler(connection, address, msg_obj)
     elif msg_type == REQUEST_CLOUD:
@@ -39,6 +41,8 @@ def filter_func(connection, address):
         mirror_complete(connection, address, msg_obj)
     elif msg_type == GET_HOSTS_REQUEST:
         respond_to_get_hosts_request(connection, address, msg_obj)
+    elif msg_type == CLIENT_SESSION_REQUEST:
+        setup_client_session(connection, address, msg_obj)
     else:
         print 'I don\'t know what to do with', msg_obj
     connection.close()
@@ -114,24 +118,25 @@ def host_request_cloud(connection, address, msg_obj):
     # print 'Here, they will have successfully been able to mirror?'
     ip = '0'
     port = 0
-    rand_host = match.hosts.first()
+    rand_host = match.hosts.first()  #todo make this random
     if rand_host is not None:
-        ip = rand_host.ip
-        port = rand_host.port
-        print 'rand host is ({},{})'.format(ip, port)
-        context = SSL.Context(SSL.SSLv23_METHOD)
-        context.use_privatekey_file(KEY_FILE)
-        context.use_certificate_file(CERT_FILE)
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-        # s = SSL.Connection(context, s)
-        # whatever fuck it lets just assume it's good todo
-
-        s.connect((ip, port))
         prep_for_fetch_msg = make_prepare_for_fetch_json(host_id, cloudname, address[0])
-        send_msg(prep_for_fetch_msg, s)
-        print 'nebr completed talking to rand_host'
-        s.close()
+        rand_host.send_msg(prep_for_fetch_msg)
+        # ip = rand_host.ip
+        # port = rand_host.port
+        # print 'rand host is ({},{})'.format(ip, port)
+        # context = SSL.Context(SSL.SSLv23_METHOD)
+        # context.use_privatekey_file(KEY_FILE)
+        # context.use_certificate_file(CERT_FILE)
+        # s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        #
+        # # s = SSL.Connection(context, s)
+        # # whatever fuck it lets just assume it's good todo
+        #
+        # s.connect((ip, port))
+        # send_msg(prep_for_fetch_msg, s)
+        # print 'nebr completed talking to rand_host'
+        # s.close()
 
     send_msg(make_go_retrieve_here_json(0, ip, port), connection)
 
@@ -153,19 +158,20 @@ def new_host_handler(connection, address, msg_obj):
 
 
 def start(argv):
+    set_mylog_name('nebr')
     context = SSL.Context(SSL.SSLv23_METHOD)
     context.use_privatekey_file(KEY_FILE)
     context.use_certificate_file(CERT_FILE)
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s = SSL.Connection(context, s)
     s.bind((HOST, PORT))
-    print 'Listening on ({},{})'.format(HOST, PORT)
+    mylog('Listening on ({},{})'.format(HOST, PORT))
 
     s.listen(5)
     while True:
         (connection, address) = s.accept()
 
-        print 'Connected by', address
+        mylog('Connected by {}'.format(address))
         # spawn a new thread to handle this connection
         thread = Thread(target=filter_func, args=[connection, address])
         thread.start()
