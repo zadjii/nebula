@@ -29,6 +29,10 @@ class Cloud(db.Base):
     incoming_hosts = relationship('IncomingHostEntry', backref='cloud', lazy='dynamic')
     completed_mirroring = Column(Boolean, default=False)
 
+    def translate_relative_path(self, rel_path):
+        full_path = os.path.join(self.root_directory, rel_path)
+        return full_path
+
     # we might end up needing the message
     def create_or_update_node(self, full_path, file_transfer_msg, db):
         # msg = file_transfer_msg

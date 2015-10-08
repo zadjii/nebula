@@ -59,14 +59,53 @@ def client_setup_test():
     host_sock.connect((tgt_host_ip, tgt_host_port))
     print '__ setup host socket __'
     send_msg(
-        make_list_files_request('qwer', session_id, '/')
+        make_list_files_request('qwer', session_id, '.')
         , host_sock
     )
     response = recv_msg(host_sock)
+    print response
+    if response['type'] != LIST_FILES_RESPONSE:
+        print '__that\'s bad, mmkay?__'
+        teardown(remote_proc, host_proc)
+        return
     sleep(5)
+    resp0 = response
+    ls0 = resp0['ls']
 
-    # rem_out = remote_proc.stdout.readall()
-    # remote_proc.kill()
+    os.makedirs('test_out/tmp0/qwer')
+    os.makedirs('test_out/tmp0/asdf')
+    os.makedirs('test_out/tmp0/asdf/foo')
+    os.makedirs('test_out/tmp0/zxcv')
+    print '__ made some new dirs__'
+    sleep(1)
+    print '__ checking for new dirs__'
+    # host_sock.close()  #todo this is dumb
+    # cont we should be able to reuse the connection.
+    # but there's a lot of ways that could go wrong... right?
+    # host_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # host_sock.connect((tgt_host_ip, tgt_host_port))
+
+    send_msg(
+        make_list_files_request('qwer', session_id, '.')
+        , host_sock
+    )
+    response = recv_msg(host_sock)
+    print response
+    if response['type'] != LIST_FILES_RESPONSE:
+        print '__that\'s bad, mmkay?__'
+        teardown(remote_proc, host_proc)
+        return
+    resp1 = response
+    ls1 = resp1['ls']
+    print '__these should be different {}!={}__'.format(
+        len(ls0), len(ls1)
+    )
+
+    sleep(5)
+    teardown(remote_proc, host_proc)
+
+
+def teardown(remote_proc, host_proc):
     remote_proc.kill()
     host_proc.kill()
     print '#' * 80
@@ -78,4 +117,5 @@ def client_setup_test():
 if __name__ == '__main__':
     repop_dbs()
     client_setup_test()
+    # fixme make sure I kill all children before exiting
 
