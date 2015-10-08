@@ -53,7 +53,12 @@ def send_generic_error_and_close(socket):
 def recv_msg(socket):
     """Gets a json msg from the socket specified, and decodes into a dict
         for us."""
+    # data = memoryview(bytearray(b" " * 8))
     data = socket.recv(8)
+    # size = 0
+    # while size < 8:
+    #     size = size + socket.recv_into(data[size:], 8 - size)
+
     size = decode_msg_size(data)
     # print 'decoding msg length {}->{}'.format(data, size)
     # todo a while loop to read all the data into a buffer
@@ -301,8 +306,10 @@ def make_ls_array(file_path):
         return None
     file_path = os.path.normpath(file_path)
     subdirs = []
-    for f in os.listdir(file_path):
-        subdirs.append(make_stat_dict(f))
+    subfiles_list = os.listdir(file_path)
+    # print subfiles_list
+    for f in subfiles_list:
+        subdirs.append(make_stat_dict(os.path.join(file_path, f)))
     return subdirs
 
 

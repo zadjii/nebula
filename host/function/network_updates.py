@@ -23,7 +23,7 @@ def receive_updates_thread():
     while True:
         (connection, address) = s.accept()
         mylog('Connected by {}'.format(address))
-        thread = Thread(target=filter_fun2c, args=[connection, address])
+        thread = Thread(target=filter_func  , args=[connection, address])
         thread.start()
         thread.join()
         # todo: possible that we might want to thread.join here.
@@ -164,10 +164,12 @@ def filter_func(connection, address):
         print 'I don\'t know what to do with', msg_obj
     connection.close()
 
-
+# todo make this work... later
 def filter_func2(connection, address):
     dont_close = True
     while dont_close:
+        # keep connection alive and keep processing msgs until reaching an endstate
+        # mostly used for client session type messages
         msg_obj = recv_msg(connection)
         msg_type = msg_obj['type']
         # print 'The message is', msg_obj

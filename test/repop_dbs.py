@@ -3,19 +3,19 @@ import shutil
 from subprocess import Popen
 
 __author__ = 'Mike'
-reset_dbs = Popen('reset_dbs.bat')
 
 
 def repop_dbs():
-    global reset_dbs
+    # print os.curdir
+    # print os.listdir(os.curdir)
     if os.name == 'nt':
-        pass
+        reset_dbs = Popen('reset_dbs.bat')
     else:
-        reset_dbs = Popen('sh reset_dbs.sh')
+        reset_dbs = Popen('bash ./reset_dbs.sh', shell=True)
     reset_dbs.wait()
     print '#' * 80
 
-    autopop = Popen('python db_autopopulate_000.py')
+    autopop = Popen('python db_autopopulate_000.py', shell=True)
     autopop.wait()
     print '# DBs repop\'d'
     print '#' * 80
