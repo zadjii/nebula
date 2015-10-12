@@ -4,6 +4,7 @@ from sys import stdin
 from host import REMOTE_PORT
 from host.util import setup_remote_socket
 from msg_codes import *
+from nebsh import mylog
 
 __author__ = 'Mike'
 
@@ -53,14 +54,14 @@ class NebshClient(object):
             , self.tgt_host_port
             , make_list_files_request(self.cname, self.session_id, '.')
         )
-        print response
+        mylog.log_dbg(response)
         self.cwd = response['fpath']
         self.subdir_cache = response['ls']
         while not self.exit_requested:
             inline = raw_input(do_prompt(self.cname, self.cwd))
             # tokenize that shit
             inarray = inline.split(' ')  # todo any whitespace
-            print inarray
+            mylog.log_dbg(inarray)
             command = inarray[0]
             if command == 'exit':
                 self.exit_requested = True
@@ -99,7 +100,7 @@ class NebshClient(object):
         pass
     
     def cd(self, argv):
-        print 'cd [{}]'.format(argv[1:])
+        mylog.log_dbg('cd [{}]'.format(argv[1:]))
         dir = argv[-1]
         # if dir in [stat.name for stat in self.subdir_cache]:
         #     self.cwd = os.path.join(self.cwd, dir)
@@ -164,6 +165,10 @@ def process_args(argv):
             args_eaten = 2
         elif arg == '--test':
             test_enabled = True
+            mylog.set_mylog_verbose()
+            args_eaten = 1
+        elif arg == '--debug':
+            mylog.set_mylog_dbg()
             args_eaten = 1
         else:
             cloudname = arg
