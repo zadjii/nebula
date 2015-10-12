@@ -22,6 +22,7 @@ class NebshClient(object):
 
         self.cwd = None
         self.exit_requested = False
+        self.subdir_cache = None
 
     def main(self):
 
@@ -54,6 +55,7 @@ class NebshClient(object):
         )
         print response
         self.cwd = response['fpath']
+        self.subdir_cache = response['ls']
         while not self.exit_requested:
             inline = raw_input(do_prompt(self.cname, self.cwd))
             # tokenize that shit
@@ -64,6 +66,8 @@ class NebshClient(object):
                 self.exit_requested = True
             elif command == 'ls':
                 self.ls(inarray)
+            elif command == 'cd':
+                self.cd(inarray)
 
     def ls(self, argv):
         # print 'ls [{}]'.format(argv[1:])
@@ -94,8 +98,24 @@ class NebshClient(object):
     def pwd(self, argv):
         pass
     
-    def cd(self):
-        pass
+    def cd(self, argv):
+        print 'cd [{}]'.format(argv[1:])
+        dir = argv[-1]
+        # if dir in [stat.name for stat in self.subdir_cache]:
+        #     self.cwd = os.path.join(self.cwd, dir)
+        rel_path = os.path.join(self.cwd, dir)
+        response = create_sock_msg_get_response(
+            self.tgt_host_ip
+            , self.tgt_host_port
+            , make_list_files_request(self.cname, self.session_id, rel_path)
+        )
+        if response['type'] != LIST_FILES_RESPONSE:
+            print 'Error during cd:{}'.format(response)
+            return
+        self.cwd = os.path.join(self.cwd, dir)
+        self.cwd = os.path.normpath(self.cwd)
+        self.subdir_cache = response['ls']
+
 
 def create_sock_msg_get_response(ip, port, msg):
     sock = create_sock_and_send(ip, port, msg)
@@ -115,6 +135,7 @@ def nebsh_usage():
     print 'usage: nebsh [--test][-r address][-p port]' + \
         '[cloudname]'
     print ''
+
 
 def process_args(argv):
     host = None
@@ -158,65 +179,16 @@ def process_args(argv):
     return (test_enabled, host, port, cloudname)
 
 
-
 def main(argv):
     print 'Nebula shell, v0'
     nebsh = NebshClient(argv)
     nebsh.main()
-    # testing, rem_addr, rem_port, cname = process_args(argv)
-    # rem_sock = setup_remote_socket(rem_addr, rem_port)
-    # # todo prompt for uname, pass
-    #
-    # if testing:
-    #     print('please enter username for {}:'.format(cname))
-    #     username = stdin.readline()[:-1]
-    #     print('Enter the password for ' + cname + ':')
-    #     password = stdin.readline()[:-1]  # todo this is yea, bad.
-    # else:
-    #     username = raw_input('Enter the username for ' + cname + ':').lower()
-    #     # print('Enter the password for ' + cname + ':')
-    #     password = getpass.getpass('Enter the password for ' + cname + ':')
-    #
-    # request = make_client_session_request(cname, username, password)
-    # send_msg(request, rem_sock)
-    # response = recv_msg(rem_sock)
-    # print '__ resp:{}__'.format(response)
-    # if not (response['type'] == CLIENT_SESSION_RESPONSE):
-    #     raise Exception('remote did not respond with success')
-    # session_id = response['sid']
-    # tgt_host_ip = response['ip']
-    # tgt_host_port = response['port']
-    #
-    # print '__ setting up host socket __'
-    #
-    # # todo move these to global awshelper utils
-    # response = create_sock_msg_get_response(
-    #     tgt_host_ip
-    #     , tgt_host_port
-    #     , make_list_files_request(cname, session_id, '.')
-    # )
-    # exit_requested = False
-    # cwd = './'
-    # while not exit_requested:
-    #     inline = raw_input(do_prompt(cname, cwd))
-    #     # todo tokenize that shit
-    #     inarray = inline.split(' ')
-    #     print inarray
-    #     command = inarray[0]
-    #     if command == 'exit':
-    #         exit_requested = True
-    #     elif command == 'ls':
-    #         # print 'ls [{}]'.format(inline[3:])
-    #         response = create_sock_msg_get_response(
-    #             tgt_host_ip
-    #             , tgt_host_port
-    #             , make_list_files_request(cname, session_id, inarray[1])
-    #         )
-    #         # print response
-    #         if response is not None:
-    #             for child in response['ls']:
-    #                 print child['name']
+
 
 def do_prompt(cname, rel_path):
+    if rel_path == '.':
+        rel_path = '/'
+    else:
+        rel_path = '/' + rel_path
     return '{}:{}>'.format(cname, rel_path)
 
