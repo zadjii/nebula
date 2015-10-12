@@ -105,7 +105,7 @@ def request_cloud(cloud, test_enabled, db):
 
 
 def mirror_usage():
-    print 'usage: neb mirror [-r address][-p port]' + \
+    print 'usage: neb mirror [--test][-r address][-p port]' + \
         '[-d root directory][cloudname]'
     print ''
 

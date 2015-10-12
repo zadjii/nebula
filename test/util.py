@@ -1,3 +1,4 @@
+import os
 from subprocess import Popen, PIPE
 from time import sleep
 from test.repop_dbs import repop_dbs
@@ -40,12 +41,36 @@ def teardown_children(children):
     # print rem_out
     # sleep(1)
 
+def populate_test_filesystem():
+    print '#' * 80
+    print '# populating some dirs'
+    os.makedirs('test_out/tmp0/qwer')
+    os.makedirs('test_out/tmp0/asdf')
+    os.makedirs('test_out/tmp0/asdf/foo')
+    os.makedirs('test_out/tmp0/zxcv')
+    fd = open('test_out/tmp0/asdf/helloworld_root.txt', mode='wb')
+    fd.write('Hello nebula!')
+    fd.close()
+    fd = open('test_out/tmp0/asdf/AHAHAHA.txt', mode='wb')
+    fd.write('WAHAHAHAHA')
+    fd.close()
+    fd = open('test_out/tmp0/asdf/foo/helloworld.txt', mode='wb')
+    fd.write('Hello nebula!\nThis is in ./asdf/foo/helloworld.txt')
+    fd.close()
+    fd = open('test_out/tmp0/asdf/foo/bar', mode='wb')
+    fd.write('foobar'*100)
+    fd.close()
+
+
+
 
 def make_fresh_test_env():
     repop_dbs()
+    populate_test_filesystem()
     host, remote = None, None
     try:
         host, remote = start_nebs_and_nebr()
+        print '##### READY TO GO #####'
         host.wait()
         remote.wait()
     except Exception, e:

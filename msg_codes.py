@@ -306,6 +306,10 @@ def make_ls_array(file_path):
         return None
     file_path = os.path.normpath(file_path)
     subdirs = []
+    if not os.path.isdir(file_path):
+        # fixme this should somehow indicate the path was not a dir
+        # cont not just that it had no children
+        return subdirs
     subfiles_list = os.listdir(file_path)
     # print subfiles_list
     for f in subfiles_list:
