@@ -23,7 +23,7 @@ def receive_updates_thread():
     while True:
         (connection, address) = s.accept()
         mylog('Connected by {}'.format(address))
-        thread = Thread(target=filter_func  , args=[connection, address])
+        thread = Thread(target=filter_func, args=[connection, address])
         thread.start()
         thread.join()
         # todo: possible that we might want to thread.join here.

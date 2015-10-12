@@ -5,6 +5,8 @@ import struct
 import sys
 
 __author__ = 'zadjii'
+FILE_IS_NOT_DIR_ERROR = -5
+FILE_IS_DIR_ERROR = -4
 UNPREPARED_HOST_ERROR = -3
 AUTH_ERROR = -2
 GENERIC_ERROR = -1
@@ -40,14 +42,29 @@ CLIENT_SESSION_ALERT = 27  # R->H
 CLIENT_SESSION_RESPONSE = 28  # R->C
 
 
-def send_unprepared_host_error_and_close(socket):
-    send_msg(json.dumps(make_msg(UNPREPARED_HOST_ERROR)), socket)
+def send_msg_and_close(message_dict, socket):
+    send_msg(json.dumps(message_dict), socket)
     socket.close()
+
+
+def send_file_is_not_dir_error_and_close(filename, socket):
+    msg = make_msg(FILE_IS_NOT_DIR_ERROR)
+    msg['path'] = filename
+    send_msg_and_close(msg, socket)
+
+
+def send_file_is_dir_error_and_close(filename, socket):
+    msg = make_msg(FILE_IS_DIR_ERROR)
+    msg['path'] = filename
+    send_msg_and_close(msg, socket)
+
+
+def send_unprepared_host_error_and_close(socket):
+    send_msg_and_close(make_msg(UNPREPARED_HOST_ERROR), socket)
 
 
 def send_generic_error_and_close(socket):
-    send_msg(json.dumps(make_msg(GENERIC_ERROR)), socket)
-    socket.close()
+    send_msg_and_close(make_msg(GENERIC_ERROR), socket)
 
 
 def recv_msg(socket):
