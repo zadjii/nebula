@@ -65,10 +65,22 @@ class NebshClient(object):
             command = inarray[0]
             if command == 'exit':
                 self.exit_requested = True
+            if '--local' in inarray or '-\\l' in inarray:
+                self.local_command(command, inarray)
             elif command == 'ls':
                 self.ls(inarray)
             elif command == 'cd':
                 self.cd(inarray)
+            elif command == 'pwd':
+                self.pwd(inarray)
+
+    def local_command(self, command, argv):
+        if command == 'ls':
+            self.local_ls(argv)
+        elif command == 'cd':
+            self.local_cd(argv)
+        elif command == 'pwd':
+            self.local_pwd(argv)
 
     def ls(self, argv):
         # print 'ls [{}]'.format(argv[1:])
@@ -90,6 +102,20 @@ class NebshClient(object):
             for child in response['ls']:
                 print child['name']
 
+    def local_ls(self, argv):
+        cwd = os.path.curdir
+        if not os.path.isdir(cwd):
+            print '{} is not a directory'.format(cwd)
+        else:
+            children = os.listdir(cwd)
+            for child in children:
+                print child
+
+    def local_cd(self, argv):
+        cwd = os.getcwd()
+        # fixme make sure this works
+        os.chdir(argv[-1])
+
     def stat(self, argv):
         pass
 
@@ -97,8 +123,12 @@ class NebshClient(object):
         pass
 
     def pwd(self, argv):
-        pass
-    
+        print self.cwd
+
+    def local_pwd(self, argv):
+        cwd = os.getcwd()
+        print cwd
+
     def cd(self, argv):
         mylog.log_dbg('cd [{}]'.format(argv[1:]))
         dir = argv[-1]
