@@ -281,7 +281,13 @@ def send_file_to_host(session_id, cloudname, local_path, neb_path, recurse, sock
             mylog.log_dbg('Sending children of <{}>={}'.format(local_path, subdirectories))
             for f in subdirectories:
                 send_file_to_host(
-                    session_id, cloudname, os.path.join(local_path, f), recurse, socket_conn)
+                    session_id
+                    , cloudname
+                    , os.path.join(local_path, f)
+                    , os.path.join(neb_path, f)
+                    , recurse
+                    , socket_conn
+                )
     else:
         req_file_size = req_file_stat.st_size
         requested_file = open(local_path, 'rb')
