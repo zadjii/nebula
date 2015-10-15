@@ -105,6 +105,7 @@ class NebshClient(object):
         #     make_client_file_transfer(self.cname, self.session_id, rel_path, is_dir, filesize)
         #     , host_sock
         # )
+        complete_sending_files(self.cname, self.session_id, host_sock)
 
     def ls(self, argv):
         # print 'ls [{}]'.format(argv[1:])
@@ -308,4 +309,13 @@ def send_file_to_host(session_id, cloudname, local_path, neb_path, recurse, sock
         )
 
         requested_file.close()
+
+
+def complete_sending_files(cloudname, session_id, socket_conn):
+    send_msg(
+        make_client_file_transfer(cloudname, session_id, None, None, None)
+        , socket_conn
+    )
+    mylog.log_dbg('[{}] completed sending files to [{}]'
+                  .format(session_id, cloudname))
 
