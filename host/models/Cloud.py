@@ -28,6 +28,7 @@ class Cloud(db.Base):
     remote_port = Column(Integer)
     incoming_hosts = relationship('IncomingHostEntry', backref='cloud', lazy='dynamic')
     completed_mirroring = Column(Boolean, default=False)
+    sessions = relationship('Session', backref='cloud', lazy='dynamic')
 
     def translate_relative_path(self, rel_path):
         full_path = os.path.join(self.root_directory, rel_path)

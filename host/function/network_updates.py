@@ -2,7 +2,7 @@ from datetime import datetime
 import socket
 from threading import Thread
 
-from host import get_db, Cloud, IncomingHostEntry
+from host import get_db, Cloud, IncomingHostEntry, Session
 from host import HOST_HOST, HOST_PORT
 from host.function.network.client_session_alert import \
     handle_client_session_alert
@@ -95,6 +95,59 @@ def handle_fetch(connection, address, msg_obj):
 
     send_tree(other_id, matching_cloud, requested_root, connection)
 
+
+def handle_recv_file_from_client(connection, address, msg_obj):
+    db = get_db()
+    # my_id = msg_obj['tid']
+    session_uuid = msg_obj['sid']
+    cloudname = msg_obj['cname']
+    updated_file = msg_obj['fpath']
+    their_ip = address[0]
+    matching_session = db.session.query(Session).filter_by(uuid=session_uuid).first()
+    if matching_session is None:
+        send_generic_error_and_close(connection)
+        mylog('ERR: got a CLIENT_._PUT from {} but I don\'t have that session'.format(session_uuid))
+    # matching_id_clouds = db.session.query(Cloud)\
+    #     .filter(Cloud.my_id_from_remote == my_id)
+    # if matching_id_clouds.count() <= 0:
+    #     send_generic_error_and_close(connection)
+    #     raise Exception(
+    #         'Received a message intended for id={},'
+    #         ' but I don\'t have any clouds with that id'
+    #         .format(my_id)
+    #     )
+    #
+    matching_cloud = matching_session.cloud
+    if matching_cloud is None:
+        send_generic_error_and_close(connection)
+        raise Exception(
+            'The session {} didn\'t have a cloud associated with it'
+        )
+    # matching_cloud = matching_id_clouds.filter_by(name=cloudname).first()
+    if not (matching_cloud.name == cloudname):
+        send_generic_error_and_close(connection)
+        raise Exception(
+            '{} came asking for cloudname=\'{}\','
+            ' however, their cloud doesn\'t match that'
+            .format(session_uuid, cloudname)
+        )
+    # matching_entry = db.session.query(IncomingHostEntry).filter_by(their_address=their_ip).first()
+    # if matching_entry is None:
+    #     send_unprepared_host_error_and_close(connection)
+    #     raise Exception(
+    #         'host came asking for cloudname=\'' + cloudname + '\''
+    #         + ', but I was not told to expect them.'
+    #     )
+    response = recv_msg(connection)
+    resp_type = response['type']
+    # print 'host_host_fetch response:{}'.format(response)
+    check_response(CLIENT_FILE_TRANSFER, resp_type)
+
+    recv_file_tree(response, matching_cloud, connection, db)
+    mylog('[{}]bottom of handle_recv_file_from_client(...,{})'
+          .format(session_uuid, msg_obj))
+
+
 def handle_recv_file(connection, address, msg_obj):
     db = get_db()
     my_id = msg_obj['tid']
@@ -160,6 +213,8 @@ def filter_func(connection, address):
         # handle_recv_file(connection, address, msg_obj)
     elif msg_type == LIST_FILES_REQUEST:
         list_files_handler(connection, address, msg_obj)
+    elif msg_type == CLIENT_FILE_PUT:
+        handle_recv_file_from_client(connection, address, msg_obj)
     else:
         print 'I don\'t know what to do with', msg_obj
     connection.close()

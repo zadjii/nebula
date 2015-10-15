@@ -11,7 +11,9 @@ def list_files_handler(connection, address, msg_obj):
     cloudname = msg_obj['cname']
     rel_path = msg_obj['fpath']
     db = get_db()
-    # todo match session to session object
+    # FIXME match session to session object
+    # todo make sure to do the host that has this sid, esp if more than one
+    # cont   host for this cloud is on this process
     # todo validate that the conn.ip == session ip
     cloud = db.session.query(Cloud).filter_by(name=cloudname).first()
     if cloud is None:

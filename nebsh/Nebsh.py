@@ -1,5 +1,6 @@
 import getpass
 import socket
+from stat import S_ISDIR
 from sys import stdin
 from host import REMOTE_PORT
 from host.util import setup_remote_socket
@@ -73,6 +74,8 @@ class NebshClient(object):
                 self.cd(inarray)
             elif command == 'pwd':
                 self.pwd(inarray)
+            elif command == 'nput':
+                self.nput(inarray)
 
     def local_command(self, command, argv):
         if command == 'ls':
@@ -81,6 +84,27 @@ class NebshClient(object):
             self.local_cd(argv)
         elif command == 'pwd':
             self.local_pwd(argv)
+
+    def nput(self, argv):
+        """ nput [-r] <LOCAL path> <NEB path> """
+        if len(argv) < 3:  # nput, from, to
+            print 'not enough args for nput'
+            return
+        recursive = '-r' in argv
+        local_path = argv[-2]
+        rel_path = argv[-1]
+        host_sock = create_sock_and_send(
+            self.tgt_host_ip
+            , self.tgt_host_port
+            , make_client_file_put(self.cname, self.session_id, rel_path)
+        )
+
+        send_file_to_host(self.session_id, self.cname, local_path, rel_path, recursive, host_sock)
+        mylog.log_dbg('bottom of nput?')
+        # send_msg(
+        #     make_client_file_transfer(self.cname, self.session_id, rel_path, is_dir, filesize)
+        #     , host_sock
+        # )
 
     def ls(self, argv):
         # print 'ls [{}]'.format(argv[1:])
@@ -226,4 +250,62 @@ def do_prompt(cname, rel_path):
     else:
         rel_path = '/' + rel_path
     return '{}:{}>'.format(cname, rel_path)
+
+
+def send_file_to_host(session_id, cloudname, local_path, neb_path, recurse, socket_conn):
+    """
+    Assumes that the other host was already verified, and the cloud is non-null
+    """
+    req_file_stat = os.stat(local_path)
+
+    # relative_pathname = os.path.relpath(filepath, cloud.root_directory)
+    # print 'relpath({}) in \'{}\' is <{}>'.format(filepath, cloud.name, relative_pathname)
+
+    req_file_is_dir = S_ISDIR(req_file_stat.st_mode)
+    if req_file_is_dir:
+        # if neb_path != '.':  # todo: I think this we don't need; should test.
+        # cont either way, need to determine cases for '.', '/', '..', etc todo<
+        send_msg(
+            make_client_file_transfer(
+                cloudname
+                , session_id
+                , neb_path
+                , req_file_is_dir
+                , 0
+            )
+            , socket_conn
+        )
+        if recurse:
+            subdirectories = os.listdir(local_path)
+            mylog.log_dbg('Sending children of <{}>={}'.format(local_path, subdirectories))
+            for f in subdirectories:
+                send_file_to_host(
+                    session_id, cloudname, os.path.join(local_path, f), recurse, socket_conn)
+    else:
+        req_file_size = req_file_stat.st_size
+        requested_file = open(local_path, 'rb')
+        send_msg(
+            make_client_file_transfer(
+                cloudname
+                , session_id
+                , neb_path
+                , req_file_is_dir
+                , req_file_size
+            )
+            , socket_conn
+        )
+        l = 1
+        while l:
+            new_data = requested_file.read(1024)
+            l = socket_conn.send(new_data)
+            # mylog(
+            #     '[{}]Sent {}B of file<{}> data'
+            #     .format(cloud.my_id_from_remote, l, filepath)
+            # )
+        mylog.log_dbg(
+            '[{}]Sent <{}> data to host'
+            .format(session_id, local_path)
+        )
+
+        requested_file.close()
 

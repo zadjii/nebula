@@ -27,4 +27,7 @@ def handle_client_session_alert(connection, address, msg_obj):
     new_sess.created_on = datetime.utcnow()
     new_sess.last_refresh = new_sess.created_on
     new_sess.client_ip = client_ip
+    cloud.sessions.append(new_sess)
     db.session.commit()
+
+

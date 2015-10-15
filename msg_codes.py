@@ -41,6 +41,9 @@ CLIENT_SESSION_REQUEST = 26  # C->R
 CLIENT_SESSION_ALERT = 27  # R->H
 CLIENT_SESSION_RESPONSE = 28  # R->C
 
+CLIENT_FILE_PUT = 29  # C->H
+CLIENT_FILE_TRANSFER = 30 # C->H
+
 
 def send_msg_and_close(message_dict, socket):
     send_msg(json.dumps(message_dict), socket)
@@ -228,15 +231,6 @@ def make_get_hosts_response(cloud):
     msg['hosts'] = host_jsons
     return json.dumps(msg)
 
-#
-# def make_come_fetch(host_id, port, cloudname, updated_file):
-#     msg = make_msg(COME_FETCH)
-#     msg['id'] = host_id  # The id of the recipient
-#     msg['port'] = port  # my address, don't need ip, they'll get that from the connection
-#     msg['cname'] = cloudname
-#     msg['root'] = updated_file
-#     return json.dumps(msg)
-
 
 def make_remove_file(host_id, cloudname, updated_file):
     msg = make_msg(REMOVE_FILE)
@@ -348,3 +342,20 @@ def make_list_files_response(cloudname, rel_path, file_path):
     msg['ls'] = make_ls_array(file_path)
     return json.dumps(msg)
 
+
+
+def make_client_file_put(cloudname, session_id, updated_file):
+    msg = make_session_msg(CLIENT_FILE_PUT, cloudname, session_id)
+    # msg['tid'] = tgt_host_id  # note: won't know the host id, host
+    # cont proc will differentiate based on sid
+    msg['fpath'] = updated_file
+    return json.dumps(msg)
+
+
+def make_client_file_transfer(cloudname, session_id, relative_pathname, is_dir, filesize):
+    msg = make_session_msg(CLIENT_FILE_TRANSFER, cloudname, session_id)
+    # msg['id'] = host_id  # note: see above
+    msg['fpath'] = relative_pathname
+    msg['fsize'] = filesize
+    msg['isdir'] = is_dir
+    return json.dumps(msg)
