@@ -92,14 +92,19 @@ class NebshClient(object):
             return
         recursive = '-r' in argv
         local_path = argv[-2]
+        local_file = os.path.basename(local_path)
+        mylog.log_dbg('localpath={}->{}'.format(local_path, local_file))
         rel_path = argv[-1]
+        neb_file = os.path.join(rel_path, local_file)
+        mylog.log_dbg('nebpath={}->{}'.format(rel_path, neb_file))
+
         host_sock = create_sock_and_send(
             self.tgt_host_ip
             , self.tgt_host_port
-            , make_client_file_put(self.cname, self.session_id, rel_path)
+            , make_client_file_put(self.cname, self.session_id, neb_file)
         )
 
-        send_file_to_host(self.session_id, self.cname, local_path, rel_path, recursive, host_sock)
+        send_file_to_host(self.session_id, self.cname, local_path, neb_file, recursive, host_sock)
         mylog.log_dbg('bottom of nput?')
         # send_msg(
         #     make_client_file_transfer(self.cname, self.session_id, rel_path, is_dir, filesize)
@@ -123,9 +128,15 @@ class NebshClient(object):
             print 'Error during ls:{}'.format(response)
             return
         # print response
-        if response is not None:
+        if response is not None and response['ls'] is not None:
             for child in response['ls']:
                 print child['name']
+        else:
+            if response['stat'] is None:
+                print '{} was not found'.format(rel_path)
+            else:  # I don't this this block is ever hit
+                print '{} is not a directory'.format(rel_path)
+            mylog.log_dbg(response)
 
     def local_ls(self, argv):
         cwd = os.path.curdir
