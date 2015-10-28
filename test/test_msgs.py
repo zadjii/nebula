@@ -146,3 +146,5 @@ def test_msgs():
     msg = make_list_files_response('fake-cloudname', '..', path)
     print get_msg_size(msg), decode_msg_size(get_msg_size(msg))
     print msg
+
+
