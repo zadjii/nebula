@@ -38,6 +38,10 @@ def test_msgs():
     msg_obj = NewHostMessage(port=23456)
     test_single_message(msg_obj)
 
+    print '_____ Testing AssignHostIDMessage _____'
+    msg_obj = AssignHostIDMessage(22, 'TODOkey', 'TODOcert')
+    test_single_message(msg_obj)
+
 
 if __name__ == '__main__':
     test_msgs()

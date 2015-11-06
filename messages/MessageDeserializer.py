@@ -8,7 +8,7 @@ _decoder_table = {
     , AUTH_ERROR: -2
     , GENERIC_ERROR: -1
     , NEW_HOST_MSG: NewHostMessage.deserialize # 0
-    , ASSIGN_HOST_ID: 1
+    , ASSIGN_HOST_ID: AssignHostIDMessage.deserialize #1
     , HOST_HANDSHAKE: 2
     , REMOTE_HANDSHAKE: 3
     , REM_HANDSHAKE_GO_FETCH: 4
