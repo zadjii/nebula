@@ -1,8 +1,11 @@
-from host import HOST_PORT
 from datetime import datetime
+
+from werkzeug.security import generate_password_hash
+
+from host import HOST_PORT
 from msg_codes import *
 from remote import get_db, Cloud
-from werkzeug.security import generate_password_hash
+
 __author__ = 'zadjii'
 
 def test_msgs():

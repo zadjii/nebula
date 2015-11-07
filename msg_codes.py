@@ -1,8 +1,7 @@
-from _ctypes import sizeof
 import json
 import os
-import struct
-import sys
+
+from messages import get_msg_size, decode_msg_size, make_msg
 
 __author__ = 'zadjii'
 FILE_IS_NOT_DIR_ERROR = -5
@@ -105,19 +104,6 @@ def send_msg(msg_json, socket):
     #     , msg_json)
     socket.send(get_msg_size(msg_json))
     socket.send(msg_json)
-
-
-def get_msg_size(msg_json):
-    size = len(msg_json)
-    return struct.pack('Q', size)
-
-
-def decode_msg_size(long_long):
-    return struct.unpack('Q', long_long)[0]
-
-
-def make_msg(msg_type):
-    return {'type': msg_type}
 
 
 def make_session_msg(msg_type, cloudname, session_uuid):

@@ -1,4 +1,5 @@
 import os
+import struct
 from messages.BaseMessage import BaseMessage
 from messages.NewHostMessage import NewHostMessage
 from messages.AssignHostIDMessage import AssignHostIDMessage
@@ -77,3 +78,14 @@ def make_ls_array(file_path):
     return subdirs
 
 
+def get_msg_size(msg_json):
+    size = len(msg_json)
+    return struct.pack('Q', size)
+
+
+def decode_msg_size(long_long):
+    return struct.unpack('Q', long_long)[0]
+
+
+def make_msg(msg_type):
+    return {'type': msg_type}
