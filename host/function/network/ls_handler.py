@@ -1,15 +1,16 @@
 from host import get_db, Cloud
 from host.util import mylog
-from msg_codes import send_generic_error_and_close, make_list_files_response, \
-    send_msg
+from msg_codes import send_generic_error_and_close#, make_list_files_response, \
+    #send_msg
+from messages import ListFilesRequestMessage, ListFilesResponseMessage
 
 __author__ = 'Mike'
 
 
 def list_files_handler(connection, address, msg_obj):
-    session_id = msg_obj['sid']
-    cloudname = msg_obj['cname']
-    rel_path = msg_obj['fpath']
+    session_id = msg_obj.sid
+    cloudname = msg_obj.cname
+    rel_path = msg_obj.fpath
     db = get_db()
     # FIXME match session to session object
     # todo make sure to do the host that has this sid, esp if more than one
@@ -21,5 +22,10 @@ def list_files_handler(connection, address, msg_obj):
         mylog('sid[{}] requested {}, I was alerted, but I don\'t have it'
               .format(session_id, cloudname))
     full_path = cloud.translate_relative_path(rel_path)
-    response = make_list_files_response(cloudname, rel_path, full_path)
-    send_msg(response, connection)
+    resp = ListFilesResponseMessage(cloudname, rel_path, full_path)
+    # response = make_list_files_response(cloudname, rel_path, full_path)
+    # send_msg(response, connection)
+    connection.send_obj(resp)
+
+
+

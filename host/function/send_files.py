@@ -1,7 +1,7 @@
 import os
 from stat import S_ISDIR
 from host.util import mylog
-from msg_codes import send_msg, make_host_file_transfer
+from messages import HostFileTransferMessage
 
 __author__ = 'Mike'
 
@@ -33,16 +33,24 @@ def send_file_to_other(other_id, cloud, filepath, socket_conn):
     req_file_is_dir = S_ISDIR(req_file_stat.st_mode)
     if req_file_is_dir:
         if relative_pathname != '.':
-            send_msg(
-                make_host_file_transfer(
-                    other_id
-                    , cloud.name
-                    , relative_pathname
-                    , req_file_is_dir
-                    , 0
-                )
-                , socket_conn
+            msg = HostFileTransferMessage(
+                other_id
+                , cloud.name
+                , relative_pathname
+                , req_file_is_dir
+                , 0
             )
+            socket_conn.send_obj(msg)
+            # send_msg(
+            #     make_host_file_transfer(
+            #         other_id
+            #         , cloud.name
+            #         , relative_pathname
+            #         , req_file_is_dir
+            #         , 0
+            #     )
+            #     , socket_conn
+            # )
         subdirectories = os.listdir(filepath)
         mylog('Sending children of <{}>={}'.format(filepath, subdirectories))
         for f in subdirectories:
@@ -50,16 +58,24 @@ def send_file_to_other(other_id, cloud, filepath, socket_conn):
     else:
         req_file_size = req_file_stat.st_size
         requested_file = open(filepath, 'rb')
-        send_msg(
-            make_host_file_transfer(
-                other_id
-                , cloud.name
-                , relative_pathname
-                , req_file_is_dir
-                , req_file_size
-            )
-            , socket_conn
+        msg = HostFileTransferMessage(
+            other_id
+            , cloud.name
+            , relative_pathname
+            , req_file_is_dir
+            , req_file_size
         )
+        socket_conn.send_obj(msg)
+        # send_msg(
+        #     make_host_file_transfer(
+        #         other_id
+        #         , cloud.name
+        #         , relative_pathname
+        #         , req_file_is_dir
+        #         , req_file_size
+        #     )
+        #     , socket_conn
+        # )
         l = 1
         while l:
             new_data = requested_file.read(1024)
@@ -77,10 +93,12 @@ def send_file_to_other(other_id, cloud, filepath, socket_conn):
 
 
 def complete_sending_files(other_id, cloud, filepath, socket_conn):
-    send_msg(
-        make_host_file_transfer(other_id, cloud.name, None, None, None)
-        , socket_conn
-    )
+    # send_msg(
+    #     make_host_file_transfer(other_id, cloud.name, None, None, None)
+    #     , socket_conn
+    # )
+    msg = HostFileTransferMessage(other_id, cloud.name, None, None, None)
+    socket_conn.send_obj(msg)
     mylog('[{}] completed sending files to [{}]'
           .format(cloud.my_id_from_remote, other_id))
 

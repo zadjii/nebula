@@ -8,10 +8,10 @@ __author__ = 'Mike'
 
 def handle_client_session_alert(connection, address, msg_obj):
     db = get_db()
-    cloudname = msg_obj['cname']
-    session_id = msg_obj['sid']
-    user_id = msg_obj['uid']
-    client_ip = msg_obj['ip']
+    cloudname = msg_obj.cname
+    session_id = msg_obj.sid
+    user_id = msg_obj.uid
+    client_ip = msg_obj.ip
     mylog('creating new session for (uid,sid,ip)={}'.format((user_id, session_id, client_ip)))
     cloud = db.session.query(Cloud).filter_by(name=cloudname).first()
     if cloud is None:

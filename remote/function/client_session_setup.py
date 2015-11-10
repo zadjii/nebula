@@ -1,5 +1,6 @@
 from uuid import uuid4
 from host.util import mylog
+from messages import ClientSessionAlertMessage, ClientSessionResponseMessage
 
 __author__ = 'Mike'
 
@@ -12,14 +13,16 @@ from msg_codes import *
 
 
 def setup_client_session(connection, address, msg_obj):
-    msg_type = msg_obj['type']
+    msg_type = msg_obj.type
     if msg_type is not CLIENT_SESSION_REQUEST:
         send_generic_error_and_close(connection)  # todo send proper error
         return
     db = get_db()
-    cloudname = msg_obj['cname']
-    username = msg_obj['uname']
-    password = msg_obj['pass']
+    cloudname = msg_obj.cname
+    username = msg_obj.uname
+    password = msg_obj.passw
+    mylog('This was weird, cname,uname,passw= {},{},{}'.format(cloudname, username, password))
+    mylog('weirdpt2: {}'.format(msg_obj.__dict__))
     cloud = db.session.query(Cloud).filter_by(name=cloudname).first()
     if cloud is None:
         mylog('ERR: cloud was none')
@@ -64,15 +67,19 @@ def setup_client_session(connection, address, msg_obj):
     session.uuid = sess_uuid  # todo this is probably bad.
     db.session.commit()
     # tell host
-    host.send_msg(make_client_session_alert(
-        cloudname, user.id, session.uuid, address[0])
-    )
+    msg = ClientSessionAlertMessage(cloudname, user.id, session.uuid, address[0])
+    host.send_msg(msg)
+    # host.send_msg(make_client_session_alert(
+    #     cloudname, user.id, session.uuid, address[0])
+    # )
 
     # tell client
-    send_msg(
-        make_client_session_response(cloudname, session.uuid, host.ip,host.port)
-        , connection
-    )
+    # send_msg(
+    #     make_client_session_response(cloudname, session.uuid, host.ip,host.port)
+    #     , connection
+    # )
+    msg = ClientSessionResponseMessage(cloudname, session.uuid, host.ip, host.port)
+    connection.send_obj(msg)
 
     print 'I think i setup the session'
 

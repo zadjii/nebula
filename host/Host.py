@@ -1,3 +1,5 @@
+import sys
+from connections.WebSocketConnection import MyBigFuckingLieServerProtocol
 from host.function.dbg_nodes import dbg_nodes
 from host.util import set_mylog_name
 
@@ -10,6 +12,31 @@ from host.function.list_clouds import list_clouds
 from host.function.local_updates import local_update_thread
 from host.function.network_updates import receive_updates_thread
 from msg_codes import *
+try:
+    import asyncio
+except ImportError:  # Trollius >= 0.3 was renamed
+    import trollius as asyncio
+from autobahn.asyncio.websocket import WebSocketServerFactory
+
+
+def ws_thread_function(argv=[]):
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    factory = WebSocketServerFactory(u"ws://127.0.0.1:9000", debug=False)
+    factory.protocol = MyBigFuckingLieServerProtocol
+
+    # loop = asyncio.get_event_loop()
+    coro = loop.create_server(factory, '0.0.0.0', 9000)
+    server = loop.run_until_complete(coro)
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.close()
+        loop.close()
 
 
 def start(argv):
@@ -19,6 +46,12 @@ def start(argv):
     network_thread = Thread(target=receive_updates_thread, args=argv)
     # local_thread.start()
     network_thread.start()
+    ###############
+
+    ws_thread = Thread(target=ws_thread_function, args=argv)
+    ws_thread.start()
+
+    ###############
     local_update_thread()
     # local_thread.join()
     # network_thread.join()

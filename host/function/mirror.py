@@ -4,11 +4,13 @@ import getpass
 from sys import stdin
 
 from werkzeug.security import generate_password_hash
+from connections.RawConnection import RawConnection
 
 from host import Cloud, REMOTE_PORT, HOST_PORT
 from host import get_db
 from host.function.recv_files import recv_file_tree
 from host.util import check_response, setup_remote_socket, mylog
+from messages import *
 from msg_codes import *
 
 __author__ = 'Mike'
@@ -21,19 +23,20 @@ def ask_remote_for_id(host, port, db):
      Returns a (0,cloud.id) if it successfully gets something back.
      """
     sslSocket = setup_remote_socket(host, port)
+    raw_conn = RawConnection(sslSocket)
+    # write_msg(make_new_host_json(HOST_PORT), sslSocket)
+    msg = NewHostMessage(HOST_PORT)
+    raw_conn.send_obj(msg)
+    # msg_obj = recv_msg(sslSocket)
+    resp_obj = raw_conn.recv_obj()
+    check_response(ASSIGN_HOST_ID, resp_obj.type)
 
-    write_msg(make_new_host_json(HOST_PORT), sslSocket)
-
-    msg_obj = recv_msg(sslSocket)
-
-    check_response(ASSIGN_HOST_ID, msg_obj['type'])
-
-    my_id = msg_obj['id']
+    my_id = resp_obj.id
     print 'Remote says my id is', my_id
     # I have no idea wtf to do with this.
-    key = msg_obj['key']
+    key = resp_obj.key
     print 'Remote says my key is', key
-    cert = msg_obj['cert']
+    cert = resp_obj.cert
     print 'Remote says my cert is', cert
 
     cloud = Cloud()
@@ -54,29 +57,26 @@ def request_cloud(cloud, test_enabled, db):
         print('please enter username for {}:'.format(cloud.name))
         username = stdin.readline()[:-1]
         print('Enter the password for ' + cloud.name + ':')
-        password = stdin.readline()[:-1] # todo this is yea, bad.
+        password = stdin.readline()[:-1]  # todo this is yea, bad.
     else:
         username = raw_input('Enter the username for ' + cloud.name + ':').lower()
-        # print('please enter username for {}:'.format(cloud.name))
-        # username = stdin.readline()[:-1]
         print('Enter the password for ' + cloud.name + ':')
         password = getpass.getpass()
-        # password = stdin.readline()[:-1] # todo this is yea, bad.
 
-    # password_hash = generate_password_hash(password)
-    # username = 'asdf'  # fixme
-    # password_hash = 'asdf' # fixme
-    write_msg(
-        make_request_cloud_json(cloud.my_id_from_remote, cloud.name, username, password)
-        , sslSocket
-    )
+    raw_conn = RawConnection(sslSocket)
+    msg = RequestCloudMessage(cloud.my_id_from_remote, cloud.name, username, password)
+    raw_conn.send_obj(msg)
+    # write_msg(
+    #     make_request_cloud_json(cloud.my_id_from_remote, cloud.name, username, password)
+    #     , sslSocket
+    # )
 
-    msg_obj = recv_msg(sslSocket)
-
-    check_response(GO_RETRIEVE_HERE, msg_obj['type'])
-    other_address = msg_obj['ip']
-    other_port = msg_obj['port']
-    other_id = msg_obj['id']
+    # msg_obj = recv_msg(sslSocket)
+    resp_obj = raw_conn.recv_obj()
+    check_response(GO_RETRIEVE_HERE, resp_obj.type)
+    other_address = resp_obj.ip
+    other_port = resp_obj.port
+    other_id = resp_obj.id
     if other_address == '0' and other_port == 0:
         print 'No other hosts in cloud'
         sslSocket.close()
@@ -88,20 +88,23 @@ def request_cloud(cloud, test_enabled, db):
 
     host_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     host_sock.connect((other_address, other_port))
-
+    host_conn = RawConnection(host_sock)
     # host_sock = setup_remote_socket(other_address, other_port)
     # todo initialize our ssl context here
 
-    send_msg(make_host_host_fetch(cloud.my_id_from_remote, cloud.name, '/'),
-             host_sock)
+    # send_msg(make_host_host_fetch(cloud.my_id_from_remote, cloud.name, '/'),
+    #          host_sock)
+    msg = HostHostFetchMessage(cloud.my_id_from_remote, cloud.name, '/')
+    host_conn.send_obj(msg)
     print 'Sent HOST_HOST_FETCH as a mirror request.'
 
     # Here we recv a whole bunch of files from the host
-    response = recv_msg(host_sock)
-    resp_type = response['type']
+    # response = recv_msg(host_sock)
+    resp_obj = host_conn.recv_obj()
+    resp_type = resp_obj.type
     # print 'host_host_fetch response:{}'.format(response)
     check_response(HOST_FILE_TRANSFER, resp_type)
-    recv_file_tree(response, cloud, host_sock, db)
+    recv_file_tree(resp_obj, cloud, host_sock, db)
 
 
 def mirror_usage():
@@ -181,10 +184,13 @@ def mirror(argv):
     request_cloud(cloud, test_enabled, db)
     mylog('finished requesting cloud')
     new_rem_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
-    send_msg(
-        make_mirroring_complete(cloud.my_id_from_remote, cloud.name)
-        , new_rem_sock
-    )
+    remote_conn = RawConnection(new_rem_sock)
+    msg = MirroringCompleteMessage(cloud.my_id_from_remote, cloud.name)
+    # send_msg(
+    #     make_mirroring_complete(cloud.my_id_from_remote, cloud.name)
+    #     , new_rem_sock
+    # )
+    remote_conn.send_obj(msg)
     cloud.completed_mirroring = True
     db.session.commit()
 

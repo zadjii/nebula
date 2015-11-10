@@ -50,6 +50,13 @@ class AbstractConnection(object):
         """
         return
 
+    @abc.abstractmethod
+    def close(self):
+        """
+        closes the connection.
+        """
+        return
+
 
 """
     OKAY SO HERES THE DEAL.

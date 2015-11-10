@@ -4,35 +4,39 @@ from host import REMOTE_HOST, REMOTE_PORT
 from host.util import setup_remote_socket
 from test.repop_dbs import repop_dbs
 from test.util import start_nebs_and_nebr, teardown_children
+from connections.RawConnection import RawConnection
 
 __author__ = 'Mike'
 
 from time import sleep
 from msg_codes import *
-
+from messages import *
 
 remote_proc, host_proc = None, None
 
 
 def verify_type_or_teardown(msg, type):
-    if msg['type'] != type:
+    if msg.type != type:
         print '__that\'s bad, mmkay?__'
         teardown()
         raise Exception()
 
 
 def create_sock_msg_get_response(ip, port, msg):
-    sock = create_sock_and_send(ip, port, msg)
-    response = recv_msg(sock)
-    sock.close()
+    conn = create_sock_and_send(ip, port, msg)
+    response = conn.recv_obj()
+    conn.close()
     return response
 
 
 def create_sock_and_send(ip, port, msg):
     host_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     host_sock.connect((ip, port))
-    send_msg(msg, host_sock)
-    return host_sock
+    conn = RawConnection(host_sock)
+    conn.send_obj(msg)
+    # send_msg(msg, host_sock)
+    return conn
+
 
 def client_setup_test():
     print '#' * 80
@@ -43,33 +47,37 @@ def client_setup_test():
     host_proc, remote_proc = start_nebs_and_nebr()
 
     rem_sock = setup_remote_socket(REMOTE_HOST, REMOTE_PORT)
+    rem_conn = RawConnection(rem_sock)
     print '__ setup remote socket __'
-    request = make_client_session_request('qwer', 'asdf', 'asdf')
-
-    send_msg(request, rem_sock)
+    # request = make_client_session_request('qwer', 'asdf', 'asdf')
+    request = ClientSessionRequestMessage('qwer', 'asdf', 'asdf')
+    # send_msg(request, rem_sock)
+    rem_conn.send_obj(request)
     print '__ sent client session request message __'
-    print '__ msg:{}__'.format(request)
-    response = recv_msg(rem_sock)
+    print '__ msg:{}__'.format(request.__dict__)
+    # response = recv_msg(rem_sock)
+    response = rem_conn.recv_obj()
     print '__ resp:{}__'.format(response)
 
-    if not (response['type'] == CLIENT_SESSION_RESPONSE):
+    if not (response.type == CLIENT_SESSION_RESPONSE):
         raise Exception('remote did not respond with success')
-    session_id = response['sid']
-    tgt_host_ip = response['ip']
-    tgt_host_port = response['port']
+    session_id = response.sid
+    tgt_host_ip = response.ip
+    tgt_host_port = response.port
 
     print '__ setting up host socket __'
+    msg = ListFilesRequestMessage('qwer', session_id, '.')
     response = create_sock_msg_get_response(
         tgt_host_ip
         , tgt_host_port
-        , make_list_files_request('qwer', session_id, '.')
+        , msg
     )
 
     print response
     verify_type_or_teardown(response, LIST_FILES_RESPONSE)
 
     resp0 = response
-    ls0 = resp0['ls']
+    ls0 = resp0.ls
 
     os.makedirs('test_out/tmp0/qwer')
     os.makedirs('test_out/tmp0/asdf')
@@ -91,16 +99,18 @@ def client_setup_test():
     # response = recv_msg(host_sock)
 
     print '__ setting up host socket __'
+    msg = ListFilesRequestMessage('qwer', session_id, '.')
+
     response = create_sock_msg_get_response(
         tgt_host_ip
         , tgt_host_port
-        , make_list_files_request('qwer', session_id, '.')
+        , msg
     )
     print response
     verify_type_or_teardown(response, LIST_FILES_RESPONSE)
 
     resp1 = response
-    ls1 = resp1['ls']
+    ls1 = resp1.ls
     print '__these should be different {}!={}__'.format(
         len(ls0), len(ls1)
     )
@@ -115,14 +125,16 @@ def client_setup_test():
 
 def ls_path(session_id, tgt_host_ip, tgt_host_port, path):
     print '__ setting up host socket for ls {}__'.format(path)
+    msg = ListFilesRequestMessage('qwer', session_id, path)
     response = create_sock_msg_get_response(
         tgt_host_ip
         , tgt_host_port
-        , make_list_files_request('qwer', session_id, path)
+        , msg
     )
     print '__ ls {} response=({})'.format(path, response)
     verify_type_or_teardown(response, LIST_FILES_RESPONSE)
-    print '__ {} ls contents=({})'.format(path, response['ls'])
+    print '__ {} ls contents=({})'.format(path, response.ls)
+
 
 def teardown():
     teardown_children([remote_proc, host_proc])

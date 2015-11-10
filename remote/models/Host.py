@@ -1,5 +1,6 @@
 import socket
-from msg_codes import send_msg
+# from msg_codes import send_msg
+from connections.RawConnection import RawConnection
 from remote import _remote_db as db
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table,\
     Boolean
@@ -35,5 +36,7 @@ class Host(db.Base):
         # s = SSL.Connection(context, s)
         # whatever fuck it lets just assume it's good todo
         s.connect((self.ip, self.port))
-        send_msg(msg, s)
+        conn = RawConnection(s)
+        conn.send_obj(msg)
+        # send_msg(msg, s)
         s.close()

@@ -1,4 +1,5 @@
-from messages import make_stat_dict, make_ls_array
+from messages.util import make_ls_array
+from messages.util import make_stat_dict, make_ls_array
 from messages.SessionMessage import SessionMessage
 from msg_codes import LIST_FILES_RESPONSE as LIST_FILES_RESPONSE
 __author__ = 'Mike'

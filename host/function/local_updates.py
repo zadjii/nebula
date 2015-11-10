@@ -3,22 +3,29 @@ import os
 import socket
 from stat import S_ISDIR
 import time
+from connections.RawConnection import RawConnection
 from host import FileNode, get_db, Cloud, HOST_PORT
 from host.function.send_files import send_file_to_other, complete_sending_files
 from host.util import check_response, setup_remote_socket, mylog
 from msg_codes import *
+from messages import *
 
 __author__ = 'Mike'
+
 
 def send_updates(cloud, updates, db):
     mylog('[{}] has updates {}'.format(cloud.my_id_from_remote, updates))
     # connect to remote
     ssl_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
+    raw_connection = RawConnection(ssl_sock)
     # get hosts list
-    send_msg(make_get_hosts_request(cloud.my_id_from_remote, cloud.name), ssl_sock)
-    response = recv_msg(ssl_sock)
-    check_response(GET_HOSTS_RESPONSE, response['type'])
-    hosts = response['hosts']
+    msg = GetHostsRequestMessage(cloud.my_id_from_remote, cloud.name)
+    raw_connection.send_obj(msg)
+    # send_msg(make_get_hosts_request(cloud.my_id_from_remote, cloud.name), ssl_sock)
+    response = raw_connection.recv_obj()
+    # response = recv_msg(ssl_sock)
+    check_response(GET_HOSTS_RESPONSE, response.type)
+    hosts = response.hosts
     updated_peers = 0
     for host in hosts:
         if host['id'] == cloud.my_id_from_remote:
@@ -34,7 +41,11 @@ def update_peer(cloud, host, updates):
     host_port = host['port']
     host_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     host_sock.connect((host_ip, host_port))
-    send_msg(make_host_file_push(host_id, cloud.name, 'i-dont-give-a-fuck'), host_sock)
+    raw_connection = RawConnection(host_sock)
+    msg = HostFilePushMessage(host_id, cloud.name, 'i-dont-give-a-fuck')
+    # send_msg(make_host_file_push(host_id, cloud.name, 'i-dont-give-a-fuck'), host_sock)
+    raw_connection.send_obj(msg)
+
     for update in updates:
         file_path = update[1]
         relative_pathname = os.path.relpath(file_path, cloud.root_directory)
@@ -46,7 +57,9 @@ def update_peer(cloud, host, updates):
                 , os.path.join(cloud.root_directory, relative_pathname)
                 , host_sock)
         elif update[0] == FILE_DELETE:
-            send_msg(make_remove_file(host_id, cloud.name, relative_pathname), host_sock)
+            msg = RemoveFileMessage(host_id, cloud.name, relative_pathname)
+            # send_msg(make_remove_file(host_id, cloud.name, relative_pathname), host_sock)
+            raw_connection.send_obj(msg)
         else:
             print 'Welp this shouldn\'t happen'
     complete_sending_files(host_id, cloud, None, host_sock)
@@ -106,6 +119,7 @@ def local_file_update(directory_path, dir_node, filename, filenode, db):
 FILE_CREATE = 0
 FILE_UPDATE = 1
 FILE_DELETE = 2
+
 
 def recursive_local_modifications_check(directory_path, dir_node, db):
     files = sorted(os.listdir(directory_path), key=lambda filename: filename, reverse=False)

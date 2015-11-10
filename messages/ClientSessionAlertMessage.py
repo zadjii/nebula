@@ -1,4 +1,4 @@
-from messages import make_stat_dict
+from messages.util import make_stat_dict
 from messages.SessionMessage import SessionMessage
 from msg_codes import CLIENT_SESSION_ALERT as CLIENT_SESSION_ALERT
 __author__ = 'Mike'

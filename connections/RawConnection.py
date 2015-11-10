@@ -1,5 +1,5 @@
 from connections.AbstractConnection import AbstractConnection
-from messages import decode_msg_size, get_msg_size
+from messages.util import get_msg_size, decode_msg_size
 from messages.MessageDeserializer import MessageDeserializer
 
 __author__ = 'Mike'
@@ -25,3 +25,7 @@ class RawConnection(AbstractConnection):
 
     def send_next_data(self, data):
         return self._socket.send(data)
+
+    def close(self):
+        return self._socket.close()
+

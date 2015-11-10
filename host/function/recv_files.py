@@ -2,21 +2,22 @@ from datetime import datetime
 import os
 from host import get_db, FileNode
 from host.util import mylog
-from msg_codes import recv_msg
+# from msg_codes import recv_msg
 
 __author__ = 'Mike'
 
 
 def recv_file_tree(msg, cloud, socket_conn, db):
-    while msg['fsize'] is not None:
+    while msg.fsize is not None:
         recv_file_transfer(msg, cloud, socket_conn, db)
-        msg = recv_msg(socket_conn)
+        # msg = recv_msg(socket_conn)
+        msg = socket_conn.recv_obj()
 
 
 def recv_file_transfer(msg, cloud, socket_conn, db):
-    msg_file_isdir = msg['isdir']
-    msg_file_size = msg['fsize']
-    msg_rel_path = msg['fpath']
+    msg_file_isdir = msg.isdir
+    msg_file_size = msg.fsize
+    msg_rel_path = msg.fpath
     mylog('[{}] is recv\'ing <{}>'.format(cloud.my_id_from_remote, msg_rel_path))
     full_path = os.path.join(cloud.root_directory, msg_rel_path)
     if msg_file_isdir :

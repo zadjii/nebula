@@ -6,13 +6,14 @@ import socket
 from threading import Thread
 from OpenSSL.SSL import SysCallError
 from OpenSSL import SSL
+from connections.RawConnection import RawConnection
 from host.util import set_mylog_name, mylog
 from remote.function.client_session_setup import setup_client_session
 from remote.function.new_user import new_user
 from remote.function.create import create
 
 from msg_codes import *
-
+from messages import *
 
 from remote import User, Cloud, Host, get_db
 
@@ -30,8 +31,8 @@ CERT_FILE = 'remote/cert'
 
 
 def filter_func(connection, address):
-    msg_obj = recv_msg(connection)
-    msg_type = msg_obj['type']
+    msg_obj = connection.recv_obj()
+    msg_type = msg_obj.type
     # print 'The message is', msg_obj
     if msg_type == NEW_HOST_MSG:
         new_host_handler(connection, address, msg_obj)
@@ -50,8 +51,8 @@ def filter_func(connection, address):
 
 def respond_to_get_hosts_request(connection, address, msg_obj):
     db = get_db()
-    host_id = msg_obj['id']
-    cloudname = msg_obj['cname']
+    host_id = msg_obj.id
+    cloudname = msg_obj.cname
 
     matching_host = db.session.query(Host).get(host_id)
     if matching_host is None:
@@ -63,15 +64,17 @@ def respond_to_get_hosts_request(connection, address, msg_obj):
         send_generic_error_and_close(connection)
         raise Exception('No cloud with name ' + cloudname)
 
-    send_msg(make_get_hosts_response(matching_cloud), connection)
+    # send_msg(make_get_hosts_response(matching_cloud), connection)
+    msg = GetHostsResponseMessage(matching_cloud)
+    connection.send_obj(msg)
     print 'responded to Host[{}] asking for hosts of \'{}\''\
         .format(host_id, cloudname)
 
 
 def mirror_complete(connection, address, msg_obj):
     db = get_db()
-    host_id = msg_obj['id']
-    cloudname = msg_obj['cname']
+    host_id = msg_obj.id
+    cloudname = msg_obj.cname
 
     matching_host = db.session.query(Host).get(host_id)
     if matching_host is None:
@@ -90,10 +93,10 @@ def mirror_complete(connection, address, msg_obj):
 
 def host_request_cloud(connection, address, msg_obj):
     db = get_db()
-    host_id = msg_obj['id']
-    cloudname = msg_obj['cname']
-    username = msg_obj['uname']
-    password = msg_obj['pass']
+    host_id = msg_obj.id
+    cloudname = msg_obj.cname
+    username = msg_obj.uname
+    password = msg_obj.passw
 
     print('User provided {},{},{},{}'.format(
         host_id, cloudname, username, password
@@ -137,8 +140,9 @@ def host_request_cloud(connection, address, msg_obj):
         # send_msg(prep_for_fetch_msg, s)
         # print 'nebr completed talking to rand_host'
         # s.close()
-
-    send_msg(make_go_retrieve_here_json(0, ip, port), connection)
+    msg = GoRetrieveMessage(0, ip, port)
+    connection.send_obj(msg)
+    # send_msg(make_go_retrieve_here_json(0, ip, port), connection)
 
     print 'nebr has reached the end of host_request_cloud'
 
@@ -148,13 +152,16 @@ def new_host_handler(connection, address, msg_obj):
     print 'Handling new host'
     host = Host()
     host.ip = address[0]
-    host.port = msg_obj['port']
+    host.port = msg_obj.port
     db.session.add(host)
     db.session.commit()
-    send_msg(
-        make_assign_host_id_json(host.id, 'todo_placeholder_key', 'todo_placeholder_cert')
-        , connection
-    )
+
+    msg = AssignHostIDMessage(host.id, 'todo_placeholder_key', 'todo_placeholder_cert')
+    connection.send_obj(msg)
+    # send_msg(
+    #     make_assign_host_id_json(host.id, 'todo_placeholder_key', 'todo_placeholder_cert')
+    #     , connection
+    # )
 
 
 def start(argv):
@@ -170,10 +177,10 @@ def start(argv):
     s.listen(5)
     while True:
         (connection, address) = s.accept()
-
+        raw_connection = RawConnection(connection)
         mylog('Connected by {}'.format(address))
         # spawn a new thread to handle this connection
-        thread = Thread(target=filter_func, args=[connection, address])
+        thread = Thread(target=filter_func, args=[raw_connection, address])
         thread.start()
         thread.join()
         # echo_func(connection, address)

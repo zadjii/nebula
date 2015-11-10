@@ -1,7 +1,6 @@
 import json
 import os
 
-from messages import get_msg_size, decode_msg_size, make_msg
 
 __author__ = 'zadjii'
 FILE_IS_NOT_DIR_ERROR = -5
@@ -69,42 +68,45 @@ def send_generic_error_and_close(socket):
     send_msg_and_close(make_msg(GENERIC_ERROR), socket)
 
 
-def recv_msg(socket):
-    """Gets a json msg from the socket specified, and decodes into a dict
-        for us."""
-    # data = memoryview(bytearray(b" " * 8))
-    data = socket.recv(8)
-    # size = 0
-    # while size < 8:
-    #     size = size + socket.recv_into(data[size:], 8 - size)
+# def recv_msg(socket):
+#     pass
+#     """Gets a json msg from the socket specified, and decodes into a dict
+#         for us."""
+#     # data = memoryview(bytearray(b" " * 8))
+#     data = socket.recv(8)
+#     # size = 0
+#     # while size < 8:
+#     #     size = size + socket.recv_into(data[size:], 8 - size)
+#
+#     size = decode_msg_size(data)
+#     # print 'decoding msg length {}->{}'.format(data, size)
+#     # todo a while loop to read all the data into a buffer
+#     buff = socket.recv(size)
+#     # print 'recv\'d into {}B[2]'.format(len(buff))
+#     return decode_msg(buff)
+#
+#
+# def write_msg(msg_json, socket):
+#     # print 'writing message {}.{}.{}.\'{}\''.format(
+#     #     len(msg_json)
+#     #     , get_msg_size(msg_json)
+#     #     , decode_msg_size(get_msg_size(msg_json))
+#     #     , msg_json)
+#     socket.write(get_msg_size(msg_json))
+#     socket.write(msg_json)
+#
+#
+# def send_msg(msg_json, socket):
+#     # print 'sending message {}.{}.{}.\'{}\''.format(
+#     #     len(msg_json)
+#     #     , get_msg_size(msg_json)
+#     #     , decode_msg_size(get_msg_size(msg_json))
+#     #     , msg_json)
+#     socket.send(get_msg_size(msg_json))
+#     socket.send(msg_json)
 
-    size = decode_msg_size(data)
-    # print 'decoding msg length {}->{}'.format(data, size)
-    # todo a while loop to read all the data into a buffer
-    buff = socket.recv(size)
-    # print 'recv\'d into {}B[2]'.format(len(buff))
-    return decode_msg(buff)
-
-
-def write_msg(msg_json, socket):
-    # print 'writing message {}.{}.{}.\'{}\''.format(
-    #     len(msg_json)
-    #     , get_msg_size(msg_json)
-    #     , decode_msg_size(get_msg_size(msg_json))
-    #     , msg_json)
-    socket.write(get_msg_size(msg_json))
-    socket.write(msg_json)
-
-
-def send_msg(msg_json, socket):
-    # print 'sending message {}.{}.{}.\'{}\''.format(
-    #     len(msg_json)
-    #     , get_msg_size(msg_json)
-    #     , decode_msg_size(get_msg_size(msg_json))
-    #     , msg_json)
-    socket.send(get_msg_size(msg_json))
-    socket.send(msg_json)
-
+def make_msg(msg_type):
+    return {'type': msg_type}
 
 def make_session_msg(msg_type, cloudname, session_uuid):
     msg = make_msg(msg_type)

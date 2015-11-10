@@ -1,6 +1,7 @@
 from datetime import datetime
 import socket
 from threading import Thread
+from connections.RawConnection import RawConnection
 
 from host import get_db, Cloud, IncomingHostEntry, Session
 from host import HOST_HOST, HOST_PORT
@@ -22,8 +23,9 @@ def receive_updates_thread():
     s.listen(5)
     while True:
         (connection, address) = s.accept()
+        raw_conn = RawConnection(connection)
         mylog('Connected by {}'.format(address))
-        thread = Thread(target=filter_func, args=[connection, address])
+        thread = Thread(target=filter_func, args=[raw_conn, address])
         thread.start()
         thread.join()
         # todo: possible that we might want to thread.join here.
@@ -138,21 +140,26 @@ def handle_recv_file_from_client(connection, address, msg_obj):
     #         'host came asking for cloudname=\'' + cloudname + '\''
     #         + ', but I was not told to expect them.'
     #     )
-    response = recv_msg(connection)
-    resp_type = response['type']
+    # response = recv_msg(connection)
+    resp_obj = connection.recv_obj()
+    # resp_type = response['type']
+    resp_type = resp_obj.type
     # print 'host_host_fetch response:{}'.format(response)
     check_response(CLIENT_FILE_TRANSFER, resp_type)
 
-    recv_file_tree(response, matching_cloud, connection, db)
+    recv_file_tree(resp_obj, matching_cloud, connection, db)
     mylog('[{}]bottom of handle_recv_file_from_client(...,{})'
           .format(session_uuid, msg_obj))
 
 
 def handle_recv_file(connection, address, msg_obj):
     db = get_db()
-    my_id = msg_obj['tid']
-    cloudname = msg_obj['cname']
-    updated_file = msg_obj['fpath']
+    # my_id = msg_obj['tid']
+    # cloudname = msg_obj['cname']
+    # updated_file = msg_obj['fpath']
+    my_id = msg_obj.tid
+    cloudname = msg_obj.cname
+    updated_file = msg_obj.fpath
     their_ip = address[0]
 
     matching_id_clouds = db.session.query(Cloud)\
@@ -179,20 +186,22 @@ def handle_recv_file(connection, address, msg_obj):
     #         'host came asking for cloudname=\'' + cloudname + '\''
     #         + ', but I was not told to expect them.'
     #     )
-    response = recv_msg(connection)
-    resp_type = response['type']
+    # response = recv_msg(connection)
+    resp_obj = connection.recv_obj()
+    resp_type = resp_obj.type
     # print 'host_host_fetch response:{}'.format(response)
     check_response(HOST_FILE_TRANSFER, resp_type)
 
-    recv_file_tree(response, matching_cloud, connection, db)
+    recv_file_tree(resp_obj, matching_cloud, connection, db)
     mylog('[{}]bottom of handle_recv_file(...,{})'
           .format(my_id, msg_obj))
 
 
 def filter_func(connection, address):
 
-    msg_obj = recv_msg(connection)
-    msg_type = msg_obj['type']
+    # msg_obj = recv_msg(connection)
+    msg_obj = connection.recv_obj()
+    msg_type = msg_obj.type
     # print 'The message is', msg_obj
     # todo we should make sure the connection was from the remote or a client
     # cont   that we were told about here, before doing ANY processing.

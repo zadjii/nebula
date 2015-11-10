@@ -1,4 +1,4 @@
-from messages import make_stat_dict
+from messages.util import make_stat_dict
 from messages.SessionMessage import SessionMessage
 from msg_codes import STAT_FILE_RESPONSE as STAT_FILE_RESPONSE
 __author__ = 'Mike'
