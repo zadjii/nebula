@@ -201,6 +201,7 @@ def filter_func(connection, address):
 
     # msg_obj = recv_msg(connection)
     msg_obj = connection.recv_obj()
+    mylog('msg:{}'.format(msg_obj.__dict__))
     msg_type = msg_obj.type
     # print 'The message is', msg_obj
     # todo we should make sure the connection was from the remote or a client

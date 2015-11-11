@@ -1,11 +1,17 @@
 import getpass
 import socket
+import os
 from stat import S_ISDIR
 from sys import stdin
+from connections.RawConnection import RawConnection
 from host import REMOTE_PORT
 from host.util import setup_remote_socket
-from msg_codes import *
+# from msg_codes import *
+from messages import *
+from msg_codes import CLIENT_SESSION_RESPONSE, LIST_FILES_RESPONSE,\
+    STAT_FILE_RESPONSE
 from nebsh import mylog
+
 
 __author__ = 'Mike'
 
@@ -14,8 +20,11 @@ class NebshClient(object):
     def __init__(self, args):
         self.testing, self.rem_addr, self.rem_port, self.cname =\
             process_args(args)
-        self.rem_sock = None
-        self.host_sock = None
+        # self.rem_sock = None
+        # self.host_sock = None
+        self.rem_conn = None
+        self.host_conn = None
+
         self.username = None
 
         self.session_id = None
@@ -37,27 +46,32 @@ class NebshClient(object):
             self.username = raw_input('Enter the username for ' + self.cname + ':').lower()
             password = getpass.getpass('Enter the password for ' + self.cname + ':')
 
-        self.rem_sock = setup_remote_socket(self.rem_addr, self.rem_port)
-        request = make_client_session_request(self.cname, self.username, password)
-        send_msg(request, self.rem_sock)
-        response = recv_msg(self.rem_sock)
+        rem_sock = setup_remote_socket(self.rem_addr, self.rem_port)
+        self.rem_conn = RawConnection(rem_sock)
+        # request = make_client_session_request(self.cname, self.username, password)
+        request = ClientSessionRequestMessage(self.cname, self.username, password)
+        # send_msg(request, self.rem_sock)
+        self.rem_conn.send_obj(request)
+        response = self.rem_conn.recv_obj()
+        # response = recv_msg(self.rem_sock)
         # print '__ resp:{}__'.format(response)
-        if not (response['type'] == CLIENT_SESSION_RESPONSE):
+        if not (response.type == CLIENT_SESSION_RESPONSE):
             raise Exception('remote did not respond with success')
-        self.session_id = response['sid']
-        self.tgt_host_ip = response['ip']
-        self.tgt_host_port = response['port']
+        self.session_id = response.sid
+        self.tgt_host_ip = response.ip
+        self.tgt_host_port = response.port
         self.main_loop()
 
     def main_loop(self):
+        msg = ListFilesRequestMessage(self.cname, self.session_id, '.')
         response = create_sock_msg_get_response(
             self.tgt_host_ip
             , self.tgt_host_port
-            , make_list_files_request(self.cname, self.session_id, '.')
+            , msg
         )
-        mylog.log_dbg(response)
-        self.cwd = response['fpath']
-        self.subdir_cache = response['ls']
+        mylog.log_dbg(response.__dict__)
+        self.cwd = response.fpath
+        self.subdir_cache = response.ls
         while not self.exit_requested:
             inline = raw_input(do_prompt(self.cname, self.cwd))
             # tokenize that shit
@@ -98,10 +112,11 @@ class NebshClient(object):
         neb_file = os.path.join(rel_path, local_file)
         mylog.log_dbg('nebpath={}->{}'.format(rel_path, neb_file))
 
+        msg = ClientFilePutMessage(self.cname, self.session_id, neb_file)
         host_sock = create_sock_and_send(
             self.tgt_host_ip
             , self.tgt_host_port
-            , make_client_file_put(self.cname, self.session_id, neb_file)
+            , msg
         )
 
         send_file_to_host(self.session_id, self.cname, local_path, neb_file, recursive, host_sock)
@@ -119,24 +134,25 @@ class NebshClient(object):
         if dir == 'ls':
             dir = '.'
         rel_path = os.path.join(self.cwd, dir)
+        msg = ListFilesRequestMessage(self.cname, self.session_id, rel_path)
         response = create_sock_msg_get_response(
             self.tgt_host_ip
             , self.tgt_host_port
-            , make_list_files_request(self.cname, self.session_id, rel_path)
+            , msg
         )
-        if response['type'] != LIST_FILES_RESPONSE:
+        if response.type != LIST_FILES_RESPONSE:
             print 'Error during ls:{}'.format(response)
             return
         # print response
-        if response is not None and response['ls'] is not None:
-            for child in response['ls']:
+        if response is not None and response.ls is not None:
+            for child in response.ls:
                 print child['name']
         else:
-            if response['stat'] is None:
+            if response.stat is None:
                 print '{} was not found'.format(rel_path)
             else:  # I don't this this block is ever hit
                 print '{} is not a directory'.format(rel_path)
-            mylog.log_dbg(response)
+            mylog.log_dbg(response.__dict__)
 
     def local_ls(self, argv):
         cwd = os.path.curdir
@@ -166,36 +182,44 @@ class NebshClient(object):
         print cwd
 
     def cd(self, argv):
+        # FIXME `cd \` or `cd /` takes you to the root of the Host FS.
+        # cont    this is like, REALLY bad. Gotta make sure any requests
+        # cont    don't escape the cloud's file tree.
+        # cont    like, makes sure every single request is a subdir of the root
         mylog.log_dbg('cd [{}]'.format(argv[1:]))
         dir = argv[-1]
         # if dir in [stat.name for stat in self.subdir_cache]:
         #     self.cwd = os.path.join(self.cwd, dir)
         rel_path = os.path.join(self.cwd, dir)
+        msg = ListFilesRequestMessage(self.cname, self.session_id, rel_path)
         response = create_sock_msg_get_response(
             self.tgt_host_ip
             , self.tgt_host_port
-            , make_list_files_request(self.cname, self.session_id, rel_path)
+            , msg
         )
-        if response['type'] != LIST_FILES_RESPONSE:
+        if response.type != LIST_FILES_RESPONSE:
             print 'Error during cd:{}'.format(response)
             return
-        self.cwd = os.path.join(self.cwd, dir)
-        self.cwd = os.path.normpath(self.cwd)
-        self.subdir_cache = response['ls']
+        mylog.log_dbg(response.__dict__)
+        if response.stat is not None:
+            self.cwd = os.path.join(self.cwd, dir)
+            self.cwd = os.path.normpath(self.cwd)
+            self.subdir_cache = response.ls
 
 
 def create_sock_msg_get_response(ip, port, msg):
-    sock = create_sock_and_send(ip, port, msg)
-    response = recv_msg(sock)
-    sock.close()
+    conn = create_sock_and_send(ip, port, msg)
+    response = conn.recv_obj()
+    conn.close()
     return response
 
 
 def create_sock_and_send(ip, port, msg):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect((ip, port))
-    send_msg(msg, sock)
-    return sock
+    host_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    host_sock.connect((ip, port))
+    conn = RawConnection(host_sock)
+    conn.send_obj(msg)
+    return conn
 
 
 def nebsh_usage():
@@ -220,13 +244,17 @@ def process_args(argv):
         if arg == '-r':
             if args_left < 2:
                 # throw some exception
-                raise Exception('not enough args supplied to -r')
+                print 'not enough args supplied to -r'
+                nebsh_usage()
+                exit()
             host = argv[1]
             args_eaten = 2
         elif arg == '-p':
             if args_left < 2:
                 # throw some exception
-                raise Exception('not enough args supplied to -p')
+                print 'not enough args supplied to -p'
+                nebsh_usage()
+                exit()
             port = argv[1]
             args_eaten = 2
         elif arg == '--test':
@@ -242,9 +270,13 @@ def process_args(argv):
         argv = argv[args_eaten:]
     # TODO: disallow relative paths. Absolute paths or bust.
     if cloudname is None:
-        raise Exception('Must specify a cloud name to mirror')
+        print 'Must specify a cloud name to mirror'
+        nebsh_usage()
+        exit()
     if host is None:
-        raise Exception('Must specify a host to mirror from')
+        print 'Must specify a host to mirror from'
+        nebsh_usage()
+        exit()
     # print 'attempting to get cloud named \'' + cloudname + '\' from',\
     #     'host at [',host,'] on port[',port,'], into root [',root,']'
     return (test_enabled, host, port, cloudname)
@@ -277,16 +309,24 @@ def send_file_to_host(session_id, cloudname, local_path, neb_path, recurse, sock
     if req_file_is_dir:
         # if neb_path != '.':  # todo: I think this we don't need; should test.
         # cont either way, need to determine cases for '.', '/', '..', etc todo<
-        send_msg(
-            make_client_file_transfer(
-                cloudname
-                , session_id
-                , neb_path
-                , req_file_is_dir
-                , 0
-            )
-            , socket_conn
+        msg = ClientFileTransferMessage(
+            cloudname
+            , session_id
+            , neb_path
+            , req_file_is_dir
+            , 0
         )
+        socket_conn.send_obj(msg)
+        # send_msg(
+        #     make_client_file_transfer(
+        #         cloudname
+        #         , session_id
+        #         , neb_path
+        #         , req_file_is_dir
+        #         , 0
+        #     )
+        #     , socket_conn
+        # )
         if recurse:
             subdirectories = os.listdir(local_path)
             mylog.log_dbg('Sending children of <{}>={}'.format(local_path, subdirectories))
@@ -302,16 +342,24 @@ def send_file_to_host(session_id, cloudname, local_path, neb_path, recurse, sock
     else:
         req_file_size = req_file_stat.st_size
         requested_file = open(local_path, 'rb')
-        send_msg(
-            make_client_file_transfer(
-                cloudname
-                , session_id
-                , neb_path
-                , req_file_is_dir
-                , req_file_size
-            )
-            , socket_conn
+        msg = ClientFileTransferMessage(
+            cloudname
+            , session_id
+            , neb_path
+            , req_file_is_dir
+            , req_file_size
         )
+        socket_conn.send_obj(msg)
+        # send_msg(
+        #     make_client_file_transfer(
+        #         cloudname
+        #         , session_id
+        #         , neb_path
+        #         , req_file_is_dir
+        #         , req_file_size
+        #     )
+        #     , socket_conn
+        # )
         l = 1
         while l:
             new_data = requested_file.read(1024)
@@ -329,10 +377,12 @@ def send_file_to_host(session_id, cloudname, local_path, neb_path, recurse, sock
 
 
 def complete_sending_files(cloudname, session_id, socket_conn):
-    send_msg(
-        make_client_file_transfer(cloudname, session_id, None, None, None)
-        , socket_conn
-    )
+    msg = ClientFileTransferMessage(cloudname, session_id, None, None, None)
+    socket_conn.send_obj(msg)
+    # send_msg(
+    #     make_client_file_transfer(cloudname, session_id, None, None, None)
+    #     , socket_conn
+    # )
     mylog.log_dbg('[{}] completed sending files to [{}]'
                   .format(session_id, cloudname))
 

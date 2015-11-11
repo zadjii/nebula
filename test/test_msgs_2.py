@@ -19,18 +19,18 @@ def test_msgs():
     print '# THIS IS THE OBJECT TESTER'
     print '#' * 80
 
-    print '_____ Testing BaseMessge _____'
-    base = BaseMessage()
-    base.type = 22
-    print base.__dict__
-    print base.serialize()
-    json_blob = '{"type":23}'
-    base2 = BaseMessage.deserialize(json.loads(json_blob))
-    print base2.__dict__
-
-    base3 = MessageDeserializer.decode_msg(json_blob)
-    print base3
-    print base3.__dict__
+    # print '_____ Testing BaseMessge _____'
+    # base = BaseMessage()
+    # base.type = 22
+    # print base.__dict__
+    # print base.serialize()
+    # json_blob = '{"type":23}'
+    # base2 = BaseMessage.deserialize(json.loads(json_blob))
+    # print base2.__dict__
+    #
+    # base3 = MessageDeserializer.decode_msg(json_blob)
+    # print base3
+    # print base3.__dict__
 
     # print '_____ Making NEW_HOST_MSG[0] json _____'
 
@@ -40,6 +40,10 @@ def test_msgs():
 
     print '_____ Testing AssignHostIDMessage _____'
     msg_obj = AssignHostIDMessage(22, 'TODOkey', 'TODOcert')
+    test_single_message(msg_obj)
+
+    print '_____ Testing ClientSessionRequestMessage _____'
+    msg_obj = ClientSessionRequestMessage('qwer', 'asdf', 'asdf')
     test_single_message(msg_obj)
 
 

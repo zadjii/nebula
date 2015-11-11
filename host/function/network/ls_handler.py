@@ -22,7 +22,7 @@ def list_files_handler(connection, address, msg_obj):
         mylog('sid[{}] requested {}, I was alerted, but I don\'t have it'
               .format(session_id, cloudname))
     full_path = cloud.translate_relative_path(rel_path)
-    resp = ListFilesResponseMessage(cloudname, rel_path, full_path)
+    resp = ListFilesResponseMessage(cloudname,session_id, rel_path, full_path)
     # response = make_list_files_response(cloudname, rel_path, full_path)
     # send_msg(response, connection)
     connection.send_obj(resp)

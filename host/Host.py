@@ -1,7 +1,7 @@
 import sys
 from connections.WebSocketConnection import MyBigFuckingLieServerProtocol
 from host.function.dbg_nodes import dbg_nodes
-from host.util import set_mylog_name
+from host.util import set_mylog_name, mylog
 
 __author__ = 'Mike'
 from threading import Thread
@@ -20,7 +20,7 @@ from autobahn.asyncio.websocket import WebSocketServerFactory
 
 
 def ws_thread_function(argv=[]):
-
+    mylog('top of ws thread')
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
