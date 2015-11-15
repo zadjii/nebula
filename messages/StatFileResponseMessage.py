@@ -6,9 +6,10 @@ __author__ = 'Mike'
 
 class StatFileResponseMessage(SessionMessage):
     def __init__(self, cname=None, session_id=None, fpath=None):
-        super(StatFileResponseMessage, self).__init__(cname, session_id)
+        super(StatFileResponseMessage, self).__init__(session_id)
         self.type = STAT_FILE_RESPONSE
         self.fpath = fpath
+        self.cname = cname
         self.stat = make_stat_dict(fpath)
 
     @staticmethod
@@ -16,6 +17,7 @@ class StatFileResponseMessage(SessionMessage):
         msg = SessionMessage.deserialize(json_dict)
         msg.fpath = json_dict['fpath']
         msg.stat = json_dict['stat']
+        msg.cname = json_dict['cname']
         return msg
 
 

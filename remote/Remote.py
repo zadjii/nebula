@@ -8,14 +8,16 @@ from OpenSSL.SSL import SysCallError
 from OpenSSL import SSL
 from connections.RawConnection import RawConnection
 from host.util import set_mylog_name, mylog
-from remote.function.client_session_setup import setup_client_session
+from messages.ClientGetCloudsResponse import ClientGetCloudsResponse
+from remote.function.client_session_setup import setup_client_session,\
+    get_cloud_host
 from remote.function.new_user import new_user
 from remote.function.create import create
 
 from msg_codes import *
 from messages import *
 
-from remote import User, Cloud, Host, get_db
+from remote import User, Cloud, Host, get_db, Session
 
 __author__ = 'Mike'
 
@@ -44,9 +46,36 @@ def filter_func(connection, address):
         respond_to_get_hosts_request(connection, address, msg_obj)
     elif msg_type == CLIENT_SESSION_REQUEST:
         setup_client_session(connection, address, msg_obj)
+    elif msg_type == CLIENT_GET_CLOUDS_REQUEST:
+        respond_to_get_clouds(connection, address, msg_obj)
+    elif msg_type == CLIENT_GET_CLOUD_HOST_REQUEST:
+        get_cloud_host(connection, address, msg_obj)
     else:
         print 'I don\'t know what to do with', msg_obj
     connection.close()
+
+
+def respond_to_get_clouds(connection, address, msg_obj):
+    db = get_db()
+    session_id = msg_obj.sid
+    sess_obj = db.session.query(Session).filter_by(uuid=session_id).first()
+    if sess_obj is None:
+        # fixme send error
+        mylog('CGCR: no session? {}'.format(session_id))
+        return
+    user = sess_obj.user
+    if user is None:
+        # fixme return error
+        mylog('CGCR: no user? {}'.format(sess_obj.user_id))
+        return
+    owned_names = [c.name for c in user.owned_clouds.all()]
+    contributed_names = [c.name for c in user.contributed_clouds.all()]
+    msg = ClientGetCloudsResponse(
+        session_id
+        , owned_names
+        , contributed_names
+    )
+    connection.send_obj(msg)
 
 
 def respond_to_get_hosts_request(connection, address, msg_obj):

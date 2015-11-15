@@ -4,6 +4,7 @@ from sqlalchemy.orm import relationship, backref
 
 __author__ = 'Mike'
 
+
 class Session(db.Base):
     __tablename__ = 'session'
 
@@ -16,3 +17,4 @@ class Session(db.Base):
     created_on = Column(DateTime)
     last_refresh = Column(DateTime)
     client_ip = Column(String)
+    # fixme what, we just ASSUME they're at HOST_PORT? that's dumb.

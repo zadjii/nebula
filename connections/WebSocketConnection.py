@@ -106,7 +106,7 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
         else:
             print("Text message received: {0}".format(payload.decode('utf8')))
         self._internal_conn.send(payload)
-        self._
+
         # echo back message verbatim
         # self.sendMessage(payload, isBinary)
 

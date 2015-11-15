@@ -5,8 +5,8 @@ __author__ = 'Mike'
 
 
 class ClientFileTransferMessage(SessionMessage):
-    def __init__(self, cname=None, session_id=None, fpath=None, is_dir=None, filesize=None):
-        super(ClientFileTransferMessage, self).__init__(cname, session_id)
+    def __init__(self, session_id=None, fpath=None, is_dir=None, filesize=None):
+        super(ClientFileTransferMessage, self).__init__(session_id)
         self.type = CLIENT_FILE_TRANSFER
         self.fpath = fpath
         self.fsize = filesize

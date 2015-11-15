@@ -5,15 +5,15 @@ __author__ = 'Mike'
 
 
 class ClientSessionResponseMessage(SessionMessage):
-    def __init__(self, cname=None, session_id=None, ip=None, port=None):
-        super(ClientSessionResponseMessage, self).__init__(cname, session_id)
+    def __init__(self, session_id=None):
+        super(ClientSessionResponseMessage, self).__init__(session_id)
         self.type = CLIENT_SESSION_RESPONSE
-        self.ip = ip
-        self.port = port
+        # self.ip = ip
+        # self.port = port
 
     @staticmethod
     def deserialize(json_dict):
         msg = SessionMessage.deserialize(json_dict)
-        msg.ip = json_dict['ip']
-        msg.port = json_dict['port']
+        # msg.ip = json_dict['ip']
+        # msg.port = json_dict['port']
         return msg

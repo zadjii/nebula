@@ -5,8 +5,8 @@ __author__ = 'Mike'
 
 
 class ClientSessionAlertMessage(SessionMessage):
-    def __init__(self, cname=None, session_id=None, user_id=None, ip=None):
-        super(ClientSessionAlertMessage, self).__init__(cname, session_id)
+    def __init__(self, session_id=None, user_id=None, ip=None):
+        super(ClientSessionAlertMessage, self).__init__(session_id)
         self.type = CLIENT_SESSION_ALERT
         self.uid = user_id
         self.ip = ip

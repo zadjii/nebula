@@ -1,6 +1,7 @@
 import socket
 
 from host import REMOTE_HOST, REMOTE_PORT
+
 from host.util import setup_remote_socket
 from test.repop_dbs import repop_dbs
 from test.util import start_nebs_and_nebr, teardown_children
@@ -50,21 +51,48 @@ def client_setup_test():
     rem_conn = RawConnection(rem_sock)
     print '__ setup remote socket __'
     # request = make_client_session_request('qwer', 'asdf', 'asdf')
-    request = ClientSessionRequestMessage('qwer', 'asdf', 'asdf')
+    request = ClientSessionRequestMessage('asdf', 'asdf')
     # send_msg(request, rem_sock)
     rem_conn.send_obj(request)
     print '__ sent client session request message __'
     print '__ msg:{}__'.format(request.__dict__)
     # response = recv_msg(rem_sock)
     response = rem_conn.recv_obj()
-    print '__ resp:{}__'.format(response)
+    print '__ resp:{}__'.format(response.__dict__)
 
     if not (response.type == CLIENT_SESSION_RESPONSE):
         raise Exception('remote did not respond with success')
-    session_id = response.sid
-    tgt_host_ip = response.ip
-    tgt_host_port = response.port
 
+    session_id = response.sid
+
+    ############
+    rem_sock = setup_remote_socket(REMOTE_HOST, REMOTE_PORT)
+    rem_conn = RawConnection(rem_sock)
+
+    msg = ClientGetCloudsRequest(session_id)
+    rem_conn.send_obj(msg)
+    resp = rem_conn.recv_obj()
+    if not (resp.type == CLIENT_GET_CLOUDS_RESPONSE):
+        raise Exception('remote did not respond with success CGCR')
+    print resp.__dict__
+
+    cloudname = resp.owned[0]
+
+    ############
+    rem_sock = setup_remote_socket(REMOTE_HOST, REMOTE_PORT)
+    rem_conn = RawConnection(rem_sock)
+
+    msg = ClientGetCloudHostRequest(session_id, cloudname)
+    rem_conn.send_obj(msg)
+    resp = rem_conn.recv_obj()
+    if not (resp.type == CLIENT_GET_CLOUD_HOST_RESPONSE):
+        raise Exception('remote did not respond with success CGCR')
+    print resp.__dict__
+
+    tgt_host_ip = resp.ip
+    tgt_host_port = resp.port
+
+    ############
     print '__ setting up host socket __'
     msg = ListFilesRequestMessage('qwer', session_id, '.')
     response = create_sock_msg_get_response(
@@ -131,7 +159,7 @@ def ls_path(session_id, tgt_host_ip, tgt_host_port, path):
         , tgt_host_port
         , msg
     )
-    print '__ ls {} response=({})'.format(path, response)
+    print '__ ls {} response=({})'.format(path, response.__dict__)
     verify_type_or_teardown(response, LIST_FILES_RESPONSE)
     print '__ {} ls contents=({})'.format(path, response.ls)
 

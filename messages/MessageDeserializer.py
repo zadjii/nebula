@@ -38,6 +38,10 @@ _decoder_table = {
     , CLIENT_SESSION_RESPONSE: ClientSessionResponseMessage.deserialize #28
     , CLIENT_FILE_PUT: ClientFilePutMessage.deserialize # 29
     , CLIENT_FILE_TRANSFER: ClientFileTransferMessage.deserialize #30
+    , CLIENT_GET_CLOUDS_REQUEST: ClientGetCloudsRequest.deserialize #31
+    , CLIENT_GET_CLOUDS_RESPONSE: ClientGetCloudsResponse.deserialize #32
+    , CLIENT_GET_CLOUD_HOST_REQUEST: ClientGetCloudHostRequest.deserialize #33
+    , CLIENT_GET_CLOUD_HOST_RESPONSE: ClientGetCloudHostResponse.deserialize #34
 }
 
 

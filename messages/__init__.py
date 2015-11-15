@@ -33,6 +33,10 @@ from messages.ClientSessionResponseMessage import ClientSessionResponseMessage
 from messages.ClientFilePutMessage import ClientFilePutMessage
 from messages.ClientFileTransferMessage import ClientFileTransferMessage
 
+from messages.ClientGetCloudsRequest import ClientGetCloudsRequest
+from messages.ClientGetCloudsResponse import ClientGetCloudsResponse
+from messages.ClientGetCloudHostRequest import ClientGetCloudHostRequest
+from messages.ClientGetCloudHostResponse import ClientGetCloudHostResponse
 __author__ = 'Mike'
 
 

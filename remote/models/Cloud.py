@@ -49,7 +49,7 @@ class Cloud(db.Base):
     max_size = Column(Integer)  # Cloud size in bytes
     privacy = Column(Integer, default=PRIVATE_CLOUD)
 
-    sessions = relationship('Session', backref='cloud', lazy='dynamic')
+    # sessions = relationship('Session', backref='cloud', lazy='dynamic')
 
     def is_hidden(self):
         return self.privacy == HIDDEN_CLOUD
