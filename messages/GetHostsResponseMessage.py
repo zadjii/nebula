@@ -16,6 +16,7 @@ class GetHostsResponseMessage(BaseMessage):
                 host_obj = {
                     'ip': host.ip
                     , 'port': host.port
+                    , 'wsport': host.ws_port
                     , 'id': host.id
                     , 'update': host.last_update
                     , 'hndshk': host.last_handshake

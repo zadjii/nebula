@@ -31,7 +31,9 @@ class WebsocketConnection(AbstractConnection):
         self._socket.recv(n_chars)
         buff = self._socket.recv(size)
         mylog('wsConn.r_o(1):<{}>'.format(buff))
-        return MessageDeserializer.decode_msg(buff)
+        obj = MessageDeserializer.decode_msg(buff)
+        mylog('deserialized"{}"[{}]({})'.format(buff, obj, obj.__dict__))
+        return obj
 
     def _really_bad_get_size(self):
         data = '0'
@@ -42,11 +44,13 @@ class WebsocketConnection(AbstractConnection):
         return int(data[0:length-1]), length-1
 
     def send_obj(self, message_obj):
+        mylog('ws send, {}'.format(message_obj.__dict__))
         msg_json = message_obj.serialize()
         # self._socket.send(get_msg_size(msg_json))
         # self._socket.send(msg_json)
         msg_size = get_msg_size(msg_json)
         self._ws_server_protocol.sendMessage(msg_size + msg_json)
+        mylog('bottom of ws send')
 
     def recv_next_data(self, length):
         return self._socket.recv(length)

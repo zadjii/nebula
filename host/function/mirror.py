@@ -6,7 +6,7 @@ from sys import stdin
 from werkzeug.security import generate_password_hash
 from connections.RawConnection import RawConnection
 
-from host import Cloud, REMOTE_PORT, HOST_PORT
+from host import Cloud, REMOTE_PORT, HOST_PORT, HOST_WS_PORT
 from host import get_db
 from host.function.recv_files import recv_file_tree
 from host.util import check_response, setup_remote_socket, mylog
@@ -25,7 +25,7 @@ def ask_remote_for_id(host, port, db):
     sslSocket = setup_remote_socket(host, port)
     raw_conn = RawConnection(sslSocket)
     # write_msg(make_new_host_json(HOST_PORT), sslSocket)
-    msg = NewHostMessage(HOST_PORT)
+    msg = NewHostMessage(HOST_PORT, HOST_WS_PORT)
     raw_conn.send_obj(msg)
     # msg_obj = recv_msg(sslSocket)
     resp_obj = raw_conn.recv_obj()

@@ -126,7 +126,9 @@ def get_cloud_host(connection, address, msg_obj):
     # todo: make this^ random
     if host is None:
         mylog('ERR: host was none')
-        send_generic_error_and_close(connection)  # todo send proper error
+        msg = ClientGetCloudHostResponse(session_id, cloud.name, '', 0, 0)
+        connection.send_obj(msg)# fixme
+        # send_generic_error_and_close(connection)  # todo send proper error
         return
     # fixme confirm that the host is alive, and can handle this response
 
@@ -135,7 +137,7 @@ def get_cloud_host(connection, address, msg_obj):
     host.send_msg(msg)
 
     # tell client
-    msg = ClientGetCloudHostResponse(session_id, cloud.name, host.ip, host.port)
+    msg = ClientGetCloudHostResponse(session_id, cloud.name, host.ip, host.port, host.ws_port)
     connection.send_obj(msg)
 
     mylog('I think i setup the host for this session')

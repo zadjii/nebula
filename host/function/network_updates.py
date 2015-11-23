@@ -21,6 +21,7 @@ def receive_updates_thread():
     s.bind((HOST_HOST, HOST_PORT))
     mylog('Listening on ({},{})'.format(HOST_HOST, HOST_PORT))
     s.listen(5)
+
     while True:
         (connection, address) = s.accept()
         raw_conn = RawConnection(connection)
@@ -201,7 +202,7 @@ def filter_func(connection, address):
 
     # msg_obj = recv_msg(connection)
     msg_obj = connection.recv_obj()
-    mylog('msg:{}'.format(msg_obj.__dict__))
+    mylog('<{}>msg:{}'.format(address, msg_obj.__dict__))
     msg_type = msg_obj.type
     # print 'The message is', msg_obj
     # todo we should make sure the connection was from the remote or a client
@@ -226,7 +227,7 @@ def filter_func(connection, address):
     elif msg_type == CLIENT_FILE_PUT:
         handle_recv_file_from_client(connection, address, msg_obj)
     else:
-        print 'I don\'t know what to do with', msg_obj
+        mylog('I don\'t know what to do with {},\n{}'.format(msg_obj, msg_obj.__dict__))
     connection.close()
 
 # todo make this work... later

@@ -20,6 +20,7 @@ class Host(db.Base):
     remaining_size = Column(Integer)  # remaining free space on host (in bytes)
     ip = Column(String)
     port = Column(Integer)
+    ws_port = Column(Integer)
     # sessions = relationship('Session', backref='host', lazy='dynamic')
 
     # note: leaving this here. The host will only be in the list of hosts

@@ -1,5 +1,6 @@
 import sys
 from connections.WebSocketConnection import MyBigFuckingLieServerProtocol
+from host import HOST_WS_HOST, HOST_WS_PORT
 from host.function.dbg_nodes import dbg_nodes
 from host.util import set_mylog_name, mylog
 
@@ -24,11 +25,11 @@ def ws_thread_function(argv=[]):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    factory = WebSocketServerFactory(u"ws://127.0.0.1:9000", debug=False)
+    factory = WebSocketServerFactory(u"ws://{}:{}".format(HOST_WS_HOST, HOST_WS_PORT), debug=False)
     factory.protocol = MyBigFuckingLieServerProtocol
 
     # loop = asyncio.get_event_loop()
-    coro = loop.create_server(factory, '0.0.0.0', 9000)
+    coro = loop.create_server(factory, '0.0.0.0', HOST_WS_PORT)
     server = loop.run_until_complete(coro)
     try:
         loop.run_forever()

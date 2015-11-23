@@ -35,7 +35,7 @@ def test_msgs():
     # print '_____ Making NEW_HOST_MSG[0] json _____'
 
     print '_____ Testing NewHostMessage _____'
-    msg_obj = NewHostMessage(port=23456)
+    msg_obj = NewHostMessage(port=23456, wsport=34567)
     test_single_message(msg_obj)
 
     print '_____ Testing AssignHostIDMessage _____'
@@ -43,7 +43,7 @@ def test_msgs():
     test_single_message(msg_obj)
 
     print '_____ Testing ClientSessionRequestMessage _____'
-    msg_obj = ClientSessionRequestMessage('qwer', 'asdf', 'asdf')
+    msg_obj = ClientSessionRequestMessage('asdf', 'asdf')
     test_single_message(msg_obj)
 
 
