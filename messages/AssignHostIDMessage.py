@@ -1,12 +1,12 @@
-import json
+# last generated 2015-12-31 02:30:42.285000
 from messages import BaseMessage
 from msg_codes import ASSIGN_HOST_ID as ASSIGN_HOST_ID
 __author__ = 'Mike'
 
 
-class AssignHostIDMessage(BaseMessage):
+class AssignHostIdMessage(BaseMessage):
     def __init__(self, id=None, key=None, cert=None):
-        super(AssignHostIDMessage, self).__init__()
+        super(AssignHostIdMessage, self).__init__()
         self.type = ASSIGN_HOST_ID
         self.id = id
         self.key = key
@@ -14,9 +14,7 @@ class AssignHostIDMessage(BaseMessage):
 
     @staticmethod
     def deserialize(json_dict):
-        msg = AssignHostIDMessage()
-        # msg.type = json_dict['type']
-        # ^ I think it's assumed
+        msg = AssignHostIdMessage()
         msg.id = json_dict['id']
         msg.key = json_dict['key']
         msg.cert = json_dict['cert']

@@ -1,0 +1,26 @@
+# last generated 2015-12-31 02:30:42.365000
+from messages import BaseMessage
+from msg_codes import CLIENT_GET_CLOUD_HOST_RESPONSE as CLIENT_GET_CLOUD_HOST_RESPONSE
+__author__ = 'Mike'
+
+
+class ClientGetCloudHostResponseMessage(BaseMessage):
+    def __init__(self, sid=None, cname=None, ip=None, port=None, wsport=None):
+        super(ClientGetCloudHostResponseMessage, self).__init__()
+        self.type = CLIENT_GET_CLOUD_HOST_RESPONSE
+        self.sid = sid
+        self.cname = cname
+        self.ip = ip
+        self.port = port
+        self.wsport = wsport
+
+    @staticmethod
+    def deserialize(json_dict):
+        msg = ClientGetCloudHostResponseMessage()
+        msg.sid = json_dict['sid']
+        msg.cname = json_dict['cname']
+        msg.ip = json_dict['ip']
+        msg.port = json_dict['port']
+        msg.wsport = json_dict['wsport']
+        return msg
+

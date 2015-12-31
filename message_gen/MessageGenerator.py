@@ -182,6 +182,7 @@ def make_messages_dir():
 def make_message_deserializer(messages):
     handle = open('./out/messages/MessageDeserializer.py', mode='w')
     handle.write('# last generated {}\n'.format(datetime.utcnow()))
+    handle.write('import json\n')
     handle.write('from msg_codes import *\n')
     handle.write('from messages import *\n')
     handle.write('_decoder_table = {\n')

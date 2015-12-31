@@ -1,24 +1,16 @@
-import json
+# last generated 2015-12-31 02:30:42.313000
 from messages import BaseMessage
-from msg_codes import ASSIGN_HOST_ID as ASSIGN_HOST_ID
+from msg_codes import MAKE_USER_REQUEST as MAKE_USER_REQUEST
 __author__ = 'Mike'
 
 
-class AssignHostIDMessage(BaseMessage):
-    def __init__(self, id=None, key=None, cert=None):
-        super(AssignHostIDMessage, self).__init__()
-        self.type = ASSIGN_HOST_ID
-        self.id = id
-        self.key = key
-        self.cert = cert
+class MakeUserRequestMessage(BaseMessage):
+    def __init__(self):
+        super(MakeUserRequestMessage, self).__init__()
+        self.type = MAKE_USER_REQUEST
 
     @staticmethod
     def deserialize(json_dict):
-        msg = AssignHostIDMessage()
-        # msg.type = json_dict['type']
-        # ^ I think it's assumed
-        msg.id = json_dict['id']
-        msg.key = json_dict['key']
-        msg.cert = json_dict['cert']
+        msg = MakeUserRequestMessage()
         return msg
 

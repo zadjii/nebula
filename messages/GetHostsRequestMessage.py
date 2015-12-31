@@ -1,4 +1,4 @@
-import json
+# last generated 2015-12-31 02:30:42.320000
 from messages import BaseMessage
 from msg_codes import GET_HOSTS_REQUEST as GET_HOSTS_REQUEST
 __author__ = 'Mike'
@@ -14,8 +14,6 @@ class GetHostsRequestMessage(BaseMessage):
     @staticmethod
     def deserialize(json_dict):
         msg = GetHostsRequestMessage()
-        # msg.type = json_dict['type']
-        # ^ I think it's assumed
         msg.id = json_dict['id']
         msg.cname = json_dict['cname']
         return msg

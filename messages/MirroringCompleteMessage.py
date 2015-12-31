@@ -1,4 +1,4 @@
-import json
+# last generated 2015-12-31 02:30:42.318000
 from messages import BaseMessage
 from msg_codes import MIRRORING_COMPLETE as MIRRORING_COMPLETE
 __author__ = 'Mike'
@@ -14,8 +14,6 @@ class MirroringCompleteMessage(BaseMessage):
     @staticmethod
     def deserialize(json_dict):
         msg = MirroringCompleteMessage()
-        # msg.type = json_dict['type']
-        # ^ I think it's assumed
         msg.id = json_dict['id']
         msg.cname = json_dict['cname']
         return msg

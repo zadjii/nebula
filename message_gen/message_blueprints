@@ -99,6 +99,7 @@
 # SFRp - manually add the following:
 #        self.stat = make_stat_dict(fpath)
 #    and remove that arg.
+#    and add from messages.util import *
 21  , STAT_FILE_RESPONSE    , sid       , string:cname, string:fpath, todo:stat
 
 ###############################
@@ -106,6 +107,10 @@
 #        self.stat = make_stat_dict(fpath)
 #        self.ls = make_ls_array(fpath)
 #    and remove those args.
+#    and add from messages.util import *
+#    also, get rid of the member rel_path... see:
+#        self.fpath = rel_path
+#    there is no rel_path member
 23  , LIST_FILES_RESPONSE   , sid       , string:cname, string:rel_path, string:fpath, todo:ls, todo:stat
 
 

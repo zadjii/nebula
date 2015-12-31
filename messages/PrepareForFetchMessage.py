@@ -1,4 +1,4 @@
-import json
+# last generated 2015-12-31 02:30:42.301000
 from messages import BaseMessage
 from msg_codes import PREPARE_FOR_FETCH as PREPARE_FOR_FETCH
 __author__ = 'Mike'
@@ -15,8 +15,6 @@ class PrepareForFetchMessage(BaseMessage):
     @staticmethod
     def deserialize(json_dict):
         msg = PrepareForFetchMessage()
-        # msg.type = json_dict['type']
-        # ^ I think it's assumed
         msg.id = json_dict['id']
         msg.cname = json_dict['cname']
         msg.ip = json_dict['ip']

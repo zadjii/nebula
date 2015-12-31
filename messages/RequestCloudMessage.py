@@ -1,4 +1,4 @@
-import json
+# last generated 2015-12-31 02:30:42.296000
 from messages import BaseMessage
 from msg_codes import REQUEST_CLOUD as REQUEST_CLOUD
 __author__ = 'Mike'
@@ -16,8 +16,6 @@ class RequestCloudMessage(BaseMessage):
     @staticmethod
     def deserialize(json_dict):
         msg = RequestCloudMessage()
-        # msg.type = json_dict['type']
-        # ^ I think it's assumed
         msg.id = json_dict['id']
         msg.cname = json_dict['cname']
         msg.uname = json_dict['uname']

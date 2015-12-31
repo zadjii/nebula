@@ -1,10 +1,6 @@
 import sys
-import os
-
-
 import socket
 from threading import Thread
-from OpenSSL.SSL import SysCallError
 from OpenSSL import SSL
 from connections.RawConnection import RawConnection
 from host.util import set_mylog_name, mylog
@@ -36,7 +32,7 @@ def filter_func(connection, address):
     msg_obj = connection.recv_obj()
     msg_type = msg_obj.type
     # print 'The message is', msg_obj
-    if msg_type == NEW_HOST_MSG:
+    if msg_type == NEW_HOST:
         new_host_handler(connection, address, msg_obj)
     elif msg_type == REQUEST_CLOUD:
         host_request_cloud(connection, address, msg_obj)
@@ -153,8 +149,11 @@ def host_request_cloud(connection, address, msg_obj):
     port = 0
     rand_host = match.hosts.first()  #todo make this random
     if rand_host is not None:
-        prep_for_fetch_msg = make_prepare_for_fetch_json(host_id, cloudname, address[0])
-        rand_host.send_msg(prep_for_fetch_msg)
+        msg = PrepareForFetchMessage(host_id, cloudname, address[0])
+        rand_host.send_msg(msg)
+        # prep_for_fetch_msg = make_prepare_for_fetch_json(host_id, cloudname, address[0])
+        # rand_host.send_msg(prep_for_fetch_msg)
+
         # ip = rand_host.ip
         # port = rand_host.port
         # print 'rand host is ({},{})'.format(ip, port)
@@ -170,7 +169,7 @@ def host_request_cloud(connection, address, msg_obj):
         # send_msg(prep_for_fetch_msg, s)
         # print 'nebr completed talking to rand_host'
         # s.close()
-    msg = GoRetrieveMessage(0, ip, port)
+    msg = GoRetrieveHereMessage(0, ip, port)
     connection.send_obj(msg)
     # send_msg(make_go_retrieve_here_json(0, ip, port), connection)
 
@@ -186,12 +185,8 @@ def new_host_handler(connection, address, msg_obj):
     db.session.add(host)
     db.session.commit()
 
-    msg = AssignHostIDMessage(host.id, 'todo_placeholder_key', 'todo_placeholder_cert')
+    msg = AssignHostIdMessage(host.id, 'todo_placeholder_key', 'todo_placeholder_cert')
     connection.send_obj(msg)
-    # send_msg(
-    #     make_assign_host_id_json(host.id, 'todo_placeholder_key', 'todo_placeholder_cert')
-    #     , connection
-    # )
 
 
 def start(argv):
