@@ -23,7 +23,7 @@ def recv_file_transfer(msg, cloud, socket_conn, db):
     if msg_file_isdir :
         if not os.path.exists(full_path):
             os.mkdir(full_path)
-            print 'Created directory {}'.format(full_path)
+            print 'Created directory {}m'.format(full_path)
     else:  # is normal file
         data_buffer = ''  # fixme i'm using a string to buffer this?? LOL
         total_read = 0

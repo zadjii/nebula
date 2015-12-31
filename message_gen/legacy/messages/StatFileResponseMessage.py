@@ -1,19 +1,23 @@
 from messages.util import make_stat_dict
 from messages.SessionMessage import SessionMessage
-from msg_codes import CLIENT_FILE_PUT as CLIENT_FILE_PUT
+from msg_codes import STAT_FILE_RESPONSE as STAT_FILE_RESPONSE
 __author__ = 'Mike'
 
 
-class ClientFilePutMessage(SessionMessage):
-    def __init__(self, session_id=None, cname=None, fpath=None):
-        super(ClientFilePutMessage, self).__init__(session_id)
-        self.type = CLIENT_FILE_PUT
+class StatFileResponseMessage(SessionMessage):
+    def __init__(self, cname=None, session_id=None, fpath=None):
+        super(StatFileResponseMessage, self).__init__(session_id)
+        self.type = STAT_FILE_RESPONSE
         self.fpath = fpath
         self.cname = cname
+        self.stat = make_stat_dict(fpath)
 
     @staticmethod
     def deserialize(json_dict):
         msg = SessionMessage.deserialize(json_dict)
         msg.fpath = json_dict['fpath']
+        msg.stat = json_dict['stat']
         msg.cname = json_dict['cname']
         return msg
+
+

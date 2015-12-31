@@ -112,7 +112,7 @@ class NebshClient(object):
         neb_file = os.path.join(rel_path, local_file)
         mylog.log_dbg('nebpath={}->{}'.format(rel_path, neb_file))
 
-        msg = ClientFilePutMessage(self.cname, self.session_id, neb_file)
+        msg = ClientFilePutMessage(self.session_id, self.cname, neb_file)
         host_sock = create_sock_and_send(
             self.tgt_host_ip
             , self.tgt_host_port
@@ -310,8 +310,8 @@ def send_file_to_host(session_id, cloudname, local_path, neb_path, recurse, sock
         # if neb_path != '.':  # todo: I think this we don't need; should test.
         # cont either way, need to determine cases for '.', '/', '..', etc todo<
         msg = ClientFileTransferMessage(
-            cloudname
-            , session_id
+            session_id
+            , cloudname
             , neb_path
             , req_file_is_dir
             , 0
@@ -343,8 +343,8 @@ def send_file_to_host(session_id, cloudname, local_path, neb_path, recurse, sock
         req_file_size = req_file_stat.st_size
         requested_file = open(local_path, 'rb')
         msg = ClientFileTransferMessage(
-            cloudname
-            , session_id
+            session_id
+            , cloudname
             , neb_path
             , req_file_is_dir
             , req_file_size
@@ -377,7 +377,7 @@ def send_file_to_host(session_id, cloudname, local_path, neb_path, recurse, sock
 
 
 def complete_sending_files(cloudname, session_id, socket_conn):
-    msg = ClientFileTransferMessage(cloudname, session_id, None, None, None)
+    msg = ClientFileTransferMessage(session_id, cloudname, None, None, None)
     socket_conn.send_obj(msg)
     # send_msg(
     #     make_client_file_transfer(cloudname, session_id, None, None, None)

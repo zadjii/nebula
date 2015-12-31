@@ -32,7 +32,7 @@ class WebsocketConnection(AbstractConnection):
         buff = self._socket.recv(size)
         mylog('wsConn.r_o(1):<{}>'.format(buff))
         obj = MessageDeserializer.decode_msg(buff)
-        mylog('deserialized"{}"[{}]({})'.format(buff, obj, obj.__dict__))
+        # mylog('deserialized"{}"[{}]({})'.format(buff, obj, obj.__dict__))
         return obj
 
     def _really_bad_get_size(self):
@@ -49,7 +49,8 @@ class WebsocketConnection(AbstractConnection):
         # self._socket.send(get_msg_size(msg_json))
         # self._socket.send(msg_json)
         msg_size = get_msg_size(msg_json)
-        self._ws_server_protocol.sendMessage(msg_size + msg_json)
+        # self._ws_server_protocol.sendMessage(msg_size + msg_json)
+        self._ws_server_protocol.sendMessage(msg_json)
         mylog('bottom of ws send')
 
     def recv_next_data(self, length):
@@ -77,6 +78,7 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
         self._internal_server_socket.bind(('localhost', HOST_WS_PORT))
         self._internal_server_socket.listen(5)  # todo does this 5 make sense?
         self._internal_conn = None
+        self._child_thread = None
         mylog('Bottom of MBFLSP.__init__')
 
     def onConnect(self, request):
@@ -87,17 +89,15 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
         temp_socket.connect(('localhost', self._internal_port))
         mylog('MBFLSP.onConnect-1')
         (conn, addr) = self._internal_server_socket.accept()
-        mylog('MBFLSP.onConnect-2')
-        # todo wrap the conn in a WSConn
+        # mylog('MBFLSP.onConnect-2')
         ws_conn = WebsocketConnection(temp_socket, self)
-        mylog('MBFLSP.onConnect-3')
+        # mylog('MBFLSP.onConnect-3')
         self._internal_conn = conn
-        thread = Thread(target=filter_func, args=[ws_conn, addr])
-        mylog('MBFLSP.onConnect-4')
-        # thread = Thread(target=filter_func, args=[ws_conn, addr]) #TODO turnon
+        self._child_thread = Thread(target=filter_func, args=[ws_conn, addr])
+        # mylog('MBFLSP.onConnect-4')
 
         mylog('before of MBFLSP...thread.start')
-        thread.start()
+        self._child_thread.start()
         # thread.join()
         mylog('Bottom of MBFLSP.onConnect')
 
@@ -114,9 +114,11 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
         # echo back message verbatim
         # self.sendMessage(payload, isBinary)
 
-
     def onClose(self, wasClean, code, reason):
         print("WebSocket connection closed: {0}".format(reason))
+        self._internal_conn.send('\0')
         self._internal_conn.close()
+        if self._child_thread is not None:
+            self._child_thread.exit()
 
 
