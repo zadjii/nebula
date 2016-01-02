@@ -6,7 +6,9 @@
 #    `/msg_codes.py` which has the actual ints for each message type
 #    Drop all of these guys into nebula, s.t. .../out === .../nebula
 # JAVASCRIPT: TODO
-
+# drop the generated /out/js/messages.js into static? I think?
+# I just comment out the TODO messages for now. JS won't need to be creating
+#   them for all i know.
 
 
 ################################################################################

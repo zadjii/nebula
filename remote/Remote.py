@@ -67,7 +67,7 @@ def respond_to_get_clouds(connection, address, msg_obj):
     mylog('getting clouds for {}'.format(user.username))
     owned_names = [c.name for c in user.owned_clouds.all()]
     contributed_names = [c.name for c in user.contributed_clouds.all()]
-    msg = ClientGetCloudsResponse(
+    msg = ClientGetCloudsResponseMessage(
         session_id
         , owned_names
         , contributed_names

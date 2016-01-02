@@ -211,9 +211,6 @@ def filter_func(connection, address):
         prepare_for_fetch(connection, address, msg_obj)
     elif msg_type == HOST_HOST_FETCH:
         handle_fetch(connection, address, msg_obj)
-    elif msg_type == COME_FETCH:
-        # handle_come_fetch(connection, address, msg_obj)
-        print 'COME_FETCH was a really fucking stupid idea.'
     elif msg_type == HOST_FILE_PUSH:
         handle_recv_file(connection, address, msg_obj)
     elif msg_type == CLIENT_SESSION_ALERT:
@@ -231,39 +228,39 @@ def filter_func(connection, address):
     connection.close()
 
 # todo make this work... later
-def filter_func2(connection, address):
-    dont_close = True
-    while dont_close:
-        # keep connection alive and keep processing msgs until reaching an endstate
-        # mostly used for client session type messages
-        msg_obj = recv_msg(connection)
-        msg_type = msg_obj['type']
-        # print 'The message is', msg_obj
-        # todo we should make sure the connection was from the remote or a client
-        # cont   that we were told about here, before doing ANY processing.
-        if msg_type == PREPARE_FOR_FETCH:
-            prepare_for_fetch(connection, address, msg_obj)
-            dont_close = False
-        elif msg_type == HOST_HOST_FETCH:
-            handle_fetch(connection, address, msg_obj)
-            dont_close = False
-        elif msg_type == COME_FETCH:
-            # handle_come_fetch(connection, address, msg_obj)
-            print 'COME_FETCH was a really fucking stupid idea.'
-        elif msg_type == HOST_FILE_PUSH:
-            handle_recv_file(connection, address, msg_obj)
-            dont_close = False
-        elif msg_type == CLIENT_SESSION_ALERT:
-            handle_client_session_alert(connection, address, msg_obj)
-        elif msg_type == STAT_FILE_REQUEST:
-            # fixme
-            pass
-            # handle_recv_file(connection, address, msg_obj)
-        elif msg_type == LIST_FILES_REQUEST:
-            list_files_handler(connection, address, msg_obj)
-        else:
-            print 'I don\'t know what to do with', msg_obj
-            dont_close = False
-    connection.close()
+# def filter_func2(connection, address):
+#     dont_close = True
+#     while dont_close:
+#         # keep connection alive and keep processing msgs until reaching an endstate
+#         # mostly used for client session type messages
+#         msg_obj = recv_msg(connection)
+#         msg_type = msg_obj['type']
+#         # print 'The message is', msg_obj
+#         # todo we should make sure the connection was from the remote or a client
+#         # cont   that we were told about here, before doing ANY processing.
+#         if msg_type == PREPARE_FOR_FETCH:
+#             prepare_for_fetch(connection, address, msg_obj)
+#             dont_close = False
+#         elif msg_type == HOST_HOST_FETCH:
+#             handle_fetch(connection, address, msg_obj)
+#             dont_close = False
+#         elif msg_type == COME_FETCH:
+#             # handle_come_fetch(connection, address, msg_obj)
+#             print 'COME_FETCH was a really fucking stupid idea.'
+#         elif msg_type == HOST_FILE_PUSH:
+#             handle_recv_file(connection, address, msg_obj)
+#             dont_close = False
+#         elif msg_type == CLIENT_SESSION_ALERT:
+#             handle_client_session_alert(connection, address, msg_obj)
+#         elif msg_type == STAT_FILE_REQUEST:
+#             # fixme
+#             pass
+#             # handle_recv_file(connection, address, msg_obj)
+#         elif msg_type == LIST_FILES_REQUEST:
+#             list_files_handler(connection, address, msg_obj)
+#         else:
+#             print 'I don\'t know what to do with', msg_obj
+#             dont_close = False
+#     connection.close()
 
 
