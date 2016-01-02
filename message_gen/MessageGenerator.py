@@ -280,8 +280,36 @@ def generate_python(messages):
     make_message_deserializer(messages)
 
 
+def make_messages_js(messages):
+    handle = open('./out/js/messages.js', mode='w')
+    handle.write('// last generated {}\n'.format(datetime.utcnow()))
+    for msg in messages:
+        handle.write('const {} = {};\n'.format(msg.CAPS, msg.code))
+    # make message classes
+    for msg in messages:
+        handle.write('function {}('.format(msg.class_name))
+        handle.write(', '.join([arg.name for arg in msg.get_args()]))
+        # for arg in msg.get_args():
+        #     handle.write(arg.name + ', ')
+        handle.write('){\n')
+        handle.write('    return {\n')
+        # handle.write('        "{0}": {0}\n'.format(msg.get_args()[0]))
+        handle.write('        "{}": {}\n'.format('type', msg.CAPS))
+        for arg in msg.get_args():
+            handle.write('        , "{0}": {0}'.format(arg.name))
+            if arg.type == MANUAL:
+                handle.write(' ~~~~ // FIXME TODO')
+            handle.write('\n')
+        handle.write('    };\n}\n')
+    handle.close()
+    print 'wrote messages.js'
+
+
 def generate_javascript(messages):
-    pass
+    if not os.path.exists('./out/js'):
+        os.mkdir('./out/js')
+    # make messages.js
+    make_messages_js(messages)
 
 
 def generatecode(messages):
