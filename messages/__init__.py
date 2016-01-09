@@ -1,12 +1,13 @@
 # last generated 2015-12-31 02:30:42.265000
 from messages.BaseMessage import BaseMessage
+from messages.FileDoesNotExistErrorMessage import FileDoesNotExistErrorMessage
 from messages.FileIsNotDirErrorMessage import FileIsNotDirErrorMessage
 from messages.FileIsDirErrorMessage import FileIsDirErrorMessage
 from messages.UnpreparedHostErrorMessage import UnpreparedHostErrorMessage
 from messages.AuthErrorMessage import AuthErrorMessage
 from messages.GenericErrorMessage import GenericErrorMessage
 from messages.NewHostMessage import NewHostMessage
-from messages.AssignHostIdMessage import AssignHostIdMessage
+from messages.AssignHostIDMessage import AssignHostIdMessage
 from messages.HostHandshakeMessage import HostHandshakeMessage
 from messages.RemoteHandshakeMessage import RemoteHandshakeMessage
 from messages.RemHandshakeGoFetchMessage import RemHandshakeGoFetchMessage

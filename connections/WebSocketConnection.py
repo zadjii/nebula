@@ -13,13 +13,13 @@ __author__ = 'Mike'
 
 class WebsocketConnection(AbstractConnection):
     def __init__(self, connection, ws_server_protocol):
-        mylog('top of WSConn.__init__')
+        # mylog('top of WSConn.__init__')
         self._socket = connection
         self._ws_server_protocol = ws_server_protocol
         mylog('bottom of WSConn.__init__')
 
     def recv_obj(self, repeat=False):
-        mylog('wsConn.recv_obj')
+        # mylog('wsConn.recv_obj')
         # data = self._socket.recv(8)
         #
         # mylog('wsConn.r_o(0):"<{}>'.format(data))
@@ -71,7 +71,7 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
 
     def __init__(self):
         super(MyBigFuckingLieServerProtocol, self).__init__()
-        mylog('Top of MBFLSP.__init__')
+        # mylog('Top of MBFLSP.__init__')
         self._internal_port = HOST_WS_PORT
         self._internal_server_socket = socket.socket()
         # fixme $20 to myself if this vv DOESN'T need to move outside the MBFLSP
@@ -79,15 +79,15 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
         self._internal_server_socket.listen(5)  # todo does this 5 make sense?
         self._internal_conn = None
         self._child_thread = None
-        mylog('Bottom of MBFLSP.__init__')
+        # mylog('Bottom of MBFLSP.__init__')
 
     def onConnect(self, request):
         print("Client connecting: {0}".format(request.peer))
         temp_socket = socket.socket()
-        mylog('MBFLSP.onConnect-0')
+        # mylog('MBFLSP.onConnect-0')
 
         temp_socket.connect(('localhost', self._internal_port))
-        mylog('MBFLSP.onConnect-1')
+        # mylog('MBFLSP.onConnect-1')
         (conn, addr) = self._internal_server_socket.accept()
         # mylog('MBFLSP.onConnect-2')
         ws_conn = WebsocketConnection(temp_socket, self)
@@ -96,10 +96,10 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
         self._child_thread = Thread(target=filter_func, args=[ws_conn, addr])
         # mylog('MBFLSP.onConnect-4')
 
-        mylog('before of MBFLSP...thread.start')
+        # mylog('before of MBFLSP...thread.start')
         self._child_thread.start()
         # thread.join()
-        mylog('Bottom of MBFLSP.onConnect')
+        # mylog('Bottom of MBFLSP.onConnect')
 
     def onOpen(self):
         print("WebSocket connection open.")

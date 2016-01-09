@@ -3,7 +3,8 @@ import json
 from msg_codes import *
 from messages import *
 _decoder_table = {
-    FILE_IS_NOT_DIR_ERROR: FileIsNotDirErrorMessage.deserialize # -5
+    FILE_DOES_NOT_EXIST_ERROR: FileDoesNotExistErrorMessage.deserialize # -6
+    , FILE_IS_NOT_DIR_ERROR: FileIsNotDirErrorMessage.deserialize # -5
     , FILE_IS_DIR_ERROR: FileIsDirErrorMessage.deserialize # -4
     , UNPREPARED_HOST_ERROR: UnpreparedHostErrorMessage.deserialize # -3
     , AUTH_ERROR: AuthErrorMessage.deserialize # -2

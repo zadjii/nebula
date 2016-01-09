@@ -54,7 +54,7 @@
 # 23 LFRp - Manual
 
 24  , READ_FILE_REQUEST     , sid       , string:cname, string:fpath
-25  , READ_FILE_RESPONSE #todo not done
+25  , READ_FILE_RESPONSE    , sid       , string:fpath, int:fsize #todo not done
 
 26  , CLIENT_SESSION_REQUEST    , string:uname  , string:passw
 27  , CLIENT_SESSION_ALERT      , sid           , int:uid       ,  ip
@@ -125,6 +125,7 @@
 -3  , UNPREPARED_HOST_ERROR
 -4  , FILE_IS_DIR_ERROR
 -5  , FILE_IS_NOT_DIR_ERROR
+-6  , FILE_DOES_NOT_EXIST_ERROR
 
 
 

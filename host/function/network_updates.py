@@ -1,5 +1,7 @@
+import os
 from datetime import datetime
 import socket
+from stat import S_ISDIR
 from threading import Thread
 from connections.RawConnection import RawConnection
 
@@ -11,6 +13,8 @@ from host.function.network.ls_handler import list_files_handler
 from host.function.recv_files import recv_file_tree
 from host.function.send_files import send_tree
 from host.util import check_response, mylog
+from messages import ReadFileResponseMessage, FileIsDirErrorMessage, \
+    FileDoesNotExistErrorMessage
 from msg_codes import *
 
 __author__ = 'Mike'
@@ -102,9 +106,12 @@ def handle_fetch(connection, address, msg_obj):
 def handle_recv_file_from_client(connection, address, msg_obj):
     db = get_db()
     # my_id = msg_obj['tid']
-    session_uuid = msg_obj['sid']
-    cloudname = msg_obj['cname']
-    updated_file = msg_obj['fpath']
+    # session_uuid = msg_obj['sid']
+    session_uuid = msg_obj.sid
+    # cloudname = msg_obj['cname']
+    cloudname = msg_obj.cname
+    # requested_file = msg_obj['fpath']
+    requested_file = msg_obj.fpath
     their_ip = address[0]
     matching_session = db.session.query(Session).filter_by(uuid=session_uuid).first()
     if matching_session is None:
@@ -150,6 +157,108 @@ def handle_recv_file_from_client(connection, address, msg_obj):
 
     recv_file_tree(resp_obj, matching_cloud, connection, db)
     mylog('[{}]bottom of handle_recv_file_from_client(...,{})'
+          .format(session_uuid, msg_obj))
+
+
+def handle_read_file_request(connection, address, msg_obj):
+    db = get_db()
+    # my_id = msg_obj['tid']
+    # session_uuid = msg_obj['sid']
+    session_uuid = msg_obj.sid
+    # cloudname = msg_obj['cname']
+    cloudname = msg_obj.cname
+    # requested_file = msg_obj['fpath']
+    requested_file = msg_obj.fpath
+    their_ip = address[0]
+    # todo: refactor this segment out into a verify session function
+    mylog('sessions:{}'.format([(sess.uuid, sess.client_ip) for sess in db.session.query(Session)]))
+    matching_session = db.session.query(Session).filter_by(uuid=session_uuid).first()
+    if matching_session is None:
+        send_generic_error_and_close(connection)
+        mylog('ERR: got a RFQ from {} but I don\'t have that session'.format(session_uuid))
+    # matching_id_clouds = db.session.query(Cloud)\
+    #     .filter(Cloud.my_id_from_remote == my_id)
+    # if matching_id_clouds.count() <= 0:
+    #     send_generic_error_and_close(connection)
+    #     raise Exception(
+    #         'Received a message intended for id={},'
+    #         ' but I don\'t have any clouds with that id'
+    #         .format(my_id)
+    #     )
+    #
+    # todo: ruh roh, sessions aren't tied to clouds anymore
+    # matching_cloud = matching_session.cloud
+    # if matching_cloud is None:
+    #     send_generic_error_and_close(connection)
+    #     raise Exception(
+    #         'The session {} didn\'t have a cloud associated with it'
+    #     )
+    matching_cloud = db.session.query(Cloud).filter_by(name=cloudname).first()
+    # if not (matching_cloud.name == cloudname):
+    #     send_generic_error_and_close(connection)
+    #     raise Exception(
+    #         '{} came asking for cloudname=\'{}\','
+    #         ' however, their cloud doesn\'t match that'
+    #             .format(session_uuid, cloudname)
+    #     )
+    # matching_entry = db.session.query(IncomingHostEntry).filter_by(their_address=their_ip).first()
+    # if matching_entry is None:
+    #     send_unprepared_host_error_and_close(connection)
+    #     raise Exception(
+    #         'host came asking for cloudname=\'' + cloudname + '\''
+    #         + ', but I was not told to expect them.'
+    #     )
+    # response = recv_msg(connection)
+    # resp_obj = connection.recv_obj()
+    # resp_type = response['type']
+    # resp_type = resp_obj.type
+    # print 'host_host_fetch response:{}'.format(response)
+    # check_response(CLIENT_FILE_TRANSFER, resp_type)
+    # recv_file_tree(resp_obj, matching_cloud, connection, db)
+    requesting_all = requested_file == '/'
+    filepath = None
+    # if the root is '/', send all of the children of the root
+    if requesting_all:
+        filepath = matching_cloud.root_directory
+    else:
+        filepath = os.path.join(matching_cloud.root_directory, requested_file)
+    req_file_stat = None
+    try:
+        req_file_stat = os.stat(filepath)
+    except Exception:
+        err_msg = FileDoesNotExistErrorMessage()
+        connection.send_obj(err_msg)
+        connection.close()
+        return
+    relative_pathname = os.path.relpath(filepath, matching_cloud.root_directory)
+
+    req_file_is_dir = S_ISDIR(req_file_stat.st_mode)
+    if req_file_is_dir:
+        err_msg = FileIsDirErrorMessage()
+        connection.send_obj(err_msg)
+        connection.close()
+    else:
+        # send RFP - ReadFileResponse
+        req_file_size = req_file_stat.st_size
+        requested_file = open(filepath, 'rb')
+        response = ReadFileResponseMessage(session_uuid, relative_pathname, req_file_size)
+        connection.send_obj(response)
+        l = 1
+        # send file bytes
+        while l:
+            new_data = requested_file.read(1024)
+            l = connection.send_next_data(new_data)
+            # mylog(
+            #     '[{}]Sent {}B of file<{}> data'
+            #     .format(cloud.my_id_from_remote, l, filepath)
+            # )
+        mylog(
+            '(RFQ)[{}]Sent <{}> data to [{}]'
+            .format(matching_cloud.my_id_from_remote, filepath, session_uuid)
+        )
+
+        requested_file.close()
+    mylog('[{}]bottom of handle_read_file_request(...,{})'
           .format(session_uuid, msg_obj))
 
 
@@ -223,6 +332,8 @@ def filter_func(connection, address):
         list_files_handler(connection, address, msg_obj)
     elif msg_type == CLIENT_FILE_PUT:
         handle_recv_file_from_client(connection, address, msg_obj)
+    elif msg_type == READ_FILE_REQUEST:
+        handle_read_file_request(connection, address, msg_obj)
     else:
         mylog('I don\'t know what to do with {},\n{}'.format(msg_obj, msg_obj.__dict__))
     connection.close()

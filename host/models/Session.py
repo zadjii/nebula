@@ -18,3 +18,7 @@ class Session(db.Base):
     last_refresh = Column(DateTime)
     client_ip = Column(String)
     # fixme what, we just ASSUME they're at HOST_PORT? that's dumb.
+    # note: no you stupid itiot, we don't need to give them a port,
+    # cont    they'll be connecting from random ports all the time
+
+

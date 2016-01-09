@@ -67,6 +67,7 @@ def setup_client_session(connection, address, msg_obj):
     # print 'uuid={}'.format(sess_uuid)
     session.uuid = sess_uuid  # todo this is probably bad.
     db.session.commit()
+
     # tell host
     # msg = ClientSessionAlertMessage(cloudname, user.id, session.uuid, address[0])
     # host.send_msg(msg)
@@ -83,7 +84,7 @@ def setup_client_session(connection, address, msg_obj):
     msg = ClientSessionResponseMessage(session.uuid)
     connection.send_obj(msg)
 
-    mylog('I think i setup the session')
+    mylog('I think i setup the session, user={}, sid={}'.format(user.id, session.uuid))
 
 
 def get_cloud_host(connection, address, msg_obj):
@@ -123,6 +124,7 @@ def get_cloud_host(connection, address, msg_obj):
     #   and tell them their id and where to go.
 
     host = cloud.hosts.first()
+    mylog('cloud[{}] hosts = {}'.format(cloud.name, cloud.hosts.all()))
     # todo: make this^ random
     if host is None:
         mylog('ERR: host was none')
@@ -133,7 +135,7 @@ def get_cloud_host(connection, address, msg_obj):
     # fixme confirm that the host is alive, and can handle this response
 
     # tell host
-    msg = ClientSessionAlertMessage(user.id, sess_obj.uuid, address[0])
+    msg = ClientSessionAlertMessage(sess_obj.uuid, user.id, address[0])
     host.send_msg(msg)
 
     # tell client
