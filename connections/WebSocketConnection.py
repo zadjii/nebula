@@ -19,7 +19,7 @@ class WebsocketConnection(AbstractConnection):
         mylog('bottom of WSConn.__init__')
 
     def recv_obj(self, repeat=False):
-        # mylog('wsConn.recv_obj')
+        mylog('wsConn.recv_obj')
         # data = self._socket.recv(8)
         #
         # mylog('wsConn.r_o(0):"<{}>'.format(data))
@@ -27,9 +27,14 @@ class WebsocketConnection(AbstractConnection):
         #     mylog('repeating')
         #     return self.recv_obj(True)
         # size = decode_msg_size(data)
+
         size, n_chars = self._really_bad_get_size()
-        self._socket.recv(n_chars)
+        # first recv the length of the msg from the sock
+        length_string = self._socket.recv(n_chars)
+        mylog('These two should be the same: {}={}'.format(size, length_string))
+        # then actually get the data
         buff = self._socket.recv(size)
+
         mylog('wsConn.r_o(1):<{}>'.format(buff))
         obj = MessageDeserializer.decode_msg(buff)
         # mylog('deserialized"{}"[{}]({})'.format(buff, obj, obj.__dict__))
@@ -41,6 +46,7 @@ class WebsocketConnection(AbstractConnection):
         while data[-1] != '{':
             length += 1
             data = self._socket.recv(length, socket.MSG_PEEK)
+            print '\t\t\t bad get data length {}'.format(data)
         return int(data[0:length-1]), length-1
 
     def send_obj(self, message_obj):
@@ -83,6 +89,19 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
 
     def onConnect(self, request):
         print("Client connecting: {0}".format(request.peer))
+
+        # mylog('MBFLSP.onConnect-4')
+
+        # mylog('before of MBFLSP...thread.start')
+        # self._child_thread.start()
+        # self._child_thread.join()
+        # mylog('after of MBFLSP...thread.join')
+        # # thread.join()
+        # ws_conn.close()
+        mylog('Bottom of MBFLSP.onConnect')
+
+    def onOpen(self):
+        print("WebSocket connection open.")
         temp_socket = socket.socket()
         # mylog('MBFLSP.onConnect-0')
 
@@ -94,15 +113,13 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
         # mylog('MBFLSP.onConnect-3')
         self._internal_conn = conn
         self._child_thread = Thread(target=filter_func, args=[ws_conn, addr])
-        # mylog('MBFLSP.onConnect-4')
-
-        # mylog('before of MBFLSP...thread.start')
+        mylog('before of MBFLSP...thread.start')
         self._child_thread.start()
+        # self._child_thread.join()
+        mylog('after of MBFLSP...thread.join')
         # thread.join()
-        # mylog('Bottom of MBFLSP.onConnect')
-
-    def onOpen(self):
-        print("WebSocket connection open.")
+        # ws_conn.close()
+        mylog('Bottom of MBFLSP.onOpen')
 
     def onMessage(self, payload, isBinary):
         if isBinary:
@@ -115,7 +132,7 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
         # self.sendMessage(payload, isBinary)
 
     def onClose(self, wasClean, code, reason):
-        print("WebSocket connection closed: {0}".format(reason))
+        print("WebSocket connection closed: {},{},{}".format(wasClean, code, reason))
         self._internal_conn.send('\0')
         self._internal_conn.close()
         if self._child_thread is not None:
