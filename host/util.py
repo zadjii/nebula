@@ -29,7 +29,11 @@ def set_mylog_name(name):
 
 
 def mylog(message):
+    now = datetime.utcnow()
+    now_string = now.strftime('%y-%m-%d %H:%M%S.') + now.strftime('%f')[0:3]
     if mylog_name is not None:
-        print '{}|[{}] {}'.format(datetime.utcnow(), mylog_name, message)
+        print '{}|[{}] {}'.format(now_string, mylog_name, message)
     else:
-        print '{}| {}'.format(datetime.utcnow(), message)
+        print '{}| {}'.format(now_string, message)
+
+

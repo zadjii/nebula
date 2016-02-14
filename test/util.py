@@ -66,11 +66,13 @@ def populate_test_filesystem():
 
 def make_fresh_test_env():
     repop_dbs()
-    populate_test_filesystem()
+    if not os.path.exists('test_out/tmp0'):
+        os.makedirs('test_out/tmp0')
+        populate_test_filesystem()
     host, remote = None, None
     try:
         host, remote = start_nebs_and_nebr()
-        print '##### READY TO GO #####'
+        print '\x1b[30;42m##### READY TO GO #####\x1b[0m'
         host.wait()
         remote.wait()
     except Exception, e:

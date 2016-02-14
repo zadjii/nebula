@@ -9,6 +9,9 @@ class Session(db.Base):
     __tablename__ = 'session'
 
     id = Column(Integer, primary_key=True)
+
+    # todo this needs to be a many-many, sessions have lots of clouds, clouds
+    # cont have lots of sessions.
     cloud_id = Column(ForeignKey('cloud.id'))
     user_id = Column(Integer)
     # host_id = Column(ForeignKey('host.id'))

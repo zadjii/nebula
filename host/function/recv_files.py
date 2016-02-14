@@ -28,7 +28,7 @@ def recv_file_transfer(msg, cloud, socket_conn, db):
         data_buffer = ''  # fixme i'm using a string to buffer this?? LOL
         total_read = 0
         while total_read < msg_file_size:
-            new_data = socket_conn.recv(min(1024, (msg_file_size - total_read)))
+            new_data = socket_conn.recv_next_data(min(1024, (msg_file_size - total_read)))
             nbytes = len(new_data)
             # print 'read ({},{})'.format(new_data, nbytes)
             if total_read is None or new_data is None:
@@ -58,4 +58,4 @@ def recv_file_transfer(msg, cloud, socket_conn, db):
         mylog('update mtime {}=>{}'.format(old_modified_on, updated_node.last_modified))
         db.session.commit()
     new_num_nodes = db.session.query(FileNode).count()
-    mylog('RFT:total file nodes:'.format(new_num_nodes))
+    mylog('RFT:total file nodes:{}'.format(new_num_nodes))

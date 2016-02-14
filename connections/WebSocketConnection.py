@@ -7,6 +7,7 @@ from host.function.network_updates import filter_func
 from host.util import mylog
 from messages.util import get_msg_size, decode_msg_size
 from messages.MessageDeserializer import MessageDeserializer
+from autobahn.asyncio.websocket import WebSocketServerProtocol
 
 __author__ = 'Mike'
 
@@ -20,18 +21,11 @@ class WebsocketConnection(AbstractConnection):
 
     def recv_obj(self, repeat=False):
         mylog('wsConn.recv_obj')
-        # data = self._socket.recv(8)
-        #
-        # mylog('wsConn.r_o(0):"<{}>'.format(data))
-        # if data == '' and not repeat:
-        #     mylog('repeating')
-        #     return self.recv_obj(True)
-        # size = decode_msg_size(data)
 
         size, n_chars = self._really_bad_get_size()
         # first recv the length of the msg from the sock
         length_string = self._socket.recv(n_chars)
-        mylog('These two should be the same: {}={}'.format(size, length_string))
+        # mylog('These two should be the same:{}={}'.format(size,length_string))
         # then actually get the data
         buff = self._socket.recv(size)
 
@@ -46,16 +40,15 @@ class WebsocketConnection(AbstractConnection):
         while data[-1] != '{':
             length += 1
             data = self._socket.recv(length, socket.MSG_PEEK)
-            print '\t\t\t bad get data length {}'.format(data)
+            # print '\t\t\t bad get data length {}'.format(data)
+            if length > 64:
+                raise Exception('Well that\'s a bad packet for sure')
         return int(data[0:length-1]), length-1
 
     def send_obj(self, message_obj):
         mylog('ws send, {}'.format(message_obj.__dict__))
         msg_json = message_obj.serialize()
-        # self._socket.send(get_msg_size(msg_json))
-        # self._socket.send(msg_json)
-        msg_size = get_msg_size(msg_json)
-        # self._ws_server_protocol.sendMessage(msg_size + msg_json)
+        msg_size = get_msg_size(msg_json)  # don't send length over WS
         self._ws_server_protocol.sendMessage(msg_json)
         mylog('bottom of ws send')
 
@@ -67,41 +60,29 @@ class WebsocketConnection(AbstractConnection):
 
     def close(self):
         self._socket.close()
-
-
-from autobahn.asyncio.websocket import WebSocketServerProtocol, \
-    WebSocketServerFactory
+        self._ws_server_protocol.sendClose()
 
 
 class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
 
     def __init__(self):
+        mylog('\x1b[32;41mTop of MBFLSP.__init__\x1b[0m')
         super(MyBigFuckingLieServerProtocol, self).__init__()
-        # mylog('Top of MBFLSP.__init__')
         self._internal_port = HOST_WS_PORT
         self._internal_server_socket = socket.socket()
         # fixme $20 to myself if this vv DOESN'T need to move outside the MBFLSP
         self._internal_server_socket.bind(('localhost', HOST_WS_PORT))
-        self._internal_server_socket.listen(5)  # todo does this 5 make sense?
+        mylog('\x1b[32;46mbound to HOST_WS_PORT\x1b[0m')
+        self._internal_server_socket.listen(1)  # todo does this 5 make sense?
         self._internal_conn = None
         self._child_thread = None
         # mylog('Bottom of MBFLSP.__init__')
 
     def onConnect(self, request):
-        print("Client connecting: {0}".format(request.peer))
-
-        # mylog('MBFLSP.onConnect-4')
-
-        # mylog('before of MBFLSP...thread.start')
-        # self._child_thread.start()
-        # self._child_thread.join()
-        # mylog('after of MBFLSP...thread.join')
-        # # thread.join()
-        # ws_conn.close()
-        mylog('Bottom of MBFLSP.onConnect')
+        mylog("Client connecting: {0}".format(request.peer))
 
     def onOpen(self):
-        print("WebSocket connection open.")
+        mylog("WebSocket connection open.")
         temp_socket = socket.socket()
         # mylog('MBFLSP.onConnect-0')
 
@@ -115,10 +96,8 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
         self._child_thread = Thread(target=filter_func, args=[ws_conn, addr])
         mylog('before of MBFLSP...thread.start')
         self._child_thread.start()
-        # self._child_thread.join()
-        mylog('after of MBFLSP...thread.join')
-        # thread.join()
-        # ws_conn.close()
+        # self._child_thread.join() #note: Don't join here, we need to return in
+        #   order to be able to get data from onMessage to send to filter_func
         mylog('Bottom of MBFLSP.onOpen')
 
     def onMessage(self, payload, isBinary):
@@ -132,10 +111,15 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
         # self.sendMessage(payload, isBinary)
 
     def onClose(self, wasClean, code, reason):
-        print("WebSocket connection closed: {},{},{}".format(wasClean, code, reason))
-        self._internal_conn.send('\0')
-        self._internal_conn.close()
+        mylog("WebSocket closed: {},{},{}".format(wasClean, code, reason))
+        # self._internal_conn.send('\0')
+        # self._internal_conn.close()
         if self._child_thread is not None:
             self._child_thread.exit()
 
-
+    def _connectionLost(self, reason):
+        mylog('_connectionLost')
+        self._internal_conn.send('\0')
+        self._internal_conn.close()
+        self._internal_server_socket.close()
+        WebSocketServerProtocol._connectionLost(self, reason)

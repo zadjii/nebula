@@ -1,4 +1,4 @@
-import os
+import os, sys
 from datetime import datetime
 import socket
 from stat import S_ISDIR
@@ -127,13 +127,20 @@ def handle_recv_file_from_client(connection, address, msg_obj):
     #         .format(my_id)
     #     )
     #
-    matching_cloud = matching_session.cloud
-    if matching_cloud is None:
-        send_generic_error_and_close(connection)
-        raise Exception(
-            'The session {} didn\'t have a cloud associated with it'
-        )
-    # matching_cloud = matching_id_clouds.filter_by(name=cloudname).first()
+    # matching_cloud = matching_session.cloud
+    # if matching_cloud is None:
+    #     send_generic_error_and_close(connection)
+    #     raise Exception(
+    #         'The session {} didn\'t have a cloud associated with it'
+    #     )
+    # fixme make sure that the session has access to the cloud.
+    # cont    this will require work from the remote.
+    # cont    The client needs to ask the remote for the cloud.
+    #           The remote will tell the host (this sid is good for this cname)
+    #         the host will add that session to the cloud's list of sessions, and that cloud to the session
+    #         the remote will then tell the client to go to that host.
+
+    matching_cloud = db.session.query(Cloud).filter_by(name=cloudname).first()
     if not (matching_cloud.name == cloudname):
         send_generic_error_and_close(connection)
         raise Exception(
@@ -316,26 +323,30 @@ def filter_func(connection, address):
     # print 'The message is', msg_obj
     # todo we should make sure the connection was from the remote or a client
     # cont   that we were told about here, before doing ANY processing.
-    if msg_type == PREPARE_FOR_FETCH:
-        prepare_for_fetch(connection, address, msg_obj)
-    elif msg_type == HOST_HOST_FETCH:
-        handle_fetch(connection, address, msg_obj)
-    elif msg_type == HOST_FILE_PUSH:
-        handle_recv_file(connection, address, msg_obj)
-    elif msg_type == CLIENT_SESSION_ALERT:
-        handle_client_session_alert(connection, address, msg_obj)
-    elif msg_type == STAT_FILE_REQUEST:
-        # fixme
-        pass
-        # handle_recv_file(connection, address, msg_obj)
-    elif msg_type == LIST_FILES_REQUEST:
-        list_files_handler(connection, address, msg_obj)
-    elif msg_type == CLIENT_FILE_PUT:
-        handle_recv_file_from_client(connection, address, msg_obj)
-    elif msg_type == READ_FILE_REQUEST:
-        handle_read_file_request(connection, address, msg_obj)
-    else:
-        mylog('I don\'t know what to do with {},\n{}'.format(msg_obj, msg_obj.__dict__))
+    try:
+        if msg_type == PREPARE_FOR_FETCH:
+            prepare_for_fetch(connection, address, msg_obj)
+        elif msg_type == HOST_HOST_FETCH:
+            handle_fetch(connection, address, msg_obj)
+        elif msg_type == HOST_FILE_PUSH:
+            handle_recv_file(connection, address, msg_obj)
+        elif msg_type == CLIENT_SESSION_ALERT:
+            handle_client_session_alert(connection, address, msg_obj)
+        elif msg_type == STAT_FILE_REQUEST:
+            # fixme
+            pass
+            # handle_recv_file(connection, address, msg_obj)
+        elif msg_type == LIST_FILES_REQUEST:
+            list_files_handler(connection, address, msg_obj)
+        elif msg_type == CLIENT_FILE_PUT:
+            handle_recv_file_from_client(connection, address, msg_obj)
+        elif msg_type == READ_FILE_REQUEST:
+            handle_read_file_request(connection, address, msg_obj)
+        else:
+            mylog('I don\'t know what to do with {},\n{}'.format(msg_obj, msg_obj.__dict__))
+    except Exception, e:
+        sys.stderr.write(e.message + '\n')
+
     connection.close()
 
 # todo make this work... later

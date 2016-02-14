@@ -30,12 +30,20 @@ def ws_thread_function(argv=[]):
 
     # loop = asyncio.get_event_loop()
     coro = loop.create_server(factory, '0.0.0.0', HOST_WS_PORT)
+    mylog('\x1b[35m[35]\x1b[0m')
     server = loop.run_until_complete(coro)
+    mylog('\x1b[36m[36]\x1b[0m')
+
     try:
         loop.run_forever()
+        mylog('after run_forever for shits')
     except KeyboardInterrupt:
         pass
     finally:
+        mylog('\x1b[36mTHIS IS BAD\x1b[0m')
+        mylog('\x1b[35mTHIS IS BAD\x1b[0m')
+        mylog('\x1b[34mTHIS IS BAD\x1b[0m')
+        mylog('\x1b[33mTHIS IS BAD\x1b[0m')
         server.close()
         loop.close()
 
