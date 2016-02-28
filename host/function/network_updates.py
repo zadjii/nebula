@@ -117,6 +117,7 @@ def handle_recv_file_from_client(connection, address, msg_obj):
     if matching_session is None:
         send_generic_error_and_close(connection)
         mylog('ERR: got a CLIENT_._PUT from {} but I don\'t have that session'.format(session_uuid))
+        # fixme: we should return here, and not actually handle the file....
     # matching_id_clouds = db.session.query(Cloud)\
     #     .filter(Cloud.my_id_from_remote == my_id)
     # if matching_id_clouds.count() <= 0:

@@ -20,7 +20,11 @@ def recv_file_transfer(msg, cloud, socket_conn, db):
     msg_rel_path = msg.fpath
     mylog('[{}] is recv\'ing <{}>'.format(cloud.my_id_from_remote, msg_rel_path))
     full_path = os.path.join(cloud.root_directory, msg_rel_path)
-    if msg_file_isdir :
+    full_dir_path = os.path.dirname(full_path)
+    if not os.path.exists(full_dir_path):
+        mylog('had to make dirs for {}'.format(full_dir_path))
+        os.makedirs(full_dir_path)
+    if msg_file_isdir:
         if not os.path.exists(full_path):
             os.mkdir(full_path)
             print 'Created directory {}m'.format(full_path)
