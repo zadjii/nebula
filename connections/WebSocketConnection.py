@@ -1,5 +1,8 @@
 import socket
 from threading import Thread
+
+import sys
+
 from connections.AbstractConnection import AbstractConnection
 from host import HOST_WS_PORT
 from host.function.network_updates import filter_func
@@ -56,7 +59,10 @@ class WebsocketConnection(AbstractConnection):
         return self._socket.recv(length)
 
     def send_next_data(self, data):
-        return self._ws_server_protocol.sendMessage(data)
+        """Returns the number of bytes sent.
+        TODO: determine if the ws actually sent all of len()"""
+        self._ws_server_protocol.sendMessage(data)
+        return sys.getsizeof(data)
 
     def close(self):
         self._socket.close()
