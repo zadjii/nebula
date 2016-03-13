@@ -43,26 +43,23 @@ def update_peer(cloud, host, updates):
     host_sock.connect((host_ip, host_port))
     raw_connection = RawConnection(host_sock)
     msg = HostFilePushMessage(host_id, cloud.name, 'i-dont-give-a-fuck')
-    # send_msg(make_host_file_push(host_id, cloud.name, 'i-dont-give-a-fuck'), host_sock)
     raw_connection.send_obj(msg)
 
     for update in updates:
         file_path = update[1]
         relative_pathname = os.path.relpath(file_path, cloud.root_directory)
-        # mylog('translated path \'{}\'-\'{}\'=?\'{}\''.format(file_path, cloud.root_directory, relative_pathname))
         if update[0] == FILE_CREATE or update[0] == FILE_UPDATE:
             send_file_to_other(
                 host_id
                 , cloud
                 , os.path.join(cloud.root_directory, relative_pathname)
-                , host_sock)
+                , raw_connection)
         elif update[0] == FILE_DELETE:
             msg = RemoveFileMessage(host_id, cloud.name, relative_pathname)
-            # send_msg(make_remove_file(host_id, cloud.name, relative_pathname), host_sock)
             raw_connection.send_obj(msg)
         else:
             print 'Welp this shouldn\'t happen'
-    complete_sending_files(host_id, cloud, None, host_sock)
+    complete_sending_files(host_id, cloud, None, raw_connection)
 
 
 def local_file_create(directory_path, dir_node, filename, db):

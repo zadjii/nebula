@@ -104,7 +104,7 @@ def request_cloud(cloud, test_enabled, db):
     resp_type = resp_obj.type
     # print 'host_host_fetch response:{}'.format(response)
     check_response(HOST_FILE_TRANSFER, resp_type)
-    recv_file_tree(resp_obj, cloud, host_sock, db)
+    recv_file_tree(resp_obj, cloud, host_conn, db)
 
 
 def mirror_usage():
@@ -172,7 +172,7 @@ def mirror(argv):
     print 'attempting to get cloud named \'' + cloudname + '\' from',\
         'host at [',host,'] on port[',port,'], into root [',root,']'
     # okay, so manually decipher the FQDN if they input one.
-
+    # fixme verify that directory is empty, don't do anything if it isn't
     (status, cloud) = ask_remote_for_id(host, port, db)
     if not status == 0:
         raise Exception('Exception while mirroring:' +

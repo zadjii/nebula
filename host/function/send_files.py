@@ -31,14 +31,15 @@ def send_file_to_other(other_id, cloud, filepath, socket_conn):
     # print 'relpath({}) in \'{}\' is <{}>'.format(filepath, cloud.name, relative_pathname)
 
     req_file_is_dir = S_ISDIR(req_file_stat.st_mode)
+    mylog('filepath<{}> is_dir={}'.format(filepath, req_file_is_dir))
     if req_file_is_dir:
         if relative_pathname != '.':
             msg = HostFileTransferMessage(
                 other_id
                 , cloud.name
                 , relative_pathname
-                , req_file_is_dir
                 , 0
+                , req_file_is_dir
             )
             socket_conn.send_obj(msg)
             # send_msg(
@@ -62,8 +63,8 @@ def send_file_to_other(other_id, cloud, filepath, socket_conn):
             other_id
             , cloud.name
             , relative_pathname
-            , req_file_is_dir
             , req_file_size
+            , req_file_is_dir
         )
         socket_conn.send_obj(msg)
         # send_msg(
@@ -79,7 +80,7 @@ def send_file_to_other(other_id, cloud, filepath, socket_conn):
         l = 1
         while l:
             new_data = requested_file.read(1024)
-            l = socket_conn.send(new_data)
+            l = socket_conn.send_next_data(new_data)
             # mylog(
             #     '[{}]Sent {}B of file<{}> data'
             #     .format(cloud.my_id_from_remote, l, filepath)

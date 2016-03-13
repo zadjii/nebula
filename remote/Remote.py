@@ -150,7 +150,10 @@ def host_request_cloud(connection, address, msg_obj):
     rand_host = match.hosts.first()  #todo make this random
     if rand_host is not None:
         msg = PrepareForFetchMessage(host_id, cloudname, address[0])
+        # fixme ssl up in here
         rand_host.send_msg(msg)
+        ip = rand_host.ip
+        port = rand_host.port
         # prep_for_fetch_msg = make_prepare_for_fetch_json(host_id, cloudname, address[0])
         # rand_host.send_msg(prep_for_fetch_msg)
 

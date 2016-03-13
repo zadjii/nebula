@@ -41,9 +41,9 @@ def prepare_for_fetch(connection, address, msg_obj):
     db = get_db()
     # todo I definitely need to confirm that this is
     # cont   the remote responsible for the cloud
-    other_id = msg_obj['id']
-    cloudname = msg_obj['cname']
-    incoming_address = msg_obj['ip']
+    other_id = msg_obj.id
+    cloudname = msg_obj.cname
+    incoming_address = msg_obj.ip
 
     matching_cloud = db.session.query(Cloud).filter_by(name=cloudname).first()
     if matching_cloud is None:
@@ -58,15 +58,16 @@ def prepare_for_fetch(connection, address, msg_obj):
     db.session.add(entry)
     matching_cloud.incoming_hosts.append(entry)
     db.session.commit()
-    print 'Prepared for arrival from', entry.their_address,\
-        'looking for cloud', matching_cloud.name
+    mylog('Prepared for arrival from {} looking for cloud "{}"'.format(
+        entry.their_address, matching_cloud.name
+    ))
 
 
 def handle_fetch(connection, address, msg_obj):
     db = get_db()
-    other_id = msg_obj['id']
-    cloudname = msg_obj['cname']
-    requested_root = msg_obj['root']
+    other_id = msg_obj.id
+    cloudname = msg_obj.cname
+    requested_root = msg_obj.root
     matching_id_clouds = db.session.query(Cloud)\
         .filter(Cloud.my_id_from_remote != other_id)\
         .filter_by(completed_mirroring=True)
