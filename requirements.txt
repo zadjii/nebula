@@ -15,3 +15,4 @@ six==1.9.0
 sqlalchemy-migrate==0.10.0
 sqlparse==0.1.16
 wsgiref==0.1.2
+sqlalchemy-migrate==0.10.0

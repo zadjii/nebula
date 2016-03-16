@@ -26,8 +26,8 @@ def new_user(argv):
         return
 
     name = raw_input('Enter a name for the new user: ').lower()
-    password = getpass.getpass('Enter a password for the new user: ').lower()
-    password_again = getpass.getpass('Enter the password (again): ').lower()
+    password = getpass.getpass('Enter a password for the new user: ')
+    password_again = getpass.getpass('Enter the password (again): ')
 
     if password != password_again:
         print 'The passwords entered didn\'t match'
