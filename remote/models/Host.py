@@ -34,10 +34,10 @@ class Host(db.Base):
         # context.use_privatekey_file(KEY_FILE)
         # context.use_certificate_file(CERT_FILE)
         # todo SSL
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         # s = SSL.Connection(context, s)
         # whatever fuck it lets just assume it's good todo
-        s.connect((self.ip, self.port))
+        s.connect((self.ip, self.port, 0, 0))
         conn = RawConnection(s)
         conn.send_obj(msg)
         # send_msg(msg, s)

@@ -39,8 +39,8 @@ def update_peer(cloud, host, updates):
     host_id = host['id']
     host_ip = host['ip']
     host_port = host['port']
-    host_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    host_sock.connect((host_ip, host_port))
+    host_sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    host_sock.connect((host_ip, host_port, 0, 0))
     raw_connection = RawConnection(host_sock)
     msg = HostFilePushMessage(host_id, cloud.name, 'i-dont-give-a-fuck')
     raw_connection.send_obj(msg)

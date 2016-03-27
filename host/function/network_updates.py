@@ -21,8 +21,8 @@ __author__ = 'Mike'
 
 
 def receive_updates_thread():
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind((HOST_HOST, HOST_PORT))
+    s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    s.bind((HOST_HOST, HOST_PORT, 0, 0))
     mylog('Listening on ({},{})'.format(HOST_HOST, HOST_PORT))
     s.listen(5)
 

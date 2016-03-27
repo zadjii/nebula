@@ -31,8 +31,8 @@ def create_sock_msg_get_response(ip, port, msg):
 
 
 def create_sock_and_send(ip, port, msg):
-    host_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    host_sock.connect((ip, port))
+    host_sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    host_sock.connect((ip, port, 0, 0))
     conn = RawConnection(host_sock)
     conn.send_obj(msg)
     # send_msg(msg, host_sock)

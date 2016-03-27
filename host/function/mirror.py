@@ -86,8 +86,8 @@ def request_cloud(cloud, test_enabled, db):
 
     print 'requesting host at [{}]({},{})'.format(other_id, other_address, other_port)
 
-    host_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    host_sock.connect((other_address, other_port))
+    host_sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    host_sock.connect((other_address, other_port, 0, 0))
     host_conn = RawConnection(host_sock)
     # host_sock = setup_remote_socket(other_address, other_port)
     # todo initialize our ssl context here

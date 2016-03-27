@@ -197,9 +197,9 @@ def start(argv):
     context = SSL.Context(SSL.SSLv23_METHOD)
     context.use_privatekey_file(KEY_FILE)
     context.use_certificate_file(CERT_FILE)
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
     s = SSL.Connection(context, s)
-    s.bind((HOST, PORT))
+    s.bind((HOST, PORT, 0, 0))
     mylog('Listening on ({},{})'.format(HOST, PORT))
 
     s.listen(5)
