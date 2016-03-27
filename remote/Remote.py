@@ -256,7 +256,7 @@ command_descriptions = {
 }
 
 
-def usage():
+def usage(argv):
     print 'usage: nebr <command>'
     print ''
     print 'The available commands are:'
@@ -266,7 +266,7 @@ def usage():
 
 def nebr_main(argv):
     if len(argv) < 2:
-        usage()
+        usage(argv)
         sys.exit(0)
 
     command = argv[1]

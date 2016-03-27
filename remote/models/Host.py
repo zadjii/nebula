@@ -1,6 +1,7 @@
 import socket
 # from msg_codes import send_msg
 from connections.RawConnection import RawConnection
+from host import HOST_PORT
 from remote import _remote_db as db
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table,\
     Boolean
