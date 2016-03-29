@@ -14,7 +14,7 @@ class GetHostsResponseMessage(BaseMessage):
             host_jsons = []
             for host in hosts:
                 host_obj = {
-                    'ip': host.ip
+                    'ip': host.ipv6
                     , 'port': host.port
                     , 'wsport': host.ws_port
                     , 'id': host.id

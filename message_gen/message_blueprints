@@ -15,7 +15,7 @@
 # Messages
 ################################################################################
 
-0   , NEW_HOST              , int:port  , int:wsport
+0   , NEW_HOST              , string:ipv6, int:port     , int:wsport
 1   , ASSIGN_HOST_ID        , int:id    , string:key    , string:cert
 2   , HOST_HANDSHAKE        , int:id    , int:port      , int:wsport    , update
 

@@ -25,7 +25,18 @@ def ask_remote_for_id(host, port, db):
     sslSocket = setup_remote_socket(host, port)
     raw_conn = RawConnection(sslSocket)
     # write_msg(make_new_host_json(HOST_PORT), sslSocket)
-    msg = NewHostMessage(HOST_PORT, HOST_WS_PORT)
+
+    addr_info = socket.getaddrinfo(socket.gethostname(), None)
+    ipv6_addr = None
+    for iface in addr_info:
+        if iface[0] == socket.AF_INET6:
+            if ipv6_addr is None and iface[4][3] == 0:
+                ipv6_addr = iface[4]
+    mylog('\x1b[35m MY IPV6 IS {} \x1b[0m'.format(ipv6_addr))
+    if ipv6_addr is None:
+        mylog('ERR: could not find an ipv6 address for this host. Don\'t really know what to do...')
+        return (-1, None)
+    msg = NewHostMessage(ipv6_addr[0], HOST_PORT, HOST_WS_PORT)
     raw_conn.send_obj(msg)
     # msg_obj = recv_msg(sslSocket)
     resp_obj = raw_conn.recv_obj()

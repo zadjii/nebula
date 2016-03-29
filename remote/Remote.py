@@ -149,10 +149,11 @@ def host_request_cloud(connection, address, msg_obj):
     port = 0
     rand_host = match.hosts.first()  #todo make this random
     if rand_host is not None:
-        msg = PrepareForFetchMessage(host_id, cloudname, address[0])
+        msg = PrepareForFetchMessage(host_id, cloudname, address[0]) # ipv4, old
+        msg = PrepareForFetchMessage(host_id, cloudname, rand_host.ipv6) # ipv6
         # fixme ssl up in here
         rand_host.send_msg(msg)
-        ip = rand_host.ip
+        ip = rand_host.ipv6
         port = rand_host.port
         # prep_for_fetch_msg = make_prepare_for_fetch_json(host_id, cloudname, address[0])
         # rand_host.send_msg(prep_for_fetch_msg)
@@ -183,7 +184,8 @@ def new_host_handler(connection, address, msg_obj):
     db = get_db()
     print 'Handling new host'
     host = Host()
-    host.ip = address[0]
+    host.ipv4 = address[0]
+    host.ipv6 = msg_obj.ipv6
     host.port = msg_obj.port
     db.session.add(host)
     db.session.commit()
@@ -197,10 +199,13 @@ def start(argv):
     context = SSL.Context(SSL.SSLv23_METHOD)
     context.use_privatekey_file(KEY_FILE)
     context.use_certificate_file(CERT_FILE)
-    s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
     s = SSL.Connection(context, s)
-    s.bind((HOST, PORT, 0, 0))
-    mylog('Listening on ({},{})'.format(HOST, PORT))
+    address = (HOST, PORT) # ipv4
+    # address = (HOST, PORT, 0, 0) # ipv6
+    s.bind(address) 
+    mylog('Listening on {}'.format(address))
 
     s.listen(5)
     while True:

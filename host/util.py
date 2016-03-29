@@ -10,8 +10,11 @@ def check_response(expected, recieved):
 
 
 def setup_remote_socket(host, port):
-    s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-    s.connect((host, port, 0, 0))
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect((host, port))
+    # ipv6: 
+    # s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    # s.connect((host, port, 0, 0))
     # s.create_connection((host, port))
     # TODO May want to use:
     # socket.create_connection(address[, timeout[, source_address]])

@@ -19,7 +19,8 @@ class Host(db.Base):
     last_handshake = Column(DateTime)
     curr_size = Column(Integer)  # Cloud size in bytes
     remaining_size = Column(Integer)  # remaining free space on host (in bytes)
-    ip = Column(String)
+    ipv4 = Column(String)
+    ipv6 = Column(String)
     port = Column(Integer)
     ws_port = Column(Integer)
     # sessions = relationship('Session', backref='host', lazy='dynamic')
@@ -37,7 +38,7 @@ class Host(db.Base):
         s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         # s = SSL.Connection(context, s)
         # whatever fuck it lets just assume it's good todo
-        s.connect((self.ip, self.port, 0, 0))
+        s.connect((self.ipv6, self.port, 0, 0))
         conn = RawConnection(s)
         conn.send_obj(msg)
         # send_msg(msg, s)
