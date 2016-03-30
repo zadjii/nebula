@@ -22,8 +22,23 @@ __author__ = 'Mike'
 
 def receive_updates_thread():
     s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-    s.bind((HOST_HOST, HOST_PORT, 0, 0))
-    mylog('Listening on ({},{})'.format(HOST_HOST, HOST_PORT))
+
+    addr_info = socket.getaddrinfo(socket.gethostname(), None)
+    mylog('[00]{}'.format(addr_info))
+    ipv6_addr = None
+    for iface in addr_info:
+        if iface[0] == socket.AF_INET6:
+            if ipv6_addr is None:
+                iface_addr = iface[4]
+                mylog('[01]{}'.format(iface_addr))
+                if iface_addr[3] == 0:
+                    ipv6_addr = iface[4]
+    mylog('start on ipv6 address={}'.format(ipv6_addr))
+    result = s.bind((ipv6_addr[0], HOST_PORT, 0, 0))
+    # s.bind((HOST_HOST, HOST_PORT, 0, 0))
+    # mylog('Listening on ({},{})'.format(HOST_HOST, HOST_PORT))
+    mylog('Listening on ({},{})'.format(ipv6_addr[0], HOST_PORT))
+    mylog('Lets just see:{},{},{} \n{}'.format(s.family, s.type, s.type, result))
     s.listen(5)
 
     while True:
@@ -87,16 +102,18 @@ def handle_fetch(connection, address, msg_obj):
             + ', however, I don\'t have a matching cloud.'
         )
     their_ip = address[0]
-    matching_entry = db.session.query(IncomingHostEntry).filter_by(their_address=their_ip).first()
-
-    # todo: I haven't confirmed their ID yet...
-    # cont just that I have a cloud that DOESNT have that id
-    if matching_entry is None:
-        send_unprepared_host_error_and_close(connection)
-        raise Exception(
-            'host came asking for cloudname=\'' + cloudname + '\''
-            + ', but I was not told to expect them.'
-        )
+    mylog('skipping IncomingHost authorization in handle_fetch')
+    mylog('The connected host is via IP="{}"'.format(their_ip))
+    # matching_entry = db.session.query(IncomingHostEntry).filter_by(their_address=their_ip).first()
+    #
+    # # todo: I haven't confirmed their ID yet...
+    # # cont just that I have a cloud that DOESNT have that id
+    # if matching_entry is None:
+    #     send_unprepared_host_error_and_close(connection)
+    #     raise Exception(
+    #         'host came asking for cloudname=\'' + cloudname + '\''
+    #         + ', but I was not told to expect them.'
+    #     )
 
     # connection.send('CONGRATULATIONS! You did it!')
     print 'I SUCCESSFULLY TALKED TO ANOTHER HOST!!!!'

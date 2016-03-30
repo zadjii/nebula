@@ -149,16 +149,17 @@ def host_request_cloud(connection, address, msg_obj):
     port = 0
     rand_host = match.hosts.first()  #todo make this random
     if rand_host is not None:
-        msg = PrepareForFetchMessage(host_id, cloudname, address[0]) # ipv4, old
-        msg = PrepareForFetchMessage(host_id, cloudname, rand_host.ipv6) # ipv6
-        # fixme ssl up in here
-        rand_host.send_msg(msg)
+        # ip = rand_host.ip
         ip = rand_host.ipv6
         port = rand_host.port
+        # msg = PrepareForFetchMessage(host_id, cloudname, address[0]) # ipv4, old
+        msg = PrepareForFetchMessage(host_id, cloudname, ip) # ipv6
+        # fixme ssl up in here
+        # rand_host.send_msg(msg)
+        mylog('Not telling [{}]<{}> about [{}]<{}>'.format(rand_host.id, rand_host.ipv6, matching_host.id, matching_host.ipv6))
         # prep_for_fetch_msg = make_prepare_for_fetch_json(host_id, cloudname, address[0])
         # rand_host.send_msg(prep_for_fetch_msg)
 
-        # ip = rand_host.ip
         # port = rand_host.port
         # print 'rand host is ({},{})'.format(ip, port)
         # context = SSL.Context(SSL.SSLv23_METHOD)
