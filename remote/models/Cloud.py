@@ -75,6 +75,8 @@ class Cloud(db.Base):
     def active_hosts(self):
         hosts = []
         for host in self.hosts.all():
+            if host.last_handshake is None:
+                continue
             delta = datetime.utcnow() - host.last_handshake
             if delta.seconds / 60 <= 1:
                 hosts.append(host)

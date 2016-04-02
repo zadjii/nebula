@@ -1,8 +1,8 @@
 import os
-import shutil
 from subprocess import Popen
-from remote_autopop_000 import repop as remote_autopop
+
 from host_autopop_000 import repop as host_autopop
+from remote_autopop_000 import repop as remote_autopop
 
 __author__ = 'Mike'
 
