@@ -13,7 +13,7 @@ from messages import *
 __author__ = 'Mike'
 
 
-def send_updates(cloud, updates, db):
+def send_updates(cloud, updates):
     mylog('[{}] has updates {}'.format(cloud.my_id_from_remote, updates))
     # connect to remote
     ssl_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
@@ -99,11 +99,46 @@ def local_file_update(directory_path, dir_node, filename, filenode, db):
     # todo Should also store the current UTC offset when we notice a change.
     # cont   and use that, because computers move around.
     # note I fucking hate timezones.
+    delta = file_modified - filenode.last_modified
     if file_modified > filenode.last_modified:
+        mylog('[{}] <{}>({}) was changed,'
+              '\n\t\t{} <- delta,'
+              '\n\t\t{}, <- db.lastmodified'
+              '\n\t\t{}, <- file_modified'
+              '\n\t\t{}, <- db.lastmodified.tzinfo'
+              '\n\t\t{}, <- file_modified.tzinfo'
+              '\n\t\t{} <- mtime'
+              '\n\t\t{} <- fromtimestamp(mtime)'
+              '\n\t\t{} <- fromtimestamp(mtime).tzinfo'
+              '\n\t\t{} <- fromtimestamp(mtime) + delta'
+              '\n\t\t{} <- fromtimestamp(mtime) - delta'
+              '\n\t\t{} <- os.path.getmtime()'
+              '\n\t\t{} <- os.path.getctime()'
+              '\n\t\t{} <- os.path.getatime()'
+            .format(
+                filenode.cloud.my_id_from_remote
+                , filenode.name
+                , file_pathname
+                , delta
+                , filenode.last_modified
+                , file_modified
+                , filenode.last_modified.tzinfo
+                , file_modified.tzinfo
+                , file_stat.st_mtime
+                , datetime.fromtimestamp(file_stat.st_mtime)
+                , datetime.fromtimestamp(file_stat.st_mtime).tzinfo
+                , datetime.fromtimestamp(file_stat.st_mtime) + delta
+            , datetime.fromtimestamp(file_stat.st_mtime) - delta
+            , os.path.getmtime(file_pathname)
+            , os.path.getctime(file_pathname)
+            , os.path.getatime(file_pathname)
+        )
+        )
         filenode.last_modified = file_modified
+        db.session.commit()
         updates.append((FILE_UPDATE, file_pathname))
-        mylog('<{}> was changed since {}'.format(filenode.name, filenode.last_modified))
-    # else:
+
+        # else:
         # mylog('[{}]<{}> wasnt updated'.format(filenode.id, file_pathname))
     if S_ISDIR(mode):  # It's a directory, recurse into it
         # use the directory's node as the new root.
@@ -159,7 +194,7 @@ def check_local_modifications(cloud, db):
     root = cloud.root_directory
     updates = recursive_local_modifications_check(root, cloud, db)
     if len(updates) > 0:
-        send_updates(cloud, updates, db)
+        send_updates(cloud, updates)
 
 
 def check_ipv6_changed(curr_ipv6):
@@ -182,18 +217,33 @@ def local_update_thread(host_obj):  # todo argv is a placeholder
     current_ipv6 = host_obj.active_ipv6()
     for cloud in mirrored_clouds.all():
         host_obj.send_remote_handshake(cloud)
-
+    last_handshake = datetime.utcnow()
+    db.session.close()
     while True:
+        db = get_db()
+        mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
         ip_changed, new_ip = check_ipv6_changed(current_ipv6)
 
         all_mirrored_clouds = mirrored_clouds.all()
         if num_clouds_mirrored < mirrored_clouds.count():
             mylog('checking for updates on {}'.format([cloud.my_id_from_remote for cloud in all_mirrored_clouds]))
             num_clouds_mirrored = mirrored_clouds.count()
+            for cloud in all_mirrored_clouds:
+                host_obj.send_remote_handshake(cloud)
+            last_handshake = datetime.utcnow()
         if ip_changed:
             host_obj.change_ip(new_ip, all_mirrored_clouds)
+            last_handshake = datetime.utcnow()
+
         for cloud in all_mirrored_clouds:
             check_local_modifications(cloud, db)
+
+        delta = datetime.utcnow() - last_handshake
+        if delta.seconds > 30:
+            for cloud in all_mirrored_clouds:
+                host_obj.send_remote_handshake(cloud)
+            last_handshake = datetime.utcnow()
+        db.session.close()
         time.sleep(1)  # todo: This should be replaced with something
         # cont that actually alerts the process as opposed to just sleep/wake
 

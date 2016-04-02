@@ -88,8 +88,8 @@ class Host:
                 self.send_remote_handshake(cloud)
 
     def send_remote_handshake(self, cloud):
-        mylog('Telling {}\'s remote that I\'m at {}'.format(
-            cloud.name, self.active_ipv6())
+        mylog('Telling {}\'s remote that [{}]\'s at {}'.format(
+            cloud.name, cloud.my_id_from_remote, self.active_ipv6())
         )
         remote_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
         remote_conn = RawConnection(remote_sock)

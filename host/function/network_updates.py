@@ -183,7 +183,7 @@ def handle_recv_file_from_client(connection, address, msg_obj):
 
     recv_file_tree(resp_obj, matching_cloud, connection, db)
     mylog('[{}]bottom of handle_recv_file_from_client(...,{})'
-          .format(session_uuid, msg_obj))
+          .format(session_uuid, msg_obj.__dict__))
 
 
 def handle_read_file_request(connection, address, msg_obj):
@@ -330,7 +330,7 @@ def handle_recv_file(connection, address, msg_obj):
 
     recv_file_tree(resp_obj, matching_cloud, connection, db)
     mylog('[{}]bottom of handle_recv_file(...,{})'
-          .format(my_id, msg_obj))
+          .format(my_id, msg_obj.__dict__))
 
 
 def filter_func(connection, address):
