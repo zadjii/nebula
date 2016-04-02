@@ -9,7 +9,7 @@ from connections.RawConnection import RawConnection
 from host import Cloud, REMOTE_PORT, HOST_PORT, HOST_WS_PORT
 from host import get_db
 from host.function.recv_files import recv_file_tree
-from host.util import check_response, setup_remote_socket, mylog
+from host.util import check_response, setup_remote_socket, mylog, get_ipv6_list
 from messages import *
 from msg_codes import *
 
@@ -25,18 +25,18 @@ def ask_remote_for_id(host, port, db):
     sslSocket = setup_remote_socket(host, port)
     raw_conn = RawConnection(sslSocket)
     # write_msg(make_new_host_json(HOST_PORT), sslSocket)
+    ipv6_addresses = get_ipv6_list()
+    if len(ipv6_addresses) < 1:
+        mylog('\x1b[31m MY IPV6\'s ARE {} \x1b[0m'.format(ipv6_addresses))
+        mylog('ERR: could not find an ipv6 address for this host.'
+              ' Don\'t really know what to do...')
+        return -1, None
+    else:
+        mylog('\x1b[35m MY IPV6\'s ARE {} \x1b[0m'.format(ipv6_addresses))
 
-    addr_info = socket.getaddrinfo(socket.gethostname(), None)
-    ipv6_addr = None
-    for iface in addr_info:
-        if iface[0] == socket.AF_INET6:
-            if ipv6_addr is None and iface[4][3] == 0:
-                ipv6_addr = iface[4]
-    mylog('\x1b[35m MY IPV6 IS {} \x1b[0m'.format(ipv6_addr))
-    if ipv6_addr is None:
-        mylog('ERR: could not find an ipv6 address for this host. Don\'t really know what to do...')
-        return (-1, None)
-    msg = NewHostMessage(ipv6_addr[0], HOST_PORT, HOST_WS_PORT)
+    ipv6_addr = ipv6_addresses[0]  # arbitrarily take the first one
+
+    msg = NewHostMessage(ipv6_addr, HOST_PORT, HOST_WS_PORT)
     raw_conn.send_obj(msg)
     # msg_obj = recv_msg(sslSocket)
     resp_obj = raw_conn.recv_obj()

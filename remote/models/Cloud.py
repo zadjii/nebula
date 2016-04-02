@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from remote import _remote_db as db
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table
 from sqlalchemy.orm import relationship, backref
@@ -25,6 +27,7 @@ PRIVATE_CLOUD = 1  # only owners and contributors
 PUBLIC_CLOUD = 2  # anyone (host can still reject RDWR)
 # todo: when making links, host needs to know privacy state. If a host wants to
 # cont make a public link, then the cloud needs to be public, etc.
+
 
 class Cloud(db.Base):
     __tablename__ = 'cloud'
@@ -68,3 +71,11 @@ class Cloud(db.Base):
                 or self.contributors.filter_by(id=user.id).first() is not None
         else:
             return True
+
+    def active_hosts(self):
+        hosts = []
+        for host in self.hosts.all():
+            delta = datetime.utcnow() - host.last_handshake
+            if delta.seconds / 60 <= 1:
+                hosts.append(host)
+        return hosts

@@ -1,6 +1,8 @@
 import sys
 import socket
 from threading import Thread
+
+from datetime import datetime
 from OpenSSL import SSL
 from connections.RawConnection import RawConnection
 from host.util import set_mylog_name, mylog
@@ -34,6 +36,8 @@ def filter_func(connection, address):
     # print 'The message is', msg_obj
     if msg_type == NEW_HOST:
         new_host_handler(connection, address, msg_obj)
+    elif msg_type == HOST_HANDSHAKE:
+        host_handshake(connection, address, msg_obj)
     elif msg_type == REQUEST_CLOUD:
         host_request_cloud(connection, address, msg_obj)
     elif msg_type == MIRRORING_COMPLETE:
@@ -49,6 +53,17 @@ def filter_func(connection, address):
     else:
         print 'I don\'t know what to do with', msg_obj
     connection.close()
+
+
+def host_handshake(connection, address, msg_obj):
+    db = get_db()
+    ipv6 = msg_obj.ipv6
+    host = db.session.query(Host).get(msg_obj.id)
+    if host is not None:
+        mylog('Host [{}] moved from "{}" to "{}"'.format(host.id, host.ipv6, ipv6))
+        host.ipv6 = ipv6
+        host.last_handshake = datetime.utcnow()
+        db.session.commit()
 
 
 def respond_to_get_clouds(connection, address, msg_obj):
@@ -147,7 +162,10 @@ def host_request_cloud(connection, address, msg_obj):
     # print 'Here, they will have successfully been able to mirror?'
     ip = '0'
     port = 0
-    rand_host = match.hosts.first()  #todo make this random
+    # rand_host = match.hosts.first()
+    rand_host = None
+    if len(match.active_hosts()) > 0:
+        rand_host = match.active_hosts()[0]  # todo make this random
     if rand_host is not None:
         # ip = rand_host.ip
         ip = rand_host.ipv6

@@ -1,7 +1,7 @@
 import os
 from subprocess import Popen, PIPE
 from time import sleep
-from test.repop_dbs import repop_dbs
+from test.all_dbs_repop import repop_dbs
 
 __author__ = 'Mike'
 

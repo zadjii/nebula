@@ -17,7 +17,7 @@
 
 0   , NEW_HOST              , string:ipv6, int:port     , int:wsport
 1   , ASSIGN_HOST_ID        , int:id    , string:key    , string:cert
-2   , HOST_HANDSHAKE        , int:id    , int:port      , int:wsport    , update
+2   , HOST_HANDSHAKE        , int:id    , string:ipv6   , int:port      , int:wsport    , update
 
 3   , REMOTE_HANDSHAKE      , int:id    , string:key    , string:cert
 4   , REM_HANDSHAKE_GO_FETCH #todo not done

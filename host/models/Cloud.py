@@ -47,7 +47,7 @@ class Cloud(db.Base):
         curr_parent_node = None
         # curr_path = '.'
         dirs = os.path.normpath(full_path).split(os.sep)
-        print 'create/update for all of {}'.format(dirs)
+        # print 'create/update for all of {}'.format(dirs)
         while len(dirs) > 0:
             # find the node in children if it exists, else make it
             if curr_parent_node is not None:
@@ -66,12 +66,12 @@ class Cloud(db.Base):
                 else:
                     self.children.append(child)
                 db.session.commit()
-                print '\tcreated node for <{}>({}), parent:<{}>'\
-                    .format(
-                        child.name
-                        , child.created_on
-                        , curr_parent_node.name if curr_parent_node is not None else 'None'
-                    )
+                # print '\tcreated node for <{}>({}), parent:<{}>'\
+                #     .format(
+                #         child.name
+                #         , child.created_on
+                #         , curr_parent_node.name if curr_parent_node is not None else 'None'
+                #     )
             curr_parent_node = child
             curr_children = child.children
             dirs.pop(0)

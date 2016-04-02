@@ -4,6 +4,17 @@ from datetime import datetime
 __author__ = 'Mike'
 
 
+def get_ipv6_list():
+    """Returns all suitable (public) ipv6 addresses for this host"""
+    addr_info = socket.getaddrinfo(socket.gethostname(), None)
+    ipv6_addresses = []
+    for iface in addr_info:
+        if iface[0] == socket.AF_INET6:
+            if iface[4][3] == 0: # if the zoneid is 0, indicating global ipv6
+                ipv6_addresses.append(iface[4])
+    return [ipaddr[0] for ipaddr in ipv6_addresses]
+
+
 def check_response(expected, recieved):
     if not(int(expected) == int(recieved)):
         raise Exception('Received wrong msg-code, expected',expected,', received',recieved)

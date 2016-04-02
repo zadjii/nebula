@@ -6,7 +6,7 @@ import time
 from connections.RawConnection import RawConnection
 from host import FileNode, get_db, Cloud, HOST_PORT
 from host.function.send_files import send_file_to_other, complete_sending_files
-from host.util import check_response, setup_remote_socket, mylog
+from host.util import check_response, setup_remote_socket, mylog, get_ipv6_list
 from msg_codes import *
 from messages import *
 
@@ -63,7 +63,7 @@ def update_peer(cloud, host, updates):
 
 
 def local_file_create(directory_path, dir_node, filename, db):
-    print '\t\tAdding',filename,'to filenode for',dir_node.name
+    # print '\t\tAdding',filename,'to filenode for',dir_node.name
     file_pathname = os.path.join(directory_path, filename)
     file_stat = os.stat(file_pathname)
     file_modified = file_stat.st_mtime
@@ -149,8 +149,8 @@ def recursive_local_modifications_check(directory_path, dir_node, db):
         i += 1
     # todo handle j < num_nodes, bulk end deletes
     new_num_nodes = db.session.query(FileNode).count()
-    if not new_num_nodes == original_total_nodes:
-        print 'RLM:total file nodes:', new_num_nodes
+    # if not new_num_nodes == original_total_nodes:
+    #     mylog('RLM:total file nodes:{}'.format(new_num_nodes))
 
     return updates
 
@@ -162,16 +162,36 @@ def check_local_modifications(cloud, db):
         send_updates(cloud, updates, db)
 
 
-def local_update_thread():  # todo argv is a placeholder
+def check_ipv6_changed(curr_ipv6):
+    ipv6_addresses = get_ipv6_list()
+    if curr_ipv6 in ipv6_addresses:
+        return False, None
+    else:
+        new_addr = None
+        if len(ipv6_addresses) > 1:
+            new_addr = ipv6_addresses[0]
+        return True, new_addr
+
+
+def local_update_thread(host_obj):  # todo argv is a placeholder
     db = get_db()
     print 'Beginning to watch for local modifications'
     mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
     num_clouds_mirrored = 0  # mirrored_clouds.count()
+
+    current_ipv6 = host_obj.active_ipv6()
+    for cloud in mirrored_clouds.all():
+        host_obj.send_remote_handshake(cloud)
+
     while True:
+        ip_changed, new_ip = check_ipv6_changed(current_ipv6)
+
         all_mirrored_clouds = mirrored_clouds.all()
         if num_clouds_mirrored < mirrored_clouds.count():
             mylog('checking for updates on {}'.format([cloud.my_id_from_remote for cloud in all_mirrored_clouds]))
             num_clouds_mirrored = mirrored_clouds.count()
+        if ip_changed:
+            host_obj.change_ip(new_ip, all_mirrored_clouds)
         for cloud in all_mirrored_clouds:
             check_local_modifications(cloud, db)
         time.sleep(1)  # todo: This should be replaced with something

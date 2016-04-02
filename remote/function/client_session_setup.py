@@ -123,13 +123,18 @@ def get_cloud_host(connection, address, msg_obj):
     # Now we  tell a host that they are coming,
     #   and tell them their id and where to go.
 
-    host = cloud.hosts.first()
+    # host = match.hosts.first()
+    host = None
+    if len(cloud.active_hosts()) > 0:
+        host = cloud.active_hosts()[0]  # todo make this random
+
     mylog('cloud[{}] hosts = {}'.format(cloud.name, cloud.hosts.all()))
-    # todo: make this^ random
+    mylog('cloud[{}] ACTIVE hosts = {}'.format(cloud.name, cloud.active_hosts()))
+
     if host is None:
         mylog('ERR: host was none')
         msg = ClientGetCloudHostResponseMessage(session_id, cloud.name, '', 0, 0)
-        connection.send_obj(msg)# fixme
+        connection.send_obj(msg)  # fixme
         # send_generic_error_and_close(connection)  # todo send proper error
         return
     # fixme confirm that the host is alive, and can handle this response

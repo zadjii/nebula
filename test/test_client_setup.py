@@ -3,7 +3,7 @@ import socket
 from host import REMOTE_HOST, REMOTE_PORT
 
 from host.util import setup_remote_socket
-from test.repop_dbs import repop_dbs
+from test.all_dbs_repop import repop_dbs
 from test.util import start_nebs_and_nebr, teardown_children
 from connections.RawConnection import RawConnection
 

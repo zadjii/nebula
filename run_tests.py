@@ -1,6 +1,6 @@
 from subprocess import Popen
 
-from test.repop_dbs import repop_dbs
+from test.all_dbs_repop import repop_dbs
 
 __author__ = 'zadjii'
 from test import test_msgs, test_client_setup, test_msgs_2

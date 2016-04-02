@@ -1,6 +1,8 @@
 import os
 import shutil
 from subprocess import Popen
+from remote_autopop_000 import repop as remote_autopop
+from host_autopop_000 import repop as host_autopop
 
 __author__ = 'Mike'
 
@@ -15,8 +17,10 @@ def repop_dbs():
     reset_dbs.wait()
     print '#' * 80
 
-    autopop = Popen('python db_autopopulate_000.py', shell=True)
-    autopop.wait()
+    # autopop = Popen('python db_autopopulate_000.py', shell=True)
+    # autopop.wait()
+    remote_autopop()
+    host_autopop()
     print '# DBs repop\'d'
     print '#' * 80
 

@@ -1,6 +1,7 @@
 # last generated 2015-12-31 02:30:42.322000
 from messages import BaseMessage
 from msg_codes import GET_HOSTS_RESPONSE as GET_HOSTS_RESPONSE
+from datetime import datetime
 __author__ = 'Mike'
 
 
@@ -10,7 +11,7 @@ class GetHostsResponseMessage(BaseMessage):
         self.type = GET_HOSTS_RESPONSE
         if cloud is not None:
             self.cname = cloud.name
-            hosts = cloud.hosts.all()
+            hosts = cloud.active_hosts()
             host_jsons = []
             for host in hosts:
                 host_obj = {
@@ -19,7 +20,7 @@ class GetHostsResponseMessage(BaseMessage):
                     , 'wsport': host.ws_port
                     , 'id': host.id
                     , 'update': host.last_update
-                    , 'hndshk': host.last_handshake
+                    , 'hndshk': host.last_handshake.isoformat()
                 }
                 host_jsons.append(host_obj)
             self.hosts = host_jsons
