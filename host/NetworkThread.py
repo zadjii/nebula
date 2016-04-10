@@ -14,6 +14,7 @@ class NetworkThread(object):
         self.ipv6_address = ipv6_address
         self.port = HOST_PORT
         self.setup_socket(ipv6_address)
+        self.connection_queue = []
 
     def setup_socket(self, ipv6_address):
         self.server_sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
@@ -26,10 +27,11 @@ class NetworkThread(object):
             (connection, address) = self.server_sock.accept()
             raw_conn = RawConnection(connection)
             mylog('Connected by {}'.format(address))
-            thread = Thread(target=filter_func, args=[raw_conn, address])
-            thread.start()
-            thread.join()
-        self.server_sock.shutdown()
+            self.connection_queue.append((raw_conn, address))
+            # thread = Thread(target=filter_func, args=[raw_conn, address])
+            # thread.start()
+            # thread.join()
+        self.server_sock.shutdown(socket.SHUT_RDWR)
         mylog('Shut down server socket on {}'.format(self.ipv6_address))
 
     def shutdown(self):

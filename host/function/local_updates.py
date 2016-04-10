@@ -19,12 +19,10 @@ def send_updates(cloud, updates):
     ssl_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
     raw_connection = RawConnection(ssl_sock)
     # get hosts list
-    msg = GetHostsRequestMessage(cloud.my_id_from_remote, cloud.name)
+    msg = GetActiveHostsRequestMessage(cloud.my_id_from_remote, cloud.name)
     raw_connection.send_obj(msg)
-    # send_msg(make_get_hosts_request(cloud.my_id_from_remote, cloud.name), ssl_sock)
     response = raw_connection.recv_obj()
-    # response = recv_msg(ssl_sock)
-    check_response(GET_HOSTS_RESPONSE, response.type)
+    check_response(GET_ACTIVE_HOSTS_RESPONSE, response.type)
     hosts = response.hosts
     updated_peers = 0
     for host in hosts:
@@ -53,7 +51,8 @@ def update_peer(cloud, host, updates):
                 host_id
                 , cloud
                 , os.path.join(cloud.root_directory, relative_pathname)
-                , raw_connection)
+                , raw_connection
+                , recurse=False)
         elif update[0] == FILE_DELETE:
             msg = RemoveFileMessage(host_id, cloud.name, relative_pathname)
             raw_connection.send_obj(msg)
@@ -75,6 +74,10 @@ def local_file_create(directory_path, dir_node, filename, db):
     filenode.name = filename
     filenode.created_on = datetime.utcfromtimestamp( file_created )
     filenode.last_modified = datetime.utcfromtimestamp( file_modified )
+    try:
+        filenode.cloud = dir_node.cloud
+    except AttributeError:
+        filenode.cloud = dir_node
     dir_node.children.append(filenode)
     db.session.commit()
     updates = [(FILE_CREATE, file_pathname)]
@@ -110,8 +113,6 @@ def local_file_update(directory_path, dir_node, filename, filenode, db):
               '\n\t\t{} <- mtime'
               '\n\t\t{} <- fromtimestamp(mtime)'
               '\n\t\t{} <- fromtimestamp(mtime).tzinfo'
-              '\n\t\t{} <- fromtimestamp(mtime) + delta'
-              '\n\t\t{} <- fromtimestamp(mtime) - delta'
               '\n\t\t{} <- os.path.getmtime()'
               '\n\t\t{} <- os.path.getctime()'
               '\n\t\t{} <- os.path.getatime()'
@@ -127,8 +128,6 @@ def local_file_update(directory_path, dir_node, filename, filenode, db):
                 , file_stat.st_mtime
                 , datetime.fromtimestamp(file_stat.st_mtime)
                 , datetime.fromtimestamp(file_stat.st_mtime).tzinfo
-                , datetime.fromtimestamp(file_stat.st_mtime) + delta
-            , datetime.fromtimestamp(file_stat.st_mtime) - delta
             , os.path.getmtime(file_pathname)
             , os.path.getctime(file_pathname)
             , os.path.getatime(file_pathname)
@@ -199,6 +198,11 @@ def check_local_modifications(cloud, db):
 
 def check_ipv6_changed(curr_ipv6):
     ipv6_addresses = get_ipv6_list()
+    if curr_ipv6 is None:
+        if len(ipv6_addresses) > 0:
+            return True, ipv6_addresses[0]
+        else:
+            return False, None
     if curr_ipv6 in ipv6_addresses:
         return False, None
     else:
@@ -215,11 +219,13 @@ def local_update_thread(host_obj):  # todo argv is a placeholder
     num_clouds_mirrored = 0  # mirrored_clouds.count()
 
     current_ipv6 = host_obj.active_ipv6()
-    for cloud in mirrored_clouds.all():
-        host_obj.send_remote_handshake(cloud)
+    host_obj.handshake_clouds(mirrored_clouds.all())
+    # for cloud in mirrored_clouds.all():
+    #     host_obj.send_remote_handshake(cloud)
     last_handshake = datetime.utcnow()
     db.session.close()
     while True:
+        host_obj.process_connections()
         db = get_db()
         mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
         ip_changed, new_ip = check_ipv6_changed(current_ipv6)
@@ -234,14 +240,16 @@ def local_update_thread(host_obj):  # todo argv is a placeholder
         if ip_changed:
             host_obj.change_ip(new_ip, all_mirrored_clouds)
             last_handshake = datetime.utcnow()
+            current_ipv6 = new_ip
 
         for cloud in all_mirrored_clouds:
             check_local_modifications(cloud, db)
 
         delta = datetime.utcnow() - last_handshake
         if delta.seconds > 30:
-            for cloud in all_mirrored_clouds:
-                host_obj.send_remote_handshake(cloud)
+            host_obj.handshake_clouds(all_mirrored_clouds)
+            # for cloud in all_mirrored_clouds:
+            #     host_obj.send_remote_handshake(cloud)
             last_handshake = datetime.utcnow()
         db.session.close()
         time.sleep(1)  # todo: This should be replaced with something

@@ -131,11 +131,14 @@ def handle_recv_file_from_client(connection, address, msg_obj):
     # requested_file = msg_obj['fpath']
     requested_file = msg_obj.fpath
     their_ip = address[0]
-    matching_session = db.session.query(Session).filter_by(uuid=session_uuid).first()
-    if matching_session is None:
-        send_generic_error_and_close(connection)
-        mylog('ERR: got a CLIENT_._PUT from {} but I don\'t have that session'.format(session_uuid))
-        # fixme: we should return here, and not actually handle the file....
+
+    # fixme This is some client session validation. Which obviously needs work.
+    # matching_session = db.session.query(Session).filter_by(uuid=session_uuid).first()
+    # if matching_session is None:
+    #     send_generic_error_and_close(connection)
+    #     mylog('ERR: got a CLIENT_._PUT from {} but I don\'t have that session'.format(session_uuid))
+    #     # fixme: we should return here, and not actually handle the file....
+
     # matching_id_clouds = db.session.query(Cloud)\
     #     .filter(Cloud.my_id_from_remote == my_id)
     # if matching_id_clouds.count() <= 0:
@@ -197,11 +200,14 @@ def handle_read_file_request(connection, address, msg_obj):
     requested_file = msg_obj.fpath
     their_ip = address[0]
     # todo: refactor this segment out into a verify session function
-    mylog('sessions:{}'.format([(sess.uuid, sess.client_ip) for sess in db.session.query(Session)]))
-    matching_session = db.session.query(Session).filter_by(uuid=session_uuid).first()
-    if matching_session is None:
-        send_generic_error_and_close(connection)
-        mylog('ERR: got a RFQ from {} but I don\'t have that session'.format(session_uuid))
+    # mylog('sessions:{}'.format([(sess.uuid, sess.client_ip) for sess in db.session.query(Session)]))
+    # matching_session = db.session.query(Session).filter_by(uuid=session_uuid).first()
+    # if matching_session is None:
+    #     send_generic_error_and_close(connection)
+    #     mylog('ERR: got a RFQ from {} but I don\'t have that session'.format(session_uuid))
+    # fixme ^ This all depended upon remotes sending the host a CSA first
+    #    which we don't do anymore. so poop on you.
+
     # matching_id_clouds = db.session.query(Cloud)\
     #     .filter(Cloud.my_id_from_remote == my_id)
     # if matching_id_clouds.count() <= 0:

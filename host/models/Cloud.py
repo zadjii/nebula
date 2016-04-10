@@ -59,7 +59,7 @@ class Cloud(db.Base):
                 child.name = dirs[0]
                 child.created_on = datetime.utcnow()
                 child.last_modified = child.created_on
-                # child.cloud_id = self.id
+                child.cloud = self
                 db.session.add(child)
                 if curr_parent_node is not None:
                     curr_parent_node.children.append(child)

@@ -128,8 +128,10 @@ def get_cloud_host(connection, address, msg_obj):
     if len(cloud.active_hosts()) > 0:
         host = cloud.active_hosts()[0]  # todo make this random
 
-    mylog('cloud[{}] hosts = {}'.format(cloud.name, cloud.hosts.all()))
-    mylog('cloud[{}] ACTIVE hosts = {}'.format(cloud.name, cloud.active_hosts()))
+    mylog('cloud[{}] hosts = {}'.format(cloud.name
+                                        , [host.id for host in cloud.hosts.all()]))
+    mylog('cloud[{}] ACTIVE hosts = {}'.format(cloud.name
+                                               , [host.id for host in cloud.active_hosts()]))
 
     if host is None:
         mylog('ERR: host was none')
@@ -140,11 +142,13 @@ def get_cloud_host(connection, address, msg_obj):
     # fixme confirm that the host is alive, and can handle this response
 
     # tell host
-    msg = ClientSessionAlertMessage(sess_obj.uuid, user.id, address[0])
-    host.send_msg(msg)
+    # msg = ClientSessionAlertMessage(sess_obj.uuid, user.id, address[0])
+    # host.send_msg(msg)
+    # fixme Hosts no longer get a CSA, the client must get some auth from the
+    #    remote that the host can trust.
 
     # tell client
-    msg = ClientGetCloudHostResponseMessage(session_id, cloud.name, host.ip, host.port, host.ws_port)
+    msg = ClientGetCloudHostResponseMessage(session_id, cloud.name, host.ipv6, host.port, host.ws_port)
     connection.send_obj(msg)
 
     mylog('I think i setup the host for this session')

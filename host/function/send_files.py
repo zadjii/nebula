@@ -22,7 +22,7 @@ def send_tree(other_id, cloud, requested_root, connection):
     connection.close()
 
 
-def send_file_to_other(other_id, cloud, filepath, socket_conn):
+def send_file_to_other(other_id, cloud, filepath, socket_conn, recurse=True):
     """
     Assumes that the other host was already verified, and the cloud is non-null
     """
@@ -52,10 +52,11 @@ def send_file_to_other(other_id, cloud, filepath, socket_conn):
             #     )
             #     , socket_conn
             # )
-        subdirectories = os.listdir(filepath)
-        mylog('Sending children of <{}>={}'.format(filepath, subdirectories))
-        for f in subdirectories:
-            send_file_to_other(other_id, cloud, os.path.join(filepath, f), socket_conn)
+        if recurse:
+            subdirectories = os.listdir(filepath)
+            mylog('Sending children of <{}>={}'.format(filepath, subdirectories))
+            for f in subdirectories:
+                send_file_to_other(other_id, cloud, os.path.join(filepath, f), socket_conn)
     else:
         req_file_size = req_file_stat.st_size
         requested_file = open(filepath, 'rb')

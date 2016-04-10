@@ -43,7 +43,9 @@ def filter_func(connection, address):
     elif msg_type == MIRRORING_COMPLETE:
         mirror_complete(connection, address, msg_obj)
     elif msg_type == GET_HOSTS_REQUEST:
-        respond_to_get_hosts_request(connection, address, msg_obj)
+        get_hosts_response(connection, address, msg_obj)
+    elif msg_type == GET_ACTIVE_HOSTS_REQUEST:
+        get_hosts_response(connection, address, msg_obj)
     elif msg_type == CLIENT_SESSION_REQUEST:
         setup_client_session(connection, address, msg_obj)
     elif msg_type == CLIENT_GET_CLOUDS_REQUEST:
@@ -60,7 +62,8 @@ def host_handshake(connection, address, msg_obj):
     ipv6 = msg_obj.ipv6
     host = db.session.query(Host).get(msg_obj.id)
     if host is not None:
-        mylog('Host [{}] moved from "{}" to "{}"'.format(host.id, host.ipv6, ipv6))
+        if not host.ipv6 == ipv6:
+            mylog('Host [{}] moved from "{}" to "{}"'.format(host.id, host.ipv6, ipv6))
         host.ipv6 = ipv6
         host.last_handshake = datetime.utcnow()
         db.session.commit()
@@ -90,6 +93,33 @@ def respond_to_get_clouds(connection, address, msg_obj):
     connection.send_obj(msg)
 
 
+def get_hosts_response(connection, address, msg_obj):
+    db = get_db()
+    host_id = msg_obj.id
+    cloudname = msg_obj.cname
+
+    matching_host = db.session.query(Host).get(host_id)
+    if matching_host is None:
+        send_generic_error_and_close(connection)
+        raise Exception('There was no host with the ID[{}], wtf'.format(host_id))
+
+    matching_cloud = db.session.query(Cloud).filter_by(name=cloudname).first()
+    if matching_cloud is None:
+        send_generic_error_and_close(connection)
+        raise Exception('No cloud with name ' + cloudname)
+    if msg_obj.type == GET_HOSTS_REQUEST:
+        msg = GetHostsResponseMessage(matching_cloud)
+    else:
+        msg = GetActiveHostsResponseMessage(matching_cloud)
+    connection.send_obj(msg)
+    if msg_obj.type == GET_HOSTS_REQUEST:
+        mylog('responded to Host[{}] asking for hosts of \'{}\''.format(
+            host_id, cloudname))
+    else:
+        mylog('responded to Host[{}] asking for ACTIVE hosts of \'{}\''.format(
+            host_id, cloudname))
+
+
 def respond_to_get_hosts_request(connection, address, msg_obj):
     db = get_db()
     host_id = msg_obj.id
@@ -109,6 +139,29 @@ def respond_to_get_hosts_request(connection, address, msg_obj):
     msg = GetHostsResponseMessage(matching_cloud)
     connection.send_obj(msg)
     print 'responded to Host[{}] asking for hosts of \'{}\''\
+        .format(host_id, cloudname)
+
+
+def respond_to_get_active_hosts_request(connection, address, msg_obj):
+    db = get_db()
+    host_id = msg_obj.id
+    cloudname = msg_obj.cname
+
+    matching_host = db.session.query(Host).get(host_id)
+    if matching_host is None:
+        send_generic_error_and_close(connection)
+        raise Exception(
+            'There was no host with the ID[{}], wtf'.format(host_id))
+
+    matching_cloud = db.session.query(Cloud).filter_by(name=cloudname).first()
+    if matching_cloud is None:
+        send_generic_error_and_close(connection)
+        raise Exception('No cloud with name ' + cloudname)
+
+    # send_msg(make_get_hosts_response(matching_cloud), connection)
+    msg = GetHostsResponseMessage(matching_cloud)
+    connection.send_obj(msg)
+    print 'responded to Host[{}] asking for hosts of \'{}\'' \
         .format(host_id, cloudname)
 
 

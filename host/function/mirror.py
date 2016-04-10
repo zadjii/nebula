@@ -2,7 +2,7 @@ from datetime import datetime
 import socket
 import getpass
 from sys import stdin
-
+import platform
 from werkzeug.security import generate_password_hash
 from connections.RawConnection import RawConnection
 
@@ -36,7 +36,7 @@ def ask_remote_for_id(host, port, db):
 
     ipv6_addr = ipv6_addresses[0]  # arbitrarily take the first one
 
-    msg = NewHostMessage(ipv6_addr, HOST_PORT, HOST_WS_PORT)
+    msg = NewHostMessage(ipv6_addr, HOST_PORT, HOST_WS_PORT, platform.uname()[1])
     raw_conn.send_obj(msg)
     # msg_obj = recv_msg(sslSocket)
     resp_obj = raw_conn.recv_obj()

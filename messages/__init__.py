@@ -1,4 +1,4 @@
-# last generated 2015-12-31 02:30:42.265000
+# last generated 2016-04-10 21:56:22.306000
 from messages.BaseMessage import BaseMessage
 from messages.FileDoesNotExistErrorMessage import FileDoesNotExistErrorMessage
 from messages.FileIsNotDirErrorMessage import FileIsNotDirErrorMessage
@@ -40,4 +40,6 @@ from messages.ClientGetCloudsRequestMessage import ClientGetCloudsRequestMessage
 from messages.ClientGetCloudsResponseMessage import ClientGetCloudsResponseMessage
 from messages.ClientGetCloudHostRequestMessage import ClientGetCloudHostRequestMessage
 from messages.ClientGetCloudHostResponseMessage import ClientGetCloudHostResponseMessage
+from messages.GetActiveHostsRequestMessage import GetActiveHostsRequestMessage
+from messages.GetActiveHostsResponseMessage import GetActiveHostsResponseMessage
 

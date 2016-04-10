@@ -196,7 +196,7 @@ def make_message_deserializer(messages):
 class MessageDeserializer(object):
     @staticmethod
     def decode_msg(json_string):
-        print 'decoding"{}"'.format(json_string)
+        print '\t\t-> decoding"{}"'.format(json_string)
         json_dict = json.loads(json_string)
         if 'type' not in json_dict.keys():
             raise

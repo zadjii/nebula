@@ -1,17 +1,16 @@
-# last generated 2015-12-31 02:30:42.322000
+# last generated 2016-04-10 21:56:22.756000
 from messages import BaseMessage
-from msg_codes import GET_HOSTS_RESPONSE as GET_HOSTS_RESPONSE
-from datetime import datetime
+from msg_codes import GET_ACTIVE_HOSTS_RESPONSE as GET_ACTIVE_HOSTS_RESPONSE
 __author__ = 'Mike'
 
 
-class GetHostsResponseMessage(BaseMessage):
+class GetActiveHostsResponseMessage(BaseMessage):
     def __init__(self, cloud=None):
-        super(GetHostsResponseMessage, self).__init__()
-        self.type = GET_HOSTS_RESPONSE
+        super(GetActiveHostsResponseMessage, self).__init__()
+        self.type = GET_ACTIVE_HOSTS_RESPONSE
         if cloud is not None:
             self.cname = cloud.name
-            hosts = cloud.hosts
+            hosts = cloud.active_hosts()
             host_jsons = []
             for host in hosts:
                 host_obj = {
@@ -28,7 +27,7 @@ class GetHostsResponseMessage(BaseMessage):
 
     @staticmethod
     def deserialize(json_dict):
-        msg = GetHostsResponseMessage()
+        msg = GetActiveHostsResponseMessage()
         msg.cname = json_dict['cname']
         msg.hosts = json_dict['hosts']
         return msg

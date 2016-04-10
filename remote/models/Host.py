@@ -23,6 +23,7 @@ class Host(db.Base):
     ipv6 = Column(String)
     port = Column(Integer)
     ws_port = Column(Integer)
+    hostname = Column(String)
     # sessions = relationship('Session', backref='host', lazy='dynamic')
 
     # note: leaving this here. The host will only be in the list of hosts

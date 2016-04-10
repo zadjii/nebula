@@ -7,20 +7,21 @@ from host.function.dbg_nodes import dbg_nodes
 from host.models import Cloud
 from host.util import set_mylog_name, mylog, get_ipv6_list, setup_remote_socket
 from messages.HostHandshakeMessage import  HostHandshakeMessage
-__author__ = 'Mike'
 from threading import Thread
-
 from host.function.mirror import mirror
 from host.function.tree import db_tree, tree
 from host.function.list_clouds import list_clouds
 from host.function.local_updates import local_update_thread
-from host.function.network_updates import receive_updates_thread
+from host.function.network_updates import receive_updates_thread, filter_func
 
 try:
     import asyncio
 except ImportError:  # Trollius >= 0.3 was renamed
     import trollius as asyncio
 from autobahn.asyncio.websocket import WebSocketServerFactory
+import platform
+
+__author__ = 'Mike'
 
 
 class Host:
@@ -28,6 +29,7 @@ class Host:
         self.active_network_obj = None
         self.active_network_thread = None
         self.active_ws_thread = None
+        self.network_queue = []  # all the queued connections to handle.
 
     def start(self, argv):
         set_mylog_name('nebs')
@@ -58,6 +60,7 @@ class Host:
 
     def spawn_net_thread(self, ipv6_address):
         if self.active_network_obj is not None:
+            # todo make sure connections from the old thread get dequeue'd
             self.active_network_obj.shutdown()
         mylog('Spawning new server thread on {}'.format(ipv6_address))
         self.active_network_obj = NetworkThread(ipv6_address)
@@ -78,7 +81,9 @@ class Host:
 
     def change_ip(self, new_ip, clouds):
         if new_ip is None:
-            mylog('I should tell all the remotes that I\'m dead now.')  # fixme
+            if self.active_ipv6() is not None:
+                mylog('I should tell all the remotes that I\'m dead now.')  # fixme
+                mylog('DISCONNECTED FROM IPv6')  # fixme
             # at this point, how is my active net thread connected to anything?
             if self.active_network_obj is not None:
                 self.active_network_obj.shutdown()
@@ -87,10 +92,19 @@ class Host:
             for cloud in clouds:
                 self.send_remote_handshake(cloud)
 
-    def send_remote_handshake(self, cloud):
-        mylog('Telling {}\'s remote that [{}]\'s at {}'.format(
-            cloud.name, cloud.my_id_from_remote, self.active_ipv6())
+    def handshake_clouds(self, clouds):
+        mylog('Telling {}\'s remote that {}\'s at {}'.format(
+            [cloud.name for cloud in clouds]
+            , [cloud.my_id_from_remote for cloud in clouds]
+            , self.active_ipv6())
         )
+        for cloud in clouds:
+            self.send_remote_handshake(cloud)
+
+    def send_remote_handshake(self, cloud):
+        # mylog('Telling {}\'s remote that [{}]\'s at {}'.format(
+        #     cloud.name, cloud.my_id_from_remote, self.active_ipv6())
+        # )
         remote_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
         remote_conn = RawConnection(remote_sock)
         msg = HostHandshakeMessage(
@@ -98,12 +112,21 @@ class Host:
             self.active_network_obj.ipv6_address,
             self.active_network_obj.port,
             0,  # todo fill in ws port
-            0  # todo update number/timestamp? it's in my notes
+            0,  # todo update number/timestamp? it's in my notes
+            platform.uname()[1]  # hostname
         )
         remote_conn.send_obj(msg)
         # todo
         # response = remote_conn.recv_obj()
         remote_conn.close()
+
+    def process_connections(self):
+        num_conns = len(self.active_network_obj.connection_queue)
+        while num_conns > 0:
+            (conn, addr) = self.active_network_obj.connection_queue.pop(0)
+        # for (conn, addr) in self.active_network_obj.connection_queue[:]:
+            filter_func(conn, addr)
+            num_conns -= 1
 
 
 def ws_thread_function(argv):

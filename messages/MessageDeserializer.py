@@ -1,4 +1,4 @@
-# last generated 2015-12-31 02:30:42.368000
+# last generated 2016-04-10 21:56:22.766000
 import json
 from msg_codes import *
 from messages import *
@@ -43,13 +43,15 @@ _decoder_table = {
     , CLIENT_GET_CLOUDS_RESPONSE: ClientGetCloudsResponseMessage.deserialize # 32
     , CLIENT_GET_CLOUD_HOST_REQUEST: ClientGetCloudHostRequestMessage.deserialize # 33
     , CLIENT_GET_CLOUD_HOST_RESPONSE: ClientGetCloudHostResponseMessage.deserialize # 34
+    , GET_ACTIVE_HOSTS_REQUEST: GetActiveHostsRequestMessage.deserialize # 35
+    , GET_ACTIVE_HOSTS_RESPONSE: GetActiveHostsResponseMessage.deserialize # 36
 }
 
 
 class MessageDeserializer(object):
     @staticmethod
     def decode_msg(json_string):
-        print 'decoding"{}"'.format(json_string)
+        print '\t\t-> decoding"{}"'.format(json_string)
         json_dict = json.loads(json_string)
         if 'type' not in json_dict.keys():
             raise
