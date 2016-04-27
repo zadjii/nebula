@@ -69,6 +69,11 @@ class Host:
         )
         self.active_network_thread.start()
 
+        self.active_ws_thread = Thread(
+            target=self.active_network_obj.ws_work_thread, args=[]
+        )
+        self.active_ws_thread.start()
+
     def active_ipv6(self):
         if self.active_network_obj is not None:
             return self.active_network_obj.ipv6_address
@@ -111,7 +116,7 @@ class Host:
             cloud.my_id_from_remote,
             self.active_network_obj.ipv6_address,
             self.active_network_obj.port,
-            0,  # todo fill in ws port
+            self.active_network_obj.ws_port,
             0,  # todo update number/timestamp? it's in my notes
             platform.uname()[1]  # hostname
         )
@@ -129,7 +134,7 @@ class Host:
             num_conns -= 1
 
 
-def ws_thread_function(argv):
+def old_ws_thread_function(argv):
     mylog('top of ws thread')
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -172,7 +177,7 @@ def old_start(argv):
 
     ###############
 
-    ws_thread = Thread(target=ws_thread_function, args=argv)
+    ws_thread = Thread(target=old_ws_thread_function, args=argv)
     ws_thread.start()
 
     ###############
