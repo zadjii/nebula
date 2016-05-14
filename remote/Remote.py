@@ -66,7 +66,7 @@ def host_handshake(connection, address, msg_obj):
             mylog('Host [{}] moved from "{}" to "{}"'.format(host.id, host.ipv6, ipv6))
         host.ipv6 = ipv6
         host.port = msg_obj.port
-        host.ws_port = msg_obj.ws_port
+        host.ws_port = msg_obj.wsport
         host.last_handshake = datetime.utcnow()
         db.session.commit()
 
