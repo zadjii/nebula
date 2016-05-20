@@ -75,6 +75,11 @@ class Host:
         )
         self.active_ws_thread.start()
 
+        # self.internal_ws_thread = Thread(
+        #     target=self.active_network_obj.ws_internal_work_thread, args=[]
+        # )
+        # self.active_ws_thread.start()
+
     def active_ipv6(self):
         if self.active_network_obj is not None:
             return self.active_network_obj.ipv6_address

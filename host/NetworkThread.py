@@ -6,7 +6,8 @@ from connections.RawConnection import RawConnection
 from host.function.network_updates import filter_func
 from util import mylog
 from host import HOST_PORT, HOST_WS_PORT
-from connections.WebSocketConnection import MyBigFuckingLieServerProtocol
+from connections.WebSocketConnection import MyBigFuckingLieServerProtocol, \
+    WebsocketConnection
 #
 import txaio
 try:
@@ -33,10 +34,10 @@ class NetworkThread(object):
 
         self.ws_event_loop = None
         self.ws_coro = None
-        self.ws_server = None
+        self.ws_server_protocol_instance = None
         self.ws_internal_server_socket = None
         self.ws_internal_port = HOST_WS_PORT + 1
-        self.setup_web_socket(ipv6_address)
+        # self.setup_web_socket(ipv6_address)
         # self.setup_web_socket2(ipv6_address)
 
     def setup_socket(self, ipv6_address):
@@ -46,7 +47,8 @@ class NetworkThread(object):
 
     def setup_web_socket(self, ipv6_address):
         mylog('top of ws thread')
-        # self._make_internal_socket()
+        MyBigFuckingLieServerProtocol.net_thread = self
+        self._make_internal_socket()
         self.ws_event_loop = asyncio.new_event_loop()
         # self.ws_event_loop = asyncio.get_event_loop()
         asyncio.set_event_loop(self.ws_event_loop)
@@ -56,7 +58,7 @@ class NetworkThread(object):
             u"ws://[{}]:{}".format(ipv6_address, self.ws_port)
             # , debug=False
         )
-            # u"ws://{}:{}".format(ipv6_address, self.ws_port), debug = False)
+        # u"ws://{}:{}".format(ipv6_address, self.ws_port), debug = False)
         factory.protocol = MyBigFuckingLieServerProtocol
 
         self.ws_coro = self.ws_event_loop.create_server(factory, ipv6_address, self.ws_port)
@@ -64,20 +66,19 @@ class NetworkThread(object):
         mylog('Bound websocket to ipv6 address, port={},{}'
               .format(ipv6_address, self.ws_port))
 
-    # def _make_internal_socket(self):
-    #     mylog('Creating a internal server in NetworkThread')
-    #     self.ws_internal_server_socket = socket.socket()
-    #     mylog('NT - before bind')
-    #     try:
-    #         self.ws_internal_server_socket.bind(
-    #             ('localhost', self.ws_internal_port))
-    #         mylog('NT - \x1b[32;46mbound to {}\x1b[0m'.format(self.ws_internal_port))
-    #     except Exception as e:
-    #         mylog('oof i fucked up')
-    #         mylog(e.message)
-    #
-    #     self.ws_internal_server_socket.listen(5)  # todo does this 5 make sense?
-    #     mylog('  \x1b[46mCompleted internal server in NetworkThread\x1b[0m')
+    def _make_internal_socket(self):
+        mylog('Creating a internal server in NetworkThread')
+        self.ws_internal_server_socket = socket.socket()
+        mylog('NT - before bind')
+        try:
+            self.ws_internal_server_socket.bind(
+                ('localhost', self.ws_internal_port))
+            mylog('NT - \x1b[32;46mbound to {}\x1b[0m'.format(self.ws_internal_port))
+        except Exception as e:
+            mylog('oof i fucked up')
+            mylog(e.message)
+
+        mylog('  \x1b[46mCompleted internal server in NetworkThread\x1b[0m')
 
     def setup_web_socket2(self, ipv6_address):
         mylog('top of ws thread')
@@ -112,8 +113,23 @@ class NetworkThread(object):
         self.server_sock.shutdown(socket.SHUT_RDWR)
         mylog('Shut down server socket on {}'.format(self.ipv6_address))
 
+    # def ws_internal_work_thread(self):
+    #     self.ws_internal_server_socket.listen(5)
+    #
+    #     while not self.shutdown_requested:
+    #         (connection, address) = self.ws_internal_server_socket.accept()
+    #         web_conn = WebsocketConnection(connection, )
+    #         mylog('Connected by {}'.format(address))
+    #         self.connection_queue.append((raw_conn, address))
+    #
+    #     self.server_sock.shutdown(socket.SHUT_RDWR)
+    #     mylog('Shut down server socket on {}'.format(self.ipv6_address))
+
     def ws_work_thread(self):
-        print 'ws work thread'
+        self.setup_web_socket(self.ipv6_address)
+        self.ws_internal_server_socket.listen(5)
+
+        mylog('ws work thread - 0')
         # reactor.run(installSignalHandlers=0)
         # mylog('im a dumbass')
         # # so I guess you run_until_complete, then run_forever? wat?
@@ -122,6 +138,7 @@ class NetworkThread(object):
         mylog('\x1b[36m[36] - ws work thread started\x1b[0m')
 
         try:
+            mylog('ws - before run_forever')
             self.ws_event_loop.run_forever()
             mylog('ws run forever exited, ws server stopping')
         except KeyboardInterrupt:
@@ -138,5 +155,11 @@ class NetworkThread(object):
         self.shutdown_requested = True
         if self.ws_event_loop is not None:
             self.ws_event_loop.stop()
+
+    def add_ws_conn(self, mbflsp):
+        mylog('adding ws conn')
+        (connection, address) = self.ws_internal_server_socket.accept()
+        ws_conn = WebsocketConnection(connection, mbflsp)
+        self.connection_queue.append((ws_conn, address))
 
 
