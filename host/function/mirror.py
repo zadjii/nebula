@@ -27,7 +27,7 @@ def ask_remote_for_id(host, port, db):
     # write_msg(make_new_host_json(HOST_PORT), sslSocket)
     ipv6_addresses = get_ipv6_list()
     if len(ipv6_addresses) < 1:
-        mylog('\x1b[31m MY IPV6\'s ARE {} \x1b[0m'.format(ipv6_addresses))
+        mylog('MY IPV6\'s ARE {}'.format(ipv6_addresses), '31')
         mylog('ERR: could not find an ipv6 address for this host.'
               ' Don\'t really know what to do...')
         return -1, None
