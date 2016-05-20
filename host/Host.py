@@ -14,11 +14,11 @@ from host.function.list_clouds import list_clouds
 from host.function.local_updates import local_update_thread
 from host.function.network_updates import receive_updates_thread, filter_func
 
-try:
-    import asyncio
-except ImportError:  # Trollius >= 0.3 was renamed
-    import trollius as asyncio
-from autobahn.asyncio.websocket import WebSocketServerFactory
+# try:
+#     import asyncio
+# except ImportError:  # Trollius >= 0.3 was renamed
+#     import trollius as asyncio
+# from autobahn.asyncio.websocket import WebSocketServerFactory
 import platform
 
 __author__ = 'Mike'
@@ -64,6 +64,7 @@ class Host:
             self.active_network_obj.shutdown()
         mylog('Spawning new server thread on {}'.format(ipv6_address))
         self.active_network_obj = NetworkThread(ipv6_address)
+        # mylog('')
         self.active_network_thread = Thread(
             target=self.active_network_obj.work_thread, args=[]
         )
@@ -134,32 +135,32 @@ class Host:
             num_conns -= 1
 
 
-def old_ws_thread_function(argv):
-    mylog('top of ws thread')
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    factory = WebSocketServerFactory(u"ws://{}:{}".format(HOST_WS_HOST, HOST_WS_PORT), debug=False)
-    factory.protocol = MyBigFuckingLieServerProtocol
-
-    # loop = asyncio.get_event_loop()
-    coro = loop.create_server(factory, '0.0.0.0', HOST_WS_PORT)
-    mylog('\x1b[35m[35]\x1b[0m')
-    server = loop.run_until_complete(coro)
-    mylog('\x1b[36m[36]\x1b[0m')
-
-    try:
-        loop.run_forever()
-        mylog('after run_forever for shits')
-    except KeyboardInterrupt:
-        pass
-    finally:
-        mylog('\x1b[36mTHIS IS BAD\x1b[0m')
-        mylog('\x1b[35mTHIS IS BAD\x1b[0m')
-        mylog('\x1b[34mTHIS IS BAD\x1b[0m')
-        mylog('\x1b[33mTHIS IS BAD\x1b[0m')
-        server.close()
-        loop.close()
+# def old_ws_thread_function(argv):
+#     mylog('top of ws thread')
+#     loop = asyncio.new_event_loop()
+#     asyncio.set_event_loop(loop)
+#
+#     factory = WebSocketServerFactory(u"ws://{}:{}".format(HOST_WS_HOST, HOST_WS_PORT), debug=False)
+#     factory.protocol = MyBigFuckingLieServerProtocol
+#
+#     # loop = asyncio.get_event_loop()
+#     coro = loop.create_server(factory, '0.0.0.0', HOST_WS_PORT)
+#     mylog('\x1b[35m[35]\x1b[0m')
+#     server = loop.run_until_complete(coro)
+#     mylog('\x1b[36m[36]\x1b[0m')
+#
+#     try:
+#         loop.run_forever()
+#         mylog('after run_forever for shits')
+#     except KeyboardInterrupt:
+#         pass
+#     finally:
+#         mylog('\x1b[36mTHIS IS BAD\x1b[0m')
+#         mylog('\x1b[35mTHIS IS BAD\x1b[0m')
+#         mylog('\x1b[34mTHIS IS BAD\x1b[0m')
+#         mylog('\x1b[33mTHIS IS BAD\x1b[0m')
+#         server.close()
+#         loop.close()
 
 
 def start(argv):

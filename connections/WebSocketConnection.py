@@ -7,17 +7,18 @@ from connections.AbstractConnection import AbstractConnection
 from host import HOST_WS_PORT
 from host.function.network_updates import filter_func
 # from messages import decode_msg_size
-from host.util import mylog
+from host.util import mylog, get_ipv6_list
 from messages.util import get_msg_size, decode_msg_size
 from messages.MessageDeserializer import MessageDeserializer
 from autobahn.asyncio.websocket import WebSocketServerProtocol
+# from autobahn.twisted.websocket import WebSocketServerProtocol
 
 __author__ = 'Mike'
 
 
 class WebsocketConnection(AbstractConnection):
     def __init__(self, connection, ws_server_protocol):
-        # mylog('top of WSConn.__init__')
+        mylog('top of WSConn.__init__')
         self._socket = connection
         self._ws_server_protocol = ws_server_protocol
         mylog('bottom of WSConn.__init__')
@@ -74,15 +75,24 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
     def __init__(self):
         mylog('\x1b[32;41mTop of MBFLSP.__init__\x1b[0m')
         super(MyBigFuckingLieServerProtocol, self).__init__()
-        self._internal_port = HOST_WS_PORT
+        mylog('after super')
+        self._internal_port = HOST_WS_PORT+1
+        # self._internal_port = HOST_WS_PORT
         self._internal_server_socket = socket.socket()
         # fixme $20 to myself if this vv DOESN'T need to move outside the MBFLSP
-        self._internal_server_socket.bind(('localhost', HOST_WS_PORT))
-        mylog('\x1b[32;46mbound to HOST_WS_PORT\x1b[0m')
-        self._internal_server_socket.listen(1)  # todo does this 5 make sense?
+        mylog('before bind')
+        try:
+            self._internal_server_socket.bind(('localhost', self._internal_port))
+            # self._internal_server_socket.bind((get_ipv6_list()[0], self._internal_port))
+            mylog('\x1b[32;46mbound to {}\x1b[0m'.format(self._internal_port))
+        except Exception as e:
+            mylog('oof i fucked up')
+            mylog(e.message)
+
+        self._internal_server_socket.listen(5)  # todo does this 5 make sense?
         self._internal_conn = None
         self._child_thread = None
-        # mylog('Bottom of MBFLSP.__init__')
+        mylog('Bottom of MBFLSP.__init__')
 
     def onConnect(self, request):
         mylog("Client connecting: {0}".format(request.peer))
@@ -90,14 +100,14 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
     def onOpen(self):
         mylog("WebSocket connection open.")
         temp_socket = socket.socket()
-        # mylog('MBFLSP.onConnect-0')
+        mylog('MBFLSP.onConnect-0')
 
         temp_socket.connect(('localhost', self._internal_port))
-        # mylog('MBFLSP.onConnect-1')
+        mylog('MBFLSP.onConnect-1')
         (conn, addr) = self._internal_server_socket.accept()
-        # mylog('MBFLSP.onConnect-2')
+        mylog('MBFLSP.onConnect-2')
         ws_conn = WebsocketConnection(temp_socket, self)
-        # mylog('MBFLSP.onConnect-3')
+        mylog('MBFLSP.onConnect-3')
         self._internal_conn = conn
         self._child_thread = Thread(target=filter_func, args=[ws_conn, addr])
         mylog('before of MBFLSP...thread.start')
