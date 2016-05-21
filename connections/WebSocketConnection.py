@@ -27,6 +27,7 @@ class WebsocketConnection(AbstractConnection):
         mylog('wsConn.recv_obj')
 
         size, n_chars = self._really_bad_get_size()
+
         # first recv the length of the msg from the sock
         length_string = self._socket.recv(n_chars)
         # mylog('These two should be the same:{}={}'.format(size,length_string))
@@ -46,6 +47,7 @@ class WebsocketConnection(AbstractConnection):
             data = self._socket.recv(length, socket.MSG_PEEK)
             # print '\t\t\t bad get data length {}'.format(data)
             if length > 64:
+                mylog('BAD_PACKET:{}'.format(self._socket.recv(64)))
                 raise Exception('Well that\'s a bad packet for sure')
         return int(data[0:length-1]), length-1
 

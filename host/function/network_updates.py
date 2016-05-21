@@ -342,6 +342,8 @@ def handle_recv_file(connection, address, msg_obj):
 def filter_func(connection, address):
 
     # msg_obj = recv_msg(connection)
+    # fixme: Failing to decode the message should not bring the entire system down.
+    # cont: should gracefully ignore and close connection
     msg_obj = connection.recv_obj()
     mylog('<{}>msg:{}'.format(address, msg_obj.__dict__))
     msg_type = msg_obj.type
