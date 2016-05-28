@@ -254,6 +254,9 @@ def handle_read_file_request(connection, address, msg_obj):
         filepath = matching_cloud.root_directory
     else:
         filepath = os.path.join(matching_cloud.root_directory, requested_file)
+
+    # FIXME: Make sure paths are limited to children of the root
+
     req_file_stat = None
     try:
         req_file_stat = os.stat(filepath)
@@ -276,10 +279,15 @@ def handle_read_file_request(connection, address, msg_obj):
         response = ReadFileResponseMessage(session_uuid, relative_pathname, req_file_size)
         connection.send_obj(response)
         l = 1
+        total_len = 0
         # send file bytes
         while l:
             new_data = requested_file.read(1024)
-            l = connection.send_next_data(new_data)
+            sent_len = connection.send_next_data(new_data)
+            l = sent_len
+            total_len += sent_len
+            # mylog('sent {}B of <{}> ({}/{}B total)'
+            #       .format(sent_len, filepath, total_len, req_file_size))
             # mylog(
             #     '[{}]Sent {}B of file<{}> data'
             #     .format(cloud.my_id_from_remote, l, filepath)

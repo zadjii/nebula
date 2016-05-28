@@ -138,6 +138,7 @@ class Host:
         # for (conn, addr) in self.active_network_obj.connection_queue[:]:
             filter_func(conn, addr)
             num_conns -= 1
+            mylog('processed {} from {}'.format(conn, addr))
 
 
 # def old_ws_thread_function(argv):

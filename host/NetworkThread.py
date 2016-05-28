@@ -128,6 +128,7 @@ class NetworkThread(object):
         # todo: Lock this such that only the MBFLSP that is currently connecting
         # cont    can actually accept the conn. (prevent out of order conns)
         (connection, address) = self.ws_internal_server_socket.accept()
+        mylog('accepted connection from MBFLSP')
         ws_conn = WebsocketConnection(connection, mbflsp)
         self.connection_queue.append((ws_conn, address))
 

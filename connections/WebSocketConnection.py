@@ -56,7 +56,7 @@ class WebsocketConnection(AbstractConnection):
         msg_json = message_obj.serialize()
         msg_size = get_msg_size(msg_json)  # don't send length over WS
         self._ws_server_protocol.sendMessage(msg_json)
-        mylog('bottom of ws send')
+        mylog('bottom of ws send_obj')
 
     def recv_next_data(self, length):
         return self._socket.recv(length)
@@ -64,8 +64,12 @@ class WebsocketConnection(AbstractConnection):
     def send_next_data(self, data):
         """Returns the number of bytes sent.
         TODO: determine if the ws actually sent all of len()"""
+        data = data.encode('utf8')
+        length = len(data)
         self._ws_server_protocol.sendMessage(data)
-        return sys.getsizeof(data)
+        # mylog('bottom of ws send_next_data, "{}"[{}]'.format(data, length))
+        mylog('bottom of ws send_next_data')
+        return length
 
     def close(self):
         self._socket.close()
@@ -105,7 +109,7 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
         # self.sendMessage(payload, isBinary)
 
     def onClose(self, wasClean, code, reason):
-        mylog("WebSocket closed: {},{},{}".format(wasClean, code, reason))
+        mylog("WebSocket closed: (wasClean, code, reason) = ({},{},{})".format(wasClean, code, reason))
         self._internal_client_socket.send('\0')
         self._internal_client_socket.close()
         # if self._child_thread is not None:
