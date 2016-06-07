@@ -42,18 +42,13 @@ class Host:
             self.spawn_net_thread(ipv6_addresses[0])
             # local_update thread will handle the first handshake/host setup
 
-        ###############
-        # FIXME: Add WS support back
-        # ws_thread = Thread(target=ws_thread_function, args=argv)
-        # ws_thread.start()
-
-        ###############
         try:
             self.do_local_updates()
         finally:
             self.shutdown()
 
         print 'Both the local update checking thread and the network thread have exited.'
+        sys.exit()
 
     def do_local_updates(self):
         local_update_thread(self)
@@ -74,11 +69,6 @@ class Host:
             target=self.active_network_obj.ws_work_thread, args=[]
         )
         self.active_ws_thread.start()
-
-        # self.internal_ws_thread = Thread(
-        #     target=self.active_network_obj.ws_internal_work_thread, args=[]
-        # )
-        # self.active_ws_thread.start()
 
     def active_ipv6(self):
         if self.active_network_obj is not None:
@@ -139,6 +129,9 @@ class Host:
             filter_func(conn, addr)
             num_conns -= 1
             mylog('processed {} from {}'.format(conn, addr))
+
+    def is_ipv6(self):
+        return self.active_network_obj.is_ipv6()
 
 
 # def old_ws_thread_function(argv):

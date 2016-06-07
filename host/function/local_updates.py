@@ -228,7 +228,9 @@ def local_update_thread(host_obj):  # todo argv is a placeholder
         host_obj.process_connections()
         db = get_db()
         mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
-        ip_changed, new_ip = check_ipv6_changed(current_ipv6)
+        ip_changed, new_ip = False, None
+        if host_obj.is_ipv6():
+            ip_changed, new_ip = check_ipv6_changed(current_ipv6)
 
         all_mirrored_clouds = mirrored_clouds.all()
         if num_clouds_mirrored < mirrored_clouds.count():

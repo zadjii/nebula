@@ -23,13 +23,21 @@ from autobahn.asyncio.websocket import WebSocketServerFactory
 
 
 class NetworkThread(object):
-    def __init__(self, ipv6_address):
+    def __init__(self, ip_address, use_ipv6=True):
         self.shutdown_requested = False
         self.server_sock = None
-        self.ipv6_address = ipv6_address
+        self._use_ipv6 = use_ipv6
+        self.ipv4_address = None
+        self.ipv6_address = None
+        if self._use_ipv6:
+            self.ipv6_address = ip_address
+        else:
+            self.ipv4_address = ip_address
+
+        # self.ipv6_address = ipv6_address
         self.port = HOST_PORT
         self.ws_port = HOST_WS_PORT
-        self.setup_socket(ipv6_address)
+        self.setup_socket(ip_address, self._use_ipv6)
         self.connection_queue = []
 
         self.ws_event_loop = None
@@ -39,12 +47,17 @@ class NetworkThread(object):
         self.ws_internal_port = HOST_WS_PORT + 1
         # self.setup_web_socket(ipv6_address)
 
-    def setup_socket(self, ipv6_address):
-        self.server_sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-        self.server_sock.bind((ipv6_address, self.port, 0, 0))
-        mylog('Bound to ipv6 address={}'.format(ipv6_address))
+    def setup_socket(self, ip_address, use_ipv6=True):
+        if use_ipv6:
+            self.server_sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+            self.server_sock.bind((ip_address, self.port, 0, 0))
+            mylog('Bound to ipv6 address={}'.format(ip_address))
+        else:
+            self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.server_sock.bind((ip_address, self.port))
+            mylog('Bound to ipv4 address={}'.format(ip_address))
 
-    def setup_web_socket(self, ipv6_address):
+    def setup_web_socket(self, ip_address):
         mylog('top of ws thread')
         self._make_internal_socket()
         self.ws_event_loop = asyncio.new_event_loop()
@@ -52,14 +65,14 @@ class NetworkThread(object):
         txaio.use_asyncio()
         txaio.start_logging()
         factory = WebSocketServerFactory(
-            u"ws://[{}]:{}".format(ipv6_address, self.ws_port)
+            u"ws://[{}]:{}".format(ip_address, self.ws_port)
         )
         factory.protocol = MyBigFuckingLieServerProtocol
         MyBigFuckingLieServerProtocol.net_thread = self
 
-        self.ws_coro = self.ws_event_loop.create_server(factory, ipv6_address, self.ws_port)
-        mylog('Bound websocket to (ipv6, port)=({},{})'
-              .format(ipv6_address, self.ws_port))
+        self.ws_coro = self.ws_event_loop.create_server(factory, ip_address, self.ws_port)
+        mylog('Bound websocket to (ip, port)=({},{})'
+              .format(ip_address, self.ws_port))
 
     def _make_internal_socket(self):
         """Creates the internal server socket that accepts connections from
@@ -122,6 +135,8 @@ class NetworkThread(object):
         self.shutdown_requested = True
         if self.ws_event_loop is not None:
             self.ws_event_loop.stop()
+        if self.ws_internal_server_socket is not None:
+            self.ws_internal_server_socket.close()
 
     def add_ws_conn(self, mbflsp):
         mylog('adding ws conn')
@@ -131,5 +146,9 @@ class NetworkThread(object):
         mylog('accepted connection from MBFLSP')
         ws_conn = WebsocketConnection(connection, mbflsp)
         self.connection_queue.append((ws_conn, address))
+
+    def is_ipv6(self):
+        return self._use_ipv6
+
 
 

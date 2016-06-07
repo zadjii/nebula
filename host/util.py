@@ -12,7 +12,10 @@ def get_ipv6_list():
         if iface[0] == socket.AF_INET6:
             if iface[4][3] == 0: # if the zoneid is 0, indicating global ipv6
                 ipv6_addresses.append(iface[4])
-    return [ipaddr[0] for ipaddr in ipv6_addresses]
+    valid_global_ipv6s = [ipaddr[0] for ipaddr in ipv6_addresses]
+    if (len(valid_global_ipv6s)) == 0:
+        valid_global_ipv6s = ['::1']  # FIXME wow I shouldn't have to explain why this is bad.
+    return valid_global_ipv6s
 
 
 def check_response(expected, recieved):
