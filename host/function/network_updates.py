@@ -17,6 +17,7 @@ from messages import ReadFileResponseMessage, FileIsDirErrorMessage, \
     FileDoesNotExistErrorMessage
 from msg_codes import *
 
+import time
 __author__ = 'Mike'
 
 
@@ -278,20 +279,33 @@ def handle_read_file_request(connection, address, msg_obj):
         requested_file = open(filepath, 'rb')
         response = ReadFileResponseMessage(session_uuid, relative_pathname, req_file_size)
         connection.send_obj(response)
+        mylog('sent RFRp:{}, now sending file bytes'.format(response.serialize()))
         l = 1
         total_len = 0
+        transfer_size = 1024 * 2
+        num_transfers = 0
         # send file bytes
-        while l:
-            new_data = requested_file.read(1024)
+        while l > 0:
+            # if total_len == 0:
+            #     mylog('sending data, l={}'.format(l))
+            new_data = requested_file.read(transfer_size)
+            # if total_len == 0:
+            #     mylog('read:[{}]'.format(new_data))
             sent_len = connection.send_next_data(new_data)
             l = sent_len
             total_len += sent_len
+            num_transfers += 1
             # mylog('sent {}B of <{}> ({}/{}B total)'
             #       .format(sent_len, filepath, total_len, req_file_size))
             # mylog(
             #     '[{}]Sent {}B of file<{}> data'
             #     .format(cloud.my_id_from_remote, l, filepath)
             # )
+            if (num_transfers % 128 == 0) and num_transfers > 1:
+                mylog('sent {} blobs of <{}> ({}/{}B total)'
+                      .format(num_transfers, filepath, total_len, req_file_size))
+                time.sleep(.1)
+
         mylog(
             '(RFQ)[{}]Sent <{}> data to [{}]'
             .format(matching_cloud.my_id_from_remote, filepath, session_uuid)
