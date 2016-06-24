@@ -105,8 +105,8 @@ class NetworkThread(object):
             mylog('Connected by {}'.format(address))
             self.connection_queue.append((raw_conn, address))
 
-        self.server_sock.shutdown(socket.SHUT_RDWR)
-        mylog('Shut down server socket on {}'.format(self.ipv6_address))
+        if self.server_sock is not None:
+            self.server_sock.shutdown(socket.SHUT_RDWR)
 
     def ws_work_thread(self):
         self.setup_web_socket(self.ipv6_address)
@@ -137,6 +137,12 @@ class NetworkThread(object):
             self.ws_event_loop.stop()
         if self.ws_internal_server_socket is not None:
             self.ws_internal_server_socket.close()
+        # todo: this is still not in the right place.
+        # cont    Need to figure out how to gracefully shutdown the server.
+        # if self.server_sock is not None:
+        #     self.server_sock.shutdown(socket.SHUT_RDWR)
+        mylog('Shut down server socket on {}'.format(
+            self.ipv6_address if self._use_ipv6 else self.ipv4_address))
 
     def add_ws_conn(self, mbflsp):
         mylog('adding ws conn')

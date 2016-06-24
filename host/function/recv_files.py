@@ -20,7 +20,9 @@ def recv_file_transfer(msg, cloud, socket_conn, db):
     msg_rel_path = msg.fpath
     mylog('[{}] is recv\'ing <{}>'.format(cloud.my_id_from_remote, msg_rel_path))
     full_path = os.path.join(cloud.root_directory, msg_rel_path)
+    full_path = os.path.normpath(full_path)
     full_dir_path = os.path.dirname(full_path)
+    mylog('full_dir_path={}'.format(full_dir_path))
     if not os.path.exists(full_dir_path):
         mylog('had to make dirs for {}'.format(full_dir_path))
         os.makedirs(full_dir_path)
@@ -44,15 +46,33 @@ def recv_file_transfer(msg, cloud, socket_conn, db):
             #     msg_rel_path, nbytes, total_read, msg_file_size
             # )
         # print 'complete file data \'{}\''.format(data_buffer)
+        exists = os.path.exists(full_path)
+        # mylog('{} Exists={}'.format(full_path, exists))
+
+        # file_handle = open(full_path, mode='wb+' if exists else 'ab+')
+        file_handle = None
+        # try:
         file_handle = open(full_path, mode='wb')
+        # except (OSError, IOError) as e:
+        #     mylog('FUCK')
+        #     mylog('{}'.format(e))
+        #     mylog('{}'.format(e.__dict__))
+        #     mylog('{}'.format(e.message))
+        #     raise e
+
+        # mylog('successfully opened the file')
+        file_handle.seek(0, 0)  # seek to 0B relative to start
         done = False
         total_written = 0
         while not done:
-            nbytes_written = file_handle.write(data_buffer[total_written:])
-            if nbytes_written is None:
-                break
-            total_written += nbytes_written
-            done = total_written <= 0
+            # nbytes_written = file_handle.write(data_buffer[total_written:])
+            file_handle.write(data_buffer)
+            mylog('successfully wrote to the file')
+            # if nbytes_written is None:
+            #     break
+            # total_written += nbytes_written
+            # done = total_written <= 0
+            done = True
         file_handle.close()
         mylog('[{}]I think I wrote the file to {}'.format(cloud.my_id_from_remote, full_path))
     updated_node = cloud.create_or_update_node(msg_rel_path, msg, db)

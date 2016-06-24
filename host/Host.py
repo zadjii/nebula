@@ -12,7 +12,7 @@ from host.function.mirror import mirror
 from host.function.tree import db_tree, tree
 from host.function.list_clouds import list_clouds
 from host.function.local_updates import local_update_thread
-from host.function.network_updates import receive_updates_thread, filter_func
+from host.function.network_updates import filter_func
 
 # try:
 #     import asyncio

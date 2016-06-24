@@ -104,35 +104,6 @@ def local_file_update(directory_path, dir_node, filename, filenode, db):
     # note I fucking hate timezones.
     delta = file_modified - filenode.last_modified
     if file_modified > filenode.last_modified:
-        mylog('[{}] <{}>({}) was changed,'
-              '\n\t\t{} <- delta,'
-              '\n\t\t{}, <- db.lastmodified'
-              '\n\t\t{}, <- file_modified'
-              '\n\t\t{}, <- db.lastmodified.tzinfo'
-              '\n\t\t{}, <- file_modified.tzinfo'
-              '\n\t\t{} <- mtime'
-              '\n\t\t{} <- fromtimestamp(mtime)'
-              '\n\t\t{} <- fromtimestamp(mtime).tzinfo'
-              '\n\t\t{} <- os.path.getmtime()'
-              '\n\t\t{} <- os.path.getctime()'
-              '\n\t\t{} <- os.path.getatime()'
-            .format(
-                filenode.cloud.my_id_from_remote
-                , filenode.name
-                , file_pathname
-                , delta
-                , filenode.last_modified
-                , file_modified
-                , filenode.last_modified.tzinfo
-                , file_modified.tzinfo
-                , file_stat.st_mtime
-                , datetime.fromtimestamp(file_stat.st_mtime)
-                , datetime.fromtimestamp(file_stat.st_mtime).tzinfo
-            , os.path.getmtime(file_pathname)
-            , os.path.getctime(file_pathname)
-            , os.path.getatime(file_pathname)
-        )
-        )
         filenode.last_modified = file_modified
         db.session.commit()
         updates.append((FILE_UPDATE, file_pathname))

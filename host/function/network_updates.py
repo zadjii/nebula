@@ -16,41 +16,41 @@ from host.util import check_response, mylog
 from messages import ReadFileResponseMessage, FileIsDirErrorMessage, \
     FileDoesNotExistErrorMessage
 from msg_codes import *
-
+import math
 import time
 __author__ = 'Mike'
 
 
-def receive_updates_thread():
-    s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-
-    addr_info = socket.getaddrinfo(socket.gethostname(), None)
-    mylog('[00]{}'.format(addr_info))
-    ipv6_addr = None
-    for iface in addr_info:
-        if iface[0] == socket.AF_INET6:
-            if ipv6_addr is None:
-                iface_addr = iface[4]
-                mylog('[01]{}'.format(iface_addr))
-                if iface_addr[3] == 0:
-                    ipv6_addr = iface[4]
-    mylog('start on ipv6 address={}'.format(ipv6_addr))
-    result = s.bind((ipv6_addr[0], HOST_PORT, 0, 0))
-    # s.bind((HOST_HOST, HOST_PORT, 0, 0))
-    # mylog('Listening on ({},{})'.format(HOST_HOST, HOST_PORT))
-    mylog('Listening on ({},{})'.format(ipv6_addr[0], HOST_PORT))
-    mylog('Lets just see:{},{},{} \n{}'.format(s.family, s.type, s.type, result))
-    s.listen(5)
-
-    while True:
-        (connection, address) = s.accept()
-        raw_conn = RawConnection(connection)
-        mylog('Connected by {}'.format(address))
-        thread = Thread(target=filter_func, args=[raw_conn, address])
-        thread.start()
-        thread.join()
-        # todo: possible that we might want to thread.join here.
-        # cont  Make it so that each request gets handled before blindly continuing
+# def receive_updates_thread():
+#     s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+#
+#     addr_info = socket.getaddrinfo(socket.gethostname(), None)
+#     mylog('[00]{}'.format(addr_info))
+#     ipv6_addr = None
+#     for iface in addr_info:
+#         if iface[0] == socket.AF_INET6:
+#             if ipv6_addr is None:
+#                 iface_addr = iface[4]
+#                 mylog('[01]{}'.format(iface_addr))
+#                 if iface_addr[3] == 0:
+#                     ipv6_addr = iface[4]
+#     mylog('start on ipv6 address={}'.format(ipv6_addr))
+#     result = s.bind((ipv6_addr[0], HOST_PORT, 0, 0))
+#     # s.bind((HOST_HOST, HOST_PORT, 0, 0))
+#     # mylog('Listening on ({},{})'.format(HOST_HOST, HOST_PORT))
+#     mylog('Listening on ({},{})'.format(ipv6_addr[0], HOST_PORT))
+#     mylog('Lets just see:{},{},{} \n{}'.format(s.family, s.type, s.type, result))
+#     s.listen(5)
+#
+#     while True:
+#         (connection, address) = s.accept()
+#         raw_conn = RawConnection(connection)
+#         mylog('Connected by {}'.format(address))
+#         thread = Thread(target=filter_func, args=[raw_conn, address])
+#         thread.start()
+#         thread.join()
+#         # todo: possible that we might want to thread.join here.
+#         # cont  Make it so that each request gets handled before blindly continuing
 
 
 def prepare_for_fetch(connection, address, msg_obj):
@@ -264,7 +264,7 @@ def handle_read_file_request(connection, address, msg_obj):
     except Exception:
         err_msg = FileDoesNotExistErrorMessage()
         connection.send_obj(err_msg)
-        connection.close()
+        # connection.close()
         return
     relative_pathname = os.path.relpath(filepath, matching_cloud.root_directory)
 
@@ -272,7 +272,7 @@ def handle_read_file_request(connection, address, msg_obj):
     if req_file_is_dir:
         err_msg = FileIsDirErrorMessage()
         connection.send_obj(err_msg)
-        connection.close()
+        # connection.close()
     else:
         # send RFP - ReadFileResponse
         req_file_size = req_file_stat.st_size
@@ -282,7 +282,8 @@ def handle_read_file_request(connection, address, msg_obj):
         mylog('sent RFRp:{}, now sending file bytes'.format(response.serialize()))
         l = 1
         total_len = 0
-        transfer_size = 1024 * 2
+        num_MB = int(math.floor(req_file_size/(1024 * 1024)))
+        transfer_size = 1024 + (10 * 1024 * num_MB)
         num_transfers = 0
         # send file bytes
         while l > 0:
