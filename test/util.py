@@ -21,30 +21,30 @@ def start_nebs(host_dir, host_id, start_after_mirror):
     if start_after_mirror:
         sleep(2)
         print '\x1b[45m__ Creating first host __\x1b[0m'
-        host_proc = Popen('python nebs.py start', shell=True)
+        # host_proc = Popen('python nebs.py start', shell=True)
+        host_proc = Popen('python nebs.py start')
         sleep(1)
         print 'nebs[{}] start pid: {}'.format(host_id, host_proc.pid)
         return host_proc
     return None
 
 
-def start_nebs_and_nebr():
-    remote_proc = Popen('python nebr.py start', shell=True)
+def start_nebs_and_nebr(root='test_out'):
+    # remote_proc = Popen('python nebr.py start', shell=True)
+    remote_proc = Popen('python nebr.py start')
     # remote_proc = call('python nebr.py start')
     sleep(1)
     print '----- remote pid: {}'.format(remote_proc.pid)
     sleep(1)
-    host_proc_0 = start_nebs('test_out/tmp0', 1, True)
+    host_proc_0 = start_nebs(os.path.join(root, 'tmp0'), 1, True)
     print '----- \x1b[45m__ first host created __\x1b[0m'
-    print '----- Waiting for Host 0 to finish setup.'
-    sleep(4)
+    print '----- Waitin` for Host 0 to finish setup.'
+    sleep(2)
     print '----- We want to see a Mirroring Complete (14) before this.'
     print '----- (and make sure it\'s from host [1]'
-    # fixme starting two hosts for one cloud should still work
-    host_proc_1 = start_nebs('test_out/tmp1', 2, False)
+    host_proc_1 = start_nebs(os.path.join(root, 'tmp1'), 2, False)
     print '\x1b[44m__ second host finished __\x1b[0m'
-    # sleep(1)
-    return host_proc_0, remote_proc
+    return host_proc_0, host_proc_1, remote_proc
 
 
 def teardown_children(children):
@@ -83,7 +83,7 @@ def make_fresh_test_env():
         populate_test_filesystem()
     host_0, host_1, remote = None, None, None
     try:
-        host_0, remote = start_nebs_and_nebr()
+        host_0, host_1, remote = start_nebs_and_nebr()
         # host_0 = hosts[0]
         # host_1 = hosts[1]
         print '\x1b[30;42m##### READY TO GO #####\x1b[0m'
@@ -91,7 +91,7 @@ def make_fresh_test_env():
         host_1.wait()
         remote.wait()
     except Exception, e:
-        teardown_children([host_0, remote])
+        teardown_children([host_0, host_1, remote])
         raise e
 
 

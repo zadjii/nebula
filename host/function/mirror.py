@@ -15,6 +15,12 @@ from msg_codes import *
 
 __author__ = 'Mike'
 
+# FIXME TODO
+# Hey there. So I'm looking at this code.
+# It looks not super great.
+# seems to me like there should be no way to create a Host without also mirroring,
+# because this is stupid so yea definitely combine them into one message
+
 
 def ask_remote_for_id(host, port, db):
     """This performs a code [0] message on the remote host at host:port.
@@ -38,7 +44,7 @@ def ask_remote_for_id(host, port, db):
 
     msg = NewHostMessage(ipv6_addr, HOST_PORT, HOST_WS_PORT, platform.uname()[1])
     raw_conn.send_obj(msg)
-    # msg_obj = recv_msg(sslSocket)
+
     resp_obj = raw_conn.recv_obj()
     check_response(ASSIGN_HOST_ID, resp_obj.type)
 
@@ -50,15 +56,8 @@ def ask_remote_for_id(host, port, db):
     cert = resp_obj.cert
     print 'Remote says my cert is', cert
 
-    cloud = Cloud()
-    cloud.mirrored_on = datetime.utcnow()
-    cloud.my_id_from_remote = my_id
-    cloud.remote_host = host
-    cloud.remote_port = port
-    db.session.add(cloud)
-    db.session.commit()
     sslSocket.close()
-    return (0, cloud)  # returning a status code as well...
+    return 0, my_id # returning a status code as well...
     # I've been in kernel land too long, haven't I...
 
 
@@ -77,20 +76,30 @@ def request_cloud(cloud, test_enabled, db):
     raw_conn = RawConnection(sslSocket)
     msg = RequestCloudMessage(cloud.my_id_from_remote, cloud.name, username, password)
     raw_conn.send_obj(msg)
-    # write_msg(
-    #     make_request_cloud_json(cloud.my_id_from_remote, cloud.name, username, password)
-    #     , sslSocket
-    # )
 
-    # msg_obj = recv_msg(sslSocket)
     resp_obj = raw_conn.recv_obj()
-    check_response(GO_RETRIEVE_HERE, resp_obj.type)
-    other_address = resp_obj.ip
-    other_port = resp_obj.port
-    other_id = resp_obj.id
+    handle_go_retrieve(resp_obj, cloud, db)
+
+
+def client_request_cloud(cloud, session_id, db):
+    sslSocket = setup_remote_socket(cloud.remote_host, cloud.remote_port)
+    raw_conn = RawConnection(sslSocket)
+
+    msg = ClientMirrorMessage(session_id, cloud.my_id_from_remote, 'todo_cloud_uname', cloud.name)
+    raw_conn.send_obj(msg)
+
+    resp_obj = raw_conn.recv_obj()
+    handle_go_retrieve(resp_obj, cloud, db)
+    sslSocket.close()
+
+
+def handle_go_retrieve(response, cloud, db):
+    check_response(GO_RETRIEVE_HERE, response.type)
+    other_address = response.ip
+    other_port = response.port
+    other_id = response.id
     if other_address == '0' and other_port == 0:
         print 'No other hosts in cloud'
-        sslSocket.close()
         # note: falling out of this function takes us to the code that
         #       sends the MIRRORING_COMPLETE message.
         return
@@ -135,6 +144,9 @@ def mirror(argv):
      - [-d root directory]
      -- the path to the root directory that will store this cloud.
      -- default '.'
+     - [-s session_id]
+     -- a string representing a nebula client session_id
+     -- if not present, will prompt for a username and password.
     """
     db = get_db()
     host = None
@@ -142,6 +154,7 @@ def mirror(argv):
     cloudname = None
     root = '.'
     test_enabled = False
+    session_id = None
     if len(argv) < 1:
         mirror_usage()
         return
@@ -168,6 +181,12 @@ def mirror(argv):
                 raise Exception('not enough args supplied to mirror')
             root = argv[1]
             args_eaten = 2
+        elif arg == '-s':
+            if args_left < 2:
+                # throw some exception
+                raise Exception('not enough args supplied to mirror')
+            session_id = argv[1]
+            args_eaten = 2
         elif arg == '--test':
             test_enabled = True
             args_eaten = 1
@@ -184,15 +203,23 @@ def mirror(argv):
         'host at [',host,'] on port[',port,'], into root [',root,']'
     # okay, so manually decipher the FQDN if they input one.
     # fixme verify that directory is empty, don't do anything if it isn't
-    (status, cloud) = ask_remote_for_id(host, port, db)
+    status, my_id = ask_remote_for_id(host, port, db)
     if not status == 0:
         raise Exception('Exception while mirroring:' +
                         ' could not get ID from remote')
-
+    cloud = Cloud()
+    cloud.mirrored_on = datetime.utcnow()
+    cloud.my_id_from_remote = my_id
+    cloud.remote_host = host
+    cloud.remote_port = port
+    db.session.add(cloud)
     cloud.root_directory = root
     cloud.name = cloudname
     db.session.commit()
-    request_cloud(cloud, test_enabled, db)
+    if session_id is None:
+        request_cloud(cloud, test_enabled, db)
+    else:
+        client_request_cloud(cloud, session_id, db)
     mylog('finished requesting cloud')
     new_rem_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
     remote_conn = RawConnection(new_rem_sock)

@@ -225,7 +225,7 @@ def local_update_thread(host_obj):  # todo argv is a placeholder
             #     host_obj.send_remote_handshake(cloud)
             last_handshake = datetime.utcnow()
         db.session.close()
-        time.sleep(1)  # todo: This should be replaced with something
+        time.sleep(.25)  # todo: This should be replaced with something
         # cont that actually alerts the process as opposed to just sleep/wake
 
 

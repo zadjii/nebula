@@ -1,8 +1,12 @@
+import os
 import socket
 
 from host import REMOTE_HOST, REMOTE_PORT
 
 from host.util import setup_remote_socket
+# from messages.ClientGetCloudHostRequest import ClientGetCloudHostRequest
+# from messages.ClientGetCloudsRequest import ClientGetCloudsRequest
+# from messages import *
 from test.all_dbs_repop import repop_dbs
 from test.util import start_nebs_and_nebr, teardown_children
 from connections.RawConnection import RawConnection
@@ -40,12 +44,31 @@ def create_sock_and_send(ip, port, msg):
 
 
 def client_setup_test():
+    try:
+        client_setup_test_actual()
+    finally:
+        pass
+    teardown()
+
+
+def client_setup_test_actual():
+
     print '#' * 80
     print '# testing setting up a client session'
     print '#' * 80
     global host_proc, remote_proc
+    test_root = 'client_test'
+    neb_1_path = os.path.join(test_root, 'tmp0')
+    neb_2_path = os.path.join(test_root, 'tmp1')
 
-    host_proc, remote_proc = start_nebs_and_nebr()
+    if not os.path.exists(test_root):
+        os.makedirs(test_root)
+    if not os.path.exists(neb_1_path):
+        os.makedirs(neb_1_path)
+    if not os.path.exists(neb_2_path):
+        os.makedirs(neb_2_path)
+
+    host_proc, host_1_proc, remote_proc = start_nebs_and_nebr(test_root)
 
     rem_sock = setup_remote_socket(REMOTE_HOST, REMOTE_PORT)
     rem_conn = RawConnection(rem_sock)
@@ -69,7 +92,7 @@ def client_setup_test():
     rem_sock = setup_remote_socket(REMOTE_HOST, REMOTE_PORT)
     rem_conn = RawConnection(rem_sock)
 
-    msg = ClientGetCloudsRequest(session_id)
+    msg = ClientGetCloudsRequestMessage(session_id)
     rem_conn.send_obj(msg)
     resp = rem_conn.recv_obj()
     if not (resp.type == CLIENT_GET_CLOUDS_RESPONSE):
@@ -82,7 +105,7 @@ def client_setup_test():
     rem_sock = setup_remote_socket(REMOTE_HOST, REMOTE_PORT)
     rem_conn = RawConnection(rem_sock)
 
-    msg = ClientGetCloudHostRequest(session_id, cloudname)
+    msg = ClientGetCloudHostRequestMessage(session_id, cloudname)
     rem_conn.send_obj(msg)
     resp = rem_conn.recv_obj()
     if not (resp.type == CLIENT_GET_CLOUD_HOST_RESPONSE):
@@ -94,7 +117,7 @@ def client_setup_test():
 
     ############
     print '__ setting up host socket __'
-    msg = ListFilesRequestMessage('qwer', session_id, '.')
+    msg = ListFilesRequestMessage(session_id, 'qwer', '.')
     response = create_sock_msg_get_response(
         tgt_host_ip
         , tgt_host_port
@@ -107,7 +130,19 @@ def client_setup_test():
     resp0 = response
     ls0 = resp0.ls
 
-    os.makedirs('test_out/tmp0/qwer')
+    if not os.path.exists(neb_2_path):
+        os.makedirs('test_out/tmp0/qwer')
+    if not os.path.exists(neb_2_path):
+        os.makedirs('test_out/tmp0/asdf')
+        pass
+    if not os.path.exists(neb_2_path):
+        os.makedirs('test_out/tmp0/qwer')
+        pass
+    if not os.path.exists(neb_2_path):
+        os.makedirs('test_out/tmp0/qwer')
+        pass
+
+    # fix all the paths to use actual constants and shit.
     os.makedirs('test_out/tmp0/asdf')
     os.makedirs('test_out/tmp0/asdf/foo')
     os.makedirs('test_out/tmp0/zxcv')
@@ -127,7 +162,7 @@ def client_setup_test():
     # response = recv_msg(host_sock)
 
     print '__ setting up host socket __'
-    msg = ListFilesRequestMessage('qwer', session_id, '.')
+    msg = ListFilesRequestMessage(session_id, 'qwer', '.')
 
     response = create_sock_msg_get_response(
         tgt_host_ip
@@ -153,7 +188,7 @@ def client_setup_test():
 
 def ls_path(session_id, tgt_host_ip, tgt_host_port, path):
     print '__ setting up host socket for ls {}__'.format(path)
-    msg = ListFilesRequestMessage('qwer', session_id, path)
+    msg = ListFilesRequestMessage(session_id, 'qwer', path)
     response = create_sock_msg_get_response(
         tgt_host_ip
         , tgt_host_port

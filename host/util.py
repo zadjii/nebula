@@ -1,7 +1,40 @@
 import socket
 import ssl
 from datetime import datetime
+
+from host import Cloud
+from msg_codes import send_generic_error_and_close
+
 __author__ = 'Mike'
+
+###############################################################################
+from collections import namedtuple
+ResultAndData = namedtuple('ResultAndData', 'success, data')
+def ERROR(data=None):
+    return ResultAndData(False, data)
+###############################################################################
+
+
+def validate_host_id(db, host_id, conn):
+    rd = get_matching_clouds(db, host_id)
+    if not rd.success:
+        send_generic_error_and_close(conn)
+        raise Exception(rd.data)
+    return rd
+
+
+def get_matching_clouds(db, host_id):
+    rd = ERROR()
+    matching_id_clouds = db.session.query(Cloud)\
+        .filter(Cloud.my_id_from_remote == host_id)
+
+    if matching_id_clouds.count() <= 0:
+        rd = ERROR('Received a message intended for id={},'
+                   ' but I don\'t have any clouds with that id'
+                   .format(host_id))
+    else:
+        rd = ResultAndData(True, matching_id_clouds)
+    return rd
 
 
 def get_ipv6_list():

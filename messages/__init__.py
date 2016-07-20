@@ -42,4 +42,5 @@ from messages.ClientGetCloudHostRequestMessage import ClientGetCloudHostRequestM
 from messages.ClientGetCloudHostResponseMessage import ClientGetCloudHostResponseMessage
 from messages.GetActiveHostsRequestMessage import GetActiveHostsRequestMessage
 from messages.GetActiveHostsResponseMessage import GetActiveHostsResponseMessage
+from messages.ClientMirrorMessage import ClientMirrorMessage
 

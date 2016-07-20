@@ -12,45 +12,13 @@ from host.function.network.client_session_alert import \
 from host.function.network.ls_handler import list_files_handler
 from host.function.recv_files import recv_file_tree
 from host.function.send_files import send_tree
-from host.util import check_response, mylog
+from host.util import check_response, mylog, validate_host_id
 from messages import ReadFileResponseMessage, FileIsDirErrorMessage, \
     FileDoesNotExistErrorMessage
 from msg_codes import *
 import math
 import time
 __author__ = 'Mike'
-
-
-# def receive_updates_thread():
-#     s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-#
-#     addr_info = socket.getaddrinfo(socket.gethostname(), None)
-#     mylog('[00]{}'.format(addr_info))
-#     ipv6_addr = None
-#     for iface in addr_info:
-#         if iface[0] == socket.AF_INET6:
-#             if ipv6_addr is None:
-#                 iface_addr = iface[4]
-#                 mylog('[01]{}'.format(iface_addr))
-#                 if iface_addr[3] == 0:
-#                     ipv6_addr = iface[4]
-#     mylog('start on ipv6 address={}'.format(ipv6_addr))
-#     result = s.bind((ipv6_addr[0], HOST_PORT, 0, 0))
-#     # s.bind((HOST_HOST, HOST_PORT, 0, 0))
-#     # mylog('Listening on ({},{})'.format(HOST_HOST, HOST_PORT))
-#     mylog('Listening on ({},{})'.format(ipv6_addr[0], HOST_PORT))
-#     mylog('Lets just see:{},{},{} \n{}'.format(s.family, s.type, s.type, result))
-#     s.listen(5)
-#
-#     while True:
-#         (connection, address) = s.accept()
-#         raw_conn = RawConnection(connection)
-#         mylog('Connected by {}'.format(address))
-#         thread = Thread(target=filter_func, args=[raw_conn, address])
-#         thread.start()
-#         thread.join()
-#         # todo: possible that we might want to thread.join here.
-#         # cont  Make it so that each request gets handled before blindly continuing
 
 
 def prepare_for_fetch(connection, address, msg_obj):
@@ -84,16 +52,21 @@ def handle_fetch(connection, address, msg_obj):
     other_id = msg_obj.id
     cloudname = msg_obj.cname
     requested_root = msg_obj.root
-    matching_id_clouds = db.session.query(Cloud)\
-        .filter(Cloud.my_id_from_remote != other_id)\
-        .filter_by(completed_mirroring=True)
-    if matching_id_clouds.count() <= 0:
-        send_generic_error_and_close(connection)
-        raise Exception(
-            'Received a message intended from id={},'
-            ' but I don\'t have any clouds with that DON\'T have that id'
-            .format(other_id)
-        )
+
+    rd = validate_host_id(db, other_id, connection)
+    # validate_host_id will raise an exception if there is no cloud
+    matching_id_clouds = rd.data
+
+    # matching_id_clouds = db.session.query(Cloud)\
+    #     .filter(Cloud.my_id_from_remote != other_id)\
+    #     .filter_by(completed_mirroring=True)
+    # if matching_id_clouds.count() <= 0:
+    #     send_generic_error_and_close(connection)
+    #     raise Exception(
+    #         'Received a message intended from id={},'
+    #         ' but I don\'t have any clouds with that DON\'T have that id'
+    #         .format(other_id)
+    #     )
 
     matching_cloud = matching_id_clouds.filter_by(name=cloudname).first()
     if matching_cloud is None:
@@ -327,15 +300,18 @@ def handle_recv_file(connection, address, msg_obj):
     updated_file = msg_obj.fpath
     their_ip = address[0]
 
-    matching_id_clouds = db.session.query(Cloud)\
-        .filter(Cloud.my_id_from_remote == my_id)
-    if matching_id_clouds.count() <= 0:
-        send_generic_error_and_close(connection)
-        raise Exception(
-            'Received a message intended for id={},'
-            ' but I don\'t have any clouds with that id'
-            .format(my_id)
-        )
+    rd = validate_host_id(db, my_id, connection)
+    # validate_host_id will raise an exception if there is no cloud
+    matching_id_clouds = rd.data
+    # matching_id_clouds = db.session.query(Cloud)\
+    #     .filter(Cloud.my_id_from_remote == my_id)
+    # if matching_id_clouds.count() <= 0:
+    #     send_generic_error_and_close(connection)
+    #     raise Exception(
+    #         'Received a message intended for id={},'
+    #         ' but I don\'t have any clouds with that id'
+    #         .format(my_id)
+    #     )
 
     matching_cloud = matching_id_clouds.filter_by(name=cloudname).first()
     if matching_cloud is None:
@@ -362,6 +338,27 @@ def handle_recv_file(connection, address, msg_obj):
           .format(my_id, msg_obj.__dict__))
 
 
+def handle_remove_file(connection, address, msg_obj):
+    db = get_db()
+    my_id = msg_obj.tid
+    cloudname = msg_obj.cname
+    removed_dir = msg_obj.fpath
+    their_ip = address[0]
+    resp_type = msg_obj.type
+    check_response(REMOVE_FILE, resp_type)
+
+    rd = validate_host_id(db, my_id, connection)
+    # validate_host_id will raise an exception if there is no cloud
+    matching_id_clouds = rd.data
+    matching_cloud = matching_id_clouds.filter_by(name=cloudname).first()
+    if matching_cloud is None:
+        send_generic_error_and_close(connection)
+        raise Exception(
+            'host came asking for cloudname=\'' + cloudname + '\''
+            + ', however, I don\'t have a matching cloud.'
+        )
+
+
 def filter_func(connection, address):
 
     # msg_obj = recv_msg(connection)
@@ -380,6 +377,8 @@ def filter_func(connection, address):
             handle_fetch(connection, address, msg_obj)
         elif msg_type == HOST_FILE_PUSH:
             handle_recv_file(connection, address, msg_obj)
+        elif msg_type == REMOVE_FILE:
+            handle_remove_file(connection, address, msg_obj)
         elif msg_type == CLIENT_SESSION_ALERT:
             handle_client_session_alert(connection, address, msg_obj)
         elif msg_type == STAT_FILE_REQUEST:
