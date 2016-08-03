@@ -44,3 +44,4 @@ class Host(db.Base):
         conn.send_obj(msg)
         # send_msg(msg, s)
         s.close()
+        # todo I think maybe part of the close after close is related to this...

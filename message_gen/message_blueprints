@@ -76,6 +76,8 @@
 # 36 GAHRp - Manual
 
 # note: adding the uname to this message, even though it's not used for addressing clouds yet.
+#   also, the host_id is needed so the remote can prepare another host for the request,
+#   but a normal client won't know the host id, or, I mean I guess they could... Should investigate todo
 37  , CLIENT_MIRROR , sid   , int:host_id   , string:cloud_uname  , string:cname
 
 ################################################################################

@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from remote import _remote_db as db
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table, BigInteger
 from sqlalchemy.orm import relationship, backref
@@ -16,3 +18,7 @@ class Session(db.Base):
     # todo right now we store an uint64(?) as a String, b/c no native sqlite sup
     created_on = Column(DateTime)
     last_refresh = Column(DateTime)
+
+    def has_timed_out(self):
+        delta = datetime.utcnow() - self.last_refresh
+        return (delta.seconds/60) > 30
