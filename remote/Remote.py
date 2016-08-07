@@ -242,7 +242,7 @@ def client_mirror(connection, address, msg_obj):
         send_generic_error_and_close(connection)
         raise Exception('No cloud with name ' + cloudname)
 
-    session = db.session.query(Session).filter_by(uuid=session_id)
+    session = db.session.query(Session).filter_by(uuid=session_id).first()
     if session is None:
         send_generic_error_and_close(connection)
         raise Exception('provided session ID does not exist')

@@ -45,6 +45,7 @@ _decoder_table = {
     , CLIENT_GET_CLOUD_HOST_RESPONSE: ClientGetCloudHostResponseMessage.deserialize # 34
     , GET_ACTIVE_HOSTS_REQUEST: GetActiveHostsRequestMessage.deserialize # 35
     , GET_ACTIVE_HOSTS_RESPONSE: GetActiveHostsResponseMessage.deserialize # 36
+    , CLIENT_MIRROR: ClientMirrorMessage.deserialize # 37
 }
 
 

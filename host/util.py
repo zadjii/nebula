@@ -1,3 +1,4 @@
+import os
 import socket
 import ssl
 from datetime import datetime
@@ -87,3 +88,13 @@ def mylog(message, sgr_seq='0'):
         print '{}| \x1b[{}m{}\x1b[0m'.format(now_string, sgr_seq, message)
 
 
+def enable_vt_support():
+    if os.name == 'nt':
+        import ctypes
+        hOut = ctypes.windll.kernel32.GetStdHandle(-11)
+        out_modes = ctypes.c_uint32()
+        ENABLE_VT_PROCESSING = ctypes.c_uint32(0x0004)
+        # ctypes.addressof()
+        ctypes.windll.kernel32.GetConsoleMode(hOut, ctypes.byref(out_modes))
+        out_modes = ctypes.c_uint32(out_modes.value | 0x0004)
+        ctypes.windll.kernel32.SetConsoleMode(hOut, out_modes)

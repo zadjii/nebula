@@ -53,20 +53,23 @@ def handle_fetch(connection, address, msg_obj):
     cloudname = msg_obj.cname
     requested_root = msg_obj.root
 
-    rd = validate_host_id(db, other_id, connection)
+    # fuck this is super wrong. fixme.
+    # validate host id gets it's clouds, but we don't want that.
+    # rd = validate_host_id(db, other_id, connection)
     # validate_host_id will raise an exception if there is no cloud
-    matching_id_clouds = rd.data
+    # matching_id_clouds = rd.data
 
-    # matching_id_clouds = db.session.query(Cloud)\
-    #     .filter(Cloud.my_id_from_remote != other_id)\
-    #     .filter_by(completed_mirroring=True)
-    # if matching_id_clouds.count() <= 0:
-    #     send_generic_error_and_close(connection)
-    #     raise Exception(
-    #         'Received a message intended from id={},'
-    #         ' but I don\'t have any clouds with that DON\'T have that id'
-    #         .format(other_id)
-    #     )
+    # fixme just temporarily re-enabling the old codepath until I figure this out.
+    matching_id_clouds = db.session.query(Cloud)\
+        .filter(Cloud.my_id_from_remote != other_id)\
+        .filter_by(completed_mirroring=True)
+    if matching_id_clouds.count() <= 0:
+        send_generic_error_and_close(connection)
+        raise Exception(
+            'Received a message intended from id={},'
+            ' but I don\'t have any clouds with that DON\'T have that id'
+            .format(other_id)
+        )
 
     matching_cloud = matching_id_clouds.filter_by(name=cloudname).first()
     if matching_cloud is None:

@@ -5,7 +5,8 @@ from host import HOST_WS_HOST, HOST_WS_PORT, get_db
 from host.NetworkThread import NetworkThread
 from host.function.dbg_nodes import dbg_nodes
 from host.models import Cloud
-from host.util import set_mylog_name, mylog, get_ipv6_list, setup_remote_socket
+from host.util import set_mylog_name, mylog, get_ipv6_list, setup_remote_socket, \
+    enable_vt_support
 from messages.HostHandshakeMessage import  HostHandshakeMessage
 from threading import Thread
 from host.function.mirror import mirror
@@ -221,8 +222,10 @@ def nebs_main(argv):
     command = argv[1]
 
     selected = commands.get(command, usage)
-    selected(argv[2:])
-    sys.exit(0)
+    enable_vt_support()
+    result = selected(argv[2:])
+    result = 0 if result is None else result
+    sys.exit(result)
 
 
 if __name__ == '__main__':
