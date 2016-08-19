@@ -1,5 +1,8 @@
+import json
 import socket
 # from msg_codes import send_msg
+from datetime import datetime
+
 from connections.RawConnection import RawConnection
 from host import HOST_PORT
 from remote import _remote_db as db
@@ -30,6 +33,14 @@ class Host(db.Base):
     # cont    for a cloud if it's sent a completed_mirroring.
     # completed_mirroring = Column(Boolean, default=False)
 
+    def is_active(self):
+        if self.last_handshake is None:
+            return False
+        delta = datetime.utcnow() - self.last_handshake
+        if delta.seconds / 60 <= 1:
+            return True
+        return False
+
     def send_msg(self, msg):
         # print 'rand host is ({},{})'.format(ip, port)
         # context = SSL.Context(SSL.SSLv23_METHOD)
@@ -45,3 +56,20 @@ class Host(db.Base):
         # send_msg(msg, s)
         s.close()
         # todo I think maybe part of the close after close is related to this...
+
+    def to_dict(self):
+        # todo: Replace this with a proper marshmallow implementation
+        self_dict = {
+            'curr_size': self.curr_size
+            , 'ip': self.ipv6
+            , 'port': self.port
+            , 'wsport': self.wsport
+            , 'hostname': self.hostname
+            , 'remaining_size': self.remaining_size
+        }
+        return self_dict
+
+    def to_json(self):
+        # todo: Replace this with a proper marshmallow implementation
+        return json.dumps(self.to_dict())
+

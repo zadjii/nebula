@@ -99,7 +99,7 @@ def client_setup_test_actual():
         raise Exception('remote did not respond with success CGCR')
     print resp.__dict__
 
-    cloudname = resp.owned[0]
+    cloudname = resp.owned[0].cname
 
     ############
     rem_sock = setup_remote_socket(REMOTE_HOST, REMOTE_PORT)

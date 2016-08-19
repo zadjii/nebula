@@ -16,6 +16,7 @@ from msg_codes import *
 from messages import *
 
 from remote import User, Cloud, Host, get_db, Session
+from remote.util import get_user_from_session
 
 __author__ = 'Mike'
 
@@ -52,6 +53,8 @@ def filter_func(connection, address):
         respond_to_get_clouds(connection, address, msg_obj)
     elif msg_type == CLIENT_GET_CLOUD_HOST_REQUEST:
         get_cloud_host(connection, address, msg_obj)
+    elif msg_type == CLIENT_GET_CLOUD_HOSTS_REQUEST:
+        respond_to_client_get_cloud_hosts(connection, address, msg_obj)
     elif msg_type == CLIENT_MIRROR:
         client_mirror(connection, address, msg_obj)
     else:
@@ -76,23 +79,48 @@ def host_handshake(connection, address, msg_obj):
 def respond_to_get_clouds(connection, address, msg_obj):
     db = get_db()
     session_id = msg_obj.sid
-    sess_obj = db.session.query(Session).filter_by(uuid=session_id).first()
-    if sess_obj is None:
-        # fixme send error
-        mylog('CGCR: no session? {}'.format(session_id))
+    rd = get_user_from_session(db, session_id)
+    if not rd.success:
+        mylog('generic CGCHsR error: "{}"'.format(rd.data)) # fixme
         return
-    user = sess_obj.user
-    if user is None:
-        # fixme return error
-        mylog('CGCR: no user? {}'.format(sess_obj.user_id))
-        return
+    else:
+        user = rd.data
+
     mylog('getting clouds for {}'.format(user.username))
-    owned_names = [c.name for c in user.owned_clouds.all()]
-    contributed_names = [c.name for c in user.contributed_clouds.all()]
+    # owned_names = [c.name for c in user.owned_clouds.all()]
+    # contributed_names = [c.name for c in user.contributed_clouds.all()]
+    owned_clouds = [c.to_dict() for c in user.owned_clouds.all()]
+    contributed_clouds = [c.to_dict() for c in user.contributed_clouds.all()]
     msg = ClientGetCloudsResponseMessage(
         session_id
-        , owned_names
-        , contributed_names
+        , owned_clouds
+        , contributed_clouds
+    )
+    connection.send_obj(msg)
+
+
+def respond_to_client_get_cloud_hosts(connection, address, msg_obj):
+    db = get_db()
+    session_id = msg_obj.sid
+    rd = get_user_from_session(db, session_id)
+    if not rd.success:
+        mylog('generic CGCHsR error: "{}"'.format(rd.data))  # fixme
+        return
+    else:
+        user = rd.data
+
+    # todo: also use uname to lookup cloud
+    cloudname = msg_obj.cname
+    cloud = user.owned_clouds.filter_by(name=cloudname).first()
+    if cloud is None:
+        mylog('User({}) does not own the requested cloud:{}'.format(
+            user.id, cloudname))  # fixme send error
+        return
+
+    hosts = [host.to_dict() for host in cloud.hosts.all()]
+    msg = ClientGetCloudHostsResponseMessage(
+        session_id
+        , hosts
     )
     connection.send_obj(msg)
 

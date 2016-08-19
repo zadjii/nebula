@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 from remote import _remote_db as db
@@ -75,9 +76,29 @@ class Cloud(db.Base):
     def active_hosts(self):
         hosts = []
         for host in self.hosts.all():
-            if host.last_handshake is None:
-                continue
-            delta = datetime.utcnow() - host.last_handshake
-            if delta.seconds / 60 <= 1:
+            if host.is_active():
                 hosts.append(host)
         return hosts
+
+    def creator_name(self):
+        # todo/fixme: this is temporary until I add uname properly to the DB
+        first_owner = self.owners.first()
+        if first_owner is not None:
+            return first_owner.username
+        return None
+
+    def to_dict(self):
+        self_dict = {
+            'uname': self.creator_name()
+            , 'cname': self.name
+            , 'created_on': self.created_on
+            , 'last_update': self.last_update
+            , 'max_size': self.max_size
+            , 'privacy': self.privacy
+        }
+        return self_dict
+
+    def to_json(self):
+        # todo: Replace this with a proper marshmallow implementation
+        return json.dumps(self.to_dict())
+

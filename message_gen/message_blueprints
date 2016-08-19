@@ -80,6 +80,11 @@
 #   but a normal client won't know the host id, or, I mean I guess they could... Should investigate todo
 37  , CLIENT_MIRROR , sid   , int:host_id   , string:cloud_uname  , string:cname
 
+
+38  , CLIENT_GET_CLOUD_HOSTS_REQUEST      , sid, string:cloud_uname, string:cname
+# The remote fills hosts with [host.to_json for host in cloud.hosts]
+39  , CLIENT_GET_CLOUD_HOSTS_RESPONSE     , sid, blob:hosts
+
 ################################################################################
 #manually updated ones:
 ################################################################################
