@@ -91,8 +91,8 @@ class Cloud(db.Base):
         self_dict = {
             'uname': self.creator_name()
             , 'cname': self.name
-            , 'created_on': self.created_on
-            , 'last_update': self.last_update
+            , 'created_on': self.created_on.isoformat() + 'Z"'
+            , 'last_update': self.last_update.isoformat() + 'Z"'
             , 'max_size': self.max_size
             , 'privacy': self.privacy
         }

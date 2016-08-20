@@ -81,7 +81,8 @@ def respond_to_get_clouds(connection, address, msg_obj):
     session_id = msg_obj.sid
     rd = get_user_from_session(db, session_id)
     if not rd.success:
-        mylog('generic CGCHsR error: "{}"'.format(rd.data)) # fixme
+        mylog('generic CGCHsR error: "{}"'.format(rd.data), '31') # fixme
+        send_generic_error_and_close(connection)
         return
     else:
         user = rd.data
@@ -104,7 +105,7 @@ def respond_to_client_get_cloud_hosts(connection, address, msg_obj):
     session_id = msg_obj.sid
     rd = get_user_from_session(db, session_id)
     if not rd.success:
-        mylog('generic CGCHsR error: "{}"'.format(rd.data))  # fixme
+        mylog('generic CGCHsR error: "{}"'.format(rd.data), '31')  # fixme
         return
     else:
         user = rd.data
@@ -115,6 +116,7 @@ def respond_to_client_get_cloud_hosts(connection, address, msg_obj):
     if cloud is None:
         mylog('User({}) does not own the requested cloud:{}'.format(
             user.id, cloudname))  # fixme send error
+        send_generic_error_and_close(connection)
         return
 
     hosts = [host.to_dict() for host in cloud.hosts.all()]

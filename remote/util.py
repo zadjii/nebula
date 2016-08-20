@@ -1,4 +1,4 @@
-from models import Session
+from models.Session import Session
 from host.util import set_mylog_name, mylog, ResultAndData, ERROR
 
 
