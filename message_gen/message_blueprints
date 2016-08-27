@@ -85,6 +85,9 @@
 # The remote fills hosts with [host.to_json for host in cloud.hosts]
 39  , CLIENT_GET_CLOUD_HOSTS_RESPONSE     , sid, blob:hosts
 
+40  , HOST_VERIFY_CLIENT_REQUEST, int:id, sid, string:cloud_uname, string:cname
+41  , HOST_VERIFY_CLIENT_SUCCESS, int:id, sid, string:cloud_uname, string:cname
+
 ################################################################################
 #manually updated ones:
 ################################################################################
@@ -162,7 +165,8 @@
 -4  , FILE_IS_DIR_ERROR
 -5  , FILE_IS_NOT_DIR_ERROR
 -6  , FILE_DOES_NOT_EXIST_ERROR
-
+# todo: return an int message instead, use a resource table to translate
+-7  , HOST_VERIFY_CLIENT_FAILURE, string:message
 
 
 # ideas for this file:

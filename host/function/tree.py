@@ -57,7 +57,7 @@ def db_tree(argv):
 
     for match in matches:
         print 'db-tree for {}[{}]<{}>'.format(match.name, match.my_id_from_remote, match.root_directory)
-        for top_level_node in match.files.all():
+        for top_level_node in match.children.all():
             walk_db_recursive(top_level_node, 1, print_filename)
 
 

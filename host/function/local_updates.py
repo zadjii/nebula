@@ -183,7 +183,7 @@ def check_ipv6_changed(curr_ipv6):
         return True, new_addr
 
 
-def local_update_thread(host_obj):  # todo argv is a placeholder
+def local_update_thread(host_obj):
     db = get_db()
     print 'Beginning to watch for local modifications'
     mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)

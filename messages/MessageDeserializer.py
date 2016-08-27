@@ -3,7 +3,8 @@ import json
 from msg_codes import *
 from messages import *
 _decoder_table = {
-    FILE_DOES_NOT_EXIST_ERROR: FileDoesNotExistErrorMessage.deserialize # -6
+    HOST_VERIFY_CLIENT_FAILURE: HostVerifyClientFailureMessage.deserialize  # -7
+    , FILE_DOES_NOT_EXIST_ERROR: FileDoesNotExistErrorMessage.deserialize # -6
     , FILE_IS_NOT_DIR_ERROR: FileIsNotDirErrorMessage.deserialize # -5
     , FILE_IS_DIR_ERROR: FileIsDirErrorMessage.deserialize # -4
     , UNPREPARED_HOST_ERROR: UnpreparedHostErrorMessage.deserialize # -3
@@ -48,13 +49,15 @@ _decoder_table = {
     , CLIENT_MIRROR: ClientMirrorMessage.deserialize # 37
     , CLIENT_GET_CLOUD_HOSTS_REQUEST: ClientGetCloudHostsRequestMessage.deserialize # 38
     , CLIENT_GET_CLOUD_HOSTS_RESPONSE: ClientGetCloudHostsResponseMessage.deserialize # 39
+    , HOST_VERIFY_CLIENT_REQUEST: HostVerifyClientRequestMessage.deserialize # 40
+    , HOST_VERIFY_CLIENT_SUCCESS: HostVerifyClientSuccessMessage.deserialize # 41
 }
 
 
 class MessageDeserializer(object):
     @staticmethod
     def decode_msg(json_string):
-        print '\t\t-> decoding"{}"'.format(json_string)
+        print '\tdecoding"{}"'.format(json_string)
         json_dict = json.loads(json_string)
         if 'type' not in json_dict.keys():
             raise

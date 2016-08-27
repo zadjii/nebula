@@ -1,5 +1,6 @@
 # last generated 2016-04-10 21:56:22.306000
 from messages.BaseMessage import BaseMessage
+from messages.HostVerifyClientFailureMessage import HostVerifyClientFailureMessage
 from messages.FileDoesNotExistErrorMessage import FileDoesNotExistErrorMessage
 from messages.FileIsNotDirErrorMessage import FileIsNotDirErrorMessage
 from messages.FileIsDirErrorMessage import FileIsDirErrorMessage
@@ -45,4 +46,6 @@ from messages.GetActiveHostsResponseMessage import GetActiveHostsResponseMessage
 from messages.ClientMirrorMessage import ClientMirrorMessage
 from messages.ClientGetCloudHostsRequestMessage import ClientGetCloudHostsRequestMessage
 from messages.ClientGetCloudHostsResponseMessage import ClientGetCloudHostsResponseMessage
+from messages.HostVerifyClientRequestMessage import HostVerifyClientRequestMessage
+from messages.HostVerifyClientSuccessMessage import HostVerifyClientSuccessMessage
 
