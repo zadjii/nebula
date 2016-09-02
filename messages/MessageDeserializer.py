@@ -3,7 +3,11 @@ import json
 from msg_codes import *
 from messages import *
 _decoder_table = {
-    HOST_VERIFY_CLIENT_FAILURE: HostVerifyClientFailureMessage.deserialize  # -7
+    INVALID_PERMISSIONS: InvalidPermissionsMessage.deserialize # -11
+    , NO_ACTIVE_HOST: NoActiveHostMessage.deserialize # -10
+    , INVALID_STATE: InvalidStateMessage.deserialize # -9
+    , CLIENT_AUTH_ERROR: ClientAuthErrorMessage.deserialize # -8
+    , HOST_VERIFY_CLIENT_FAILURE: HostVerifyClientFailureMessage.deserialize  # -7
     , FILE_DOES_NOT_EXIST_ERROR: FileDoesNotExistErrorMessage.deserialize # -6
     , FILE_IS_NOT_DIR_ERROR: FileIsNotDirErrorMessage.deserialize # -5
     , FILE_IS_DIR_ERROR: FileIsDirErrorMessage.deserialize # -4

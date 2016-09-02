@@ -1,5 +1,8 @@
 import os
 from datetime import datetime
+
+from common_util import ResultAndData
+from connections.RawConnection import RawConnection
 from host import _host_db as db
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table, Boolean
 from sqlalchemy.orm import relationship, backref
@@ -31,7 +34,19 @@ class Cloud(db.Base):
 
     # todo this needs to be a many-many, sessions have lots of clouds, clouds
     # cont have lots of sessions.
-    sessions = relationship('Session', backref='cloud', lazy='dynamic')
+    clients = relationship('Client', backref='cloud', lazy='dynamic')
+
+    def get_remote_conn(self):
+        from host.util import setup_remote_socket
+
+        rd = ResultAndData(False, None)
+        try:
+            ssl_sock = setup_remote_socket(self.remote_host, self.remote_port)
+            conn = RawConnection(ssl_sock)
+            rd = ResultAndData(True, conn)
+        except Exception, e:
+            rd = ResultAndData(False, e)
+        return rd
 
     def translate_relative_path(self, rel_path):
         full_path = os.path.join(self.root_directory, rel_path)

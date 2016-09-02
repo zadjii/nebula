@@ -15,6 +15,7 @@ try:
 except ImportError:  # Trollius >= 0.3 was renamed
     import trollius as asyncio
 from autobahn.asyncio.websocket import WebSocketServerFactory
+from time import sleep
 # import sys
 #
 # from twisted.python import log
@@ -50,7 +51,21 @@ class NetworkThread(object):
     def setup_socket(self, ip_address, use_ipv6=True):
         if use_ipv6:
             self.server_sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-            self.server_sock.bind((ip_address, self.port, 0, 0))
+            failure_count = 0
+            succeeded = False
+            while not succeeded:
+                try:
+                    self.server_sock.bind((ip_address, self.port, 0, 0))
+                    succeeded = True
+                    break
+                except socket.error, e:
+                    failure_count+=1
+                    mylog('Failed {} time(s) to bind to {}'.format(
+                        failure_count, (ip_address, self.port)), '34')
+                    mylog(e)
+                    if failure_count > 4:
+                        raise e
+                    sleep(1)
             mylog('Bound to ipv6 address={}'.format(ip_address))
         else:
             self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

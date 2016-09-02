@@ -135,57 +135,9 @@ class Host:
         return self.active_network_obj.is_ipv6()
 
 
-# def old_ws_thread_function(argv):
-#     mylog('top of ws thread')
-#     loop = asyncio.new_event_loop()
-#     asyncio.set_event_loop(loop)
-#
-#     factory = WebSocketServerFactory(u"ws://{}:{}".format(HOST_WS_HOST, HOST_WS_PORT), debug=False)
-#     factory.protocol = MyBigFuckingLieServerProtocol
-#
-#     # loop = asyncio.get_event_loop()
-#     coro = loop.create_server(factory, '0.0.0.0', HOST_WS_PORT)
-#     mylog('\x1b[35m[35]\x1b[0m')
-#     server = loop.run_until_complete(coro)
-#     mylog('\x1b[36m[36]\x1b[0m')
-#
-#     try:
-#         loop.run_forever()
-#         mylog('after run_forever for shits')
-#     except KeyboardInterrupt:
-#         pass
-#     finally:
-#         mylog('\x1b[36mTHIS IS BAD\x1b[0m')
-#         mylog('\x1b[35mTHIS IS BAD\x1b[0m')
-#         mylog('\x1b[34mTHIS IS BAD\x1b[0m')
-#         mylog('\x1b[33mTHIS IS BAD\x1b[0m')
-#         server.close()
-#         loop.close()
-
-
 def start(argv):
     host_controller = Host()
     host_controller.start(argv=argv)
-
-
-def old_start(argv):
-    set_mylog_name('nebs')
-    # todo process start() args here
-    # local_thread = Thread(target=local_update_thread, args=argv)
-    network_thread = Thread(target=receive_updates_thread, args=argv)
-    # local_thread.start()
-    network_thread.start()
-
-    ###############
-
-    ws_thread = Thread(target=old_ws_thread_function, args=argv)
-    ws_thread.start()
-
-    ###############
-    local_update_thread()
-    # local_thread.join()
-    # network_thread.join()
-    print 'Both the local update checking thread and the network thread have exited.'
 
 
 commands = {

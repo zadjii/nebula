@@ -1,5 +1,6 @@
 from models.Session import Session
-from host.util import set_mylog_name, mylog, ResultAndData, ERROR
+from common_util import *
+from remote.models.Cloud import Cloud
 
 
 def get_user_from_session(db, session_id):
@@ -14,3 +15,10 @@ def get_user_from_session(db, session_id):
         else:
             rd = ResultAndData(True, user)
     return rd
+
+
+def get_cloud_by_name(db, uname, cname):
+    # return [cloud for cloud in db.session.query(Cloud).filter_by(name=cname)
+    #         if cloud.owner_name() == uname]
+    # Hosts don't know about owner names yet, todo:15
+    return db.session.query(Cloud).filter_by(name=cname).first()

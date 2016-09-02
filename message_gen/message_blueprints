@@ -167,6 +167,10 @@
 -6  , FILE_DOES_NOT_EXIST_ERROR
 # todo: return an int message instead, use a resource table to translate
 -7  , HOST_VERIFY_CLIENT_FAILURE, string:message
+-8  , CLIENT_AUTH_ERROR, string:message
+-9  , INVALID_STATE, string:message
+-10 , NO_ACTIVE_HOST, string:cloud_uname, string:cname
+-11 , INVALID_PERMISSIONS, string:message
 
 
 # ideas for this file:

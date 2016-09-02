@@ -1,5 +1,9 @@
 # last generated 2016-04-10 21:56:22.306000
 from messages.BaseMessage import BaseMessage
+from messages.InvalidPermissionsMessage import InvalidPermissionsMessage
+from messages.NoActiveHostMessage import NoActiveHostMessage
+from messages.InvalidStateMessage import InvalidStateMessage
+from messages.ClientAuthErrorMessage import ClientAuthErrorMessage
 from messages.HostVerifyClientFailureMessage import HostVerifyClientFailureMessage
 from messages.FileDoesNotExistErrorMessage import FileDoesNotExistErrorMessage
 from messages.FileIsNotDirErrorMessage import FileIsNotDirErrorMessage

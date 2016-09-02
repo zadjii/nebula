@@ -196,28 +196,40 @@ def local_update_thread(host_obj):
     last_handshake = datetime.utcnow()
     db.session.close()
     while True:
+        # process all of the incoming requests first
         host_obj.process_connections()
+
         db = get_db()
         mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
+        all_mirrored_clouds = mirrored_clouds.all()
+
+        # check if out ip has changed since last update
         ip_changed, new_ip = False, None
         if host_obj.is_ipv6():
             ip_changed, new_ip = check_ipv6_changed(current_ipv6)
 
-        all_mirrored_clouds = mirrored_clouds.all()
-        if num_clouds_mirrored < mirrored_clouds.count():
-            mylog('checking for updates on {}'.format([cloud.my_id_from_remote for cloud in all_mirrored_clouds]))
-            num_clouds_mirrored = mirrored_clouds.count()
-            for cloud in all_mirrored_clouds:
-                host_obj.send_remote_handshake(cloud)
-            last_handshake = datetime.utcnow()
+        # if the ip is different, move our server over
         if ip_changed:
             host_obj.change_ip(new_ip, all_mirrored_clouds)
+            # todo: what if one of the remotes fails to handshake?
+            # should store the last handshake per remote
             last_handshake = datetime.utcnow()
             current_ipv6 = new_ip
 
+        # if the number of mirrors has changed...
+        if num_clouds_mirrored < mirrored_clouds.count():
+            mylog('checking for updates on {}'.format([cloud.my_id_from_remote for cloud in all_mirrored_clouds]))
+            num_clouds_mirrored = mirrored_clouds.count()
+            # if the number of clouds is different, handshake all of them
+            for cloud in all_mirrored_clouds:
+                host_obj.send_remote_handshake(cloud)
+            last_handshake = datetime.utcnow()
+
+        # scan the tree for updates
         for cloud in all_mirrored_clouds:
             check_local_modifications(cloud, db)
 
+        # if more that 30s have passed since the last handshake, handshake
         delta = datetime.utcnow() - last_handshake
         if delta.seconds > 30:
             host_obj.handshake_clouds(all_mirrored_clouds)

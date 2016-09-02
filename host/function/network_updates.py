@@ -1,23 +1,15 @@
-import os, sys
+import sys
 from datetime import datetime
-import socket
-from stat import S_ISDIR
-from threading import Thread
-from connections.RawConnection import RawConnection
 
-from host import get_db, Cloud, IncomingHostEntry, Session
-from host import HOST_HOST, HOST_PORT
-from host.function.network.client_session_alert import \
-    handle_client_session_alert
-from host.function.network.ls_handler import list_files_handler
+from host import get_db, Cloud, IncomingHostEntry
+from host.function.network.client import handle_recv_file_from_client, \
+    handle_read_file_request, list_files_handler
+# from host.function.network.ls_handler import list_files_handler
 from host.function.recv_files import recv_file_tree
 from host.function.send_files import send_tree
 from host.util import check_response, mylog, validate_host_id
-from messages import ReadFileResponseMessage, FileIsDirErrorMessage, \
-    FileDoesNotExistErrorMessage
 from msg_codes import *
-import math
-import time
+
 __author__ = 'Mike'
 
 
@@ -98,201 +90,6 @@ def handle_fetch(connection, address, msg_obj):
     send_tree(other_id, matching_cloud, requested_root, connection)
 
 
-def handle_recv_file_from_client(connection, address, msg_obj):
-    db = get_db()
-    # my_id = msg_obj['tid']
-    # session_uuid = msg_obj['sid']
-    session_uuid = msg_obj.sid
-    # cloudname = msg_obj['cname']
-    cloudname = msg_obj.cname
-    # requested_file = msg_obj['fpath']
-    requested_file = msg_obj.fpath
-    their_ip = address[0]
-
-    # fixme This is some client session validation. Which obviously needs work.
-    # matching_session = db.session.query(Session).filter_by(uuid=session_uuid).first()
-    # if matching_session is None:
-    #     send_generic_error_and_close(connection)
-    #     mylog('ERR: got a CLIENT_._PUT from {} but I don\'t have that session'.format(session_uuid))
-    #     # fixme: we should return here, and not actually handle the file....
-
-    # matching_id_clouds = db.session.query(Cloud)\
-    #     .filter(Cloud.my_id_from_remote == my_id)
-    # if matching_id_clouds.count() <= 0:
-    #     send_generic_error_and_close(connection)
-    #     raise Exception(
-    #         'Received a message intended for id={},'
-    #         ' but I don\'t have any clouds with that id'
-    #         .format(my_id)
-    #     )
-    #
-    # matching_cloud = matching_session.cloud
-    # if matching_cloud is None:
-    #     send_generic_error_and_close(connection)
-    #     raise Exception(
-    #         'The session {} didn\'t have a cloud associated with it'
-    #     )
-    # fixme make sure that the session has access to the cloud.
-    # cont    this will require work from the remote.
-    # cont    The client needs to ask the remote for the cloud.
-    #           The remote will tell the host (this sid is good for this cname)
-    #         the host will add that session to the cloud's list of sessions, and that cloud to the session
-    #         the remote will then tell the client to go to that host.
-
-    matching_cloud = db.session.query(Cloud).filter_by(name=cloudname).first()
-    if not (matching_cloud.name == cloudname):
-        send_generic_error_and_close(connection)
-        raise Exception(
-            '{} came asking for cloudname=\'{}\','
-            ' however, their cloud doesn\'t match that'
-            .format(session_uuid, cloudname)
-        )
-    # matching_entry = db.session.query(IncomingHostEntry).filter_by(their_address=their_ip).first()
-    # if matching_entry is None:
-    #     send_unprepared_host_error_and_close(connection)
-    #     raise Exception(
-    #         'host came asking for cloudname=\'' + cloudname + '\''
-    #         + ', but I was not told to expect them.'
-    #     )
-    # response = recv_msg(connection)
-    resp_obj = connection.recv_obj()
-    # resp_type = response['type']
-    resp_type = resp_obj.type
-    # print 'host_host_fetch response:{}'.format(response)
-    check_response(CLIENT_FILE_TRANSFER, resp_type)
-
-    recv_file_tree(resp_obj, matching_cloud, connection, db)
-    mylog('[{}]bottom of handle_recv_file_from_client(...,{})'
-          .format(session_uuid, msg_obj.__dict__))
-
-
-def handle_read_file_request(connection, address, msg_obj):
-    db = get_db()
-    # my_id = msg_obj['tid']
-    # session_uuid = msg_obj['sid']
-    session_uuid = msg_obj.sid
-    # cloudname = msg_obj['cname']
-    cloudname = msg_obj.cname
-    # requested_file = msg_obj['fpath']
-    requested_file = msg_obj.fpath
-    their_ip = address[0]
-    # todo: refactor this segment out into a verify session function
-    # mylog('sessions:{}'.format([(sess.uuid, sess.client_ip) for sess in db.session.query(Session)]))
-    # matching_session = db.session.query(Session).filter_by(uuid=session_uuid).first()
-    # if matching_session is None:
-    #     send_generic_error_and_close(connection)
-    #     mylog('ERR: got a RFQ from {} but I don\'t have that session'.format(session_uuid))
-    # fixme ^ This all depended upon remotes sending the host a CSA first
-    #    which we don't do anymore. so poop on you.
-
-    # matching_id_clouds = db.session.query(Cloud)\
-    #     .filter(Cloud.my_id_from_remote == my_id)
-    # if matching_id_clouds.count() <= 0:
-    #     send_generic_error_and_close(connection)
-    #     raise Exception(
-    #         'Received a message intended for id={},'
-    #         ' but I don\'t have any clouds with that id'
-    #         .format(my_id)
-    #     )
-    #
-    # todo: ruh roh, sessions aren't tied to clouds anymore
-    # matching_cloud = matching_session.cloud
-    # if matching_cloud is None:
-    #     send_generic_error_and_close(connection)
-    #     raise Exception(
-    #         'The session {} didn\'t have a cloud associated with it'
-    #     )
-    matching_cloud = db.session.query(Cloud).filter_by(name=cloudname).first()
-    # if not (matching_cloud.name == cloudname):
-    #     send_generic_error_and_close(connection)
-    #     raise Exception(
-    #         '{} came asking for cloudname=\'{}\','
-    #         ' however, their cloud doesn\'t match that'
-    #             .format(session_uuid, cloudname)
-    #     )
-    # matching_entry = db.session.query(IncomingHostEntry).filter_by(their_address=their_ip).first()
-    # if matching_entry is None:
-    #     send_unprepared_host_error_and_close(connection)
-    #     raise Exception(
-    #         'host came asking for cloudname=\'' + cloudname + '\''
-    #         + ', but I was not told to expect them.'
-    #     )
-    # response = recv_msg(connection)
-    # resp_obj = connection.recv_obj()
-    # resp_type = response['type']
-    # resp_type = resp_obj.type
-    # print 'host_host_fetch response:{}'.format(response)
-    # check_response(CLIENT_FILE_TRANSFER, resp_type)
-    # recv_file_tree(resp_obj, matching_cloud, connection, db)
-    requesting_all = requested_file == '/'
-    filepath = None
-    # if the root is '/', send all of the children of the root
-    if requesting_all:
-        filepath = matching_cloud.root_directory
-    else:
-        filepath = os.path.join(matching_cloud.root_directory, requested_file)
-
-    # FIXME: Make sure paths are limited to children of the root
-
-    req_file_stat = None
-    try:
-        req_file_stat = os.stat(filepath)
-    except Exception:
-        err_msg = FileDoesNotExistErrorMessage()
-        connection.send_obj(err_msg)
-        # connection.close()
-        return
-    relative_pathname = os.path.relpath(filepath, matching_cloud.root_directory)
-
-    req_file_is_dir = S_ISDIR(req_file_stat.st_mode)
-    if req_file_is_dir:
-        err_msg = FileIsDirErrorMessage()
-        connection.send_obj(err_msg)
-        # connection.close()
-    else:
-        # send RFP - ReadFileResponse
-        req_file_size = req_file_stat.st_size
-        requested_file = open(filepath, 'rb')
-        response = ReadFileResponseMessage(session_uuid, relative_pathname, req_file_size)
-        connection.send_obj(response)
-        mylog('sent RFRp:{}, now sending file bytes'.format(response.serialize()))
-        l = 1
-        total_len = 0
-        num_MB = int(math.floor(req_file_size/(1024 * 1024)))
-        transfer_size = 1024 + (10 * 1024 * num_MB)
-        num_transfers = 0
-        # send file bytes
-        while l > 0:
-            # if total_len == 0:
-            #     mylog('sending data, l={}'.format(l))
-            new_data = requested_file.read(transfer_size)
-            # if total_len == 0:
-            #     mylog('read:[{}]'.format(new_data))
-            sent_len = connection.send_next_data(new_data)
-            l = sent_len
-            total_len += sent_len
-            num_transfers += 1
-            # mylog('sent {}B of <{}> ({}/{}B total)'
-            #       .format(sent_len, filepath, total_len, req_file_size))
-            # mylog(
-            #     '[{}]Sent {}B of file<{}> data'
-            #     .format(cloud.my_id_from_remote, l, filepath)
-            # )
-            if (num_transfers % 128 == 0) and num_transfers > 1:
-                mylog('sent {} blobs of <{}> ({}/{}B total)'
-                      .format(num_transfers, filepath, total_len, req_file_size))
-                time.sleep(.1)
-
-        mylog(
-            '(RFQ)[{}]Sent <{}> data to [{}]'
-            .format(matching_cloud.my_id_from_remote, filepath, session_uuid)
-        )
-
-        requested_file.close()
-    mylog('[{}]bottom of handle_read_file_request(...,{})'
-          .format(session_uuid, msg_obj))
-
-
 def handle_recv_file(connection, address, msg_obj):
     db = get_db()
     # my_id = msg_obj['tid']
@@ -361,10 +158,7 @@ def handle_remove_file(connection, address, msg_obj):
             + ', however, I don\'t have a matching cloud.'
         )
 
-
 def filter_func(connection, address):
-
-    # msg_obj = recv_msg(connection)
     # fixme: Failing to decode the message should not bring the entire system down.
     # cont: should gracefully ignore and close connection
     msg_obj = connection.recv_obj()
@@ -373,21 +167,25 @@ def filter_func(connection, address):
     # print 'The message is', msg_obj
     # todo we should make sure the connection was from the remote or a client
     # cont   that we were told about here, before doing ANY processing.
+
+    # NOTE: NEVER REMOTE. NEVER ALLOW REMOTE->HOST.
     try:
         if msg_type == PREPARE_FOR_FETCH:
+            # todo:14 remove. This is a R->H message.
             prepare_for_fetch(connection, address, msg_obj)
+        # H->H Messages
         elif msg_type == HOST_HOST_FETCH:
             handle_fetch(connection, address, msg_obj)
         elif msg_type == HOST_FILE_PUSH:
             handle_recv_file(connection, address, msg_obj)
         elif msg_type == REMOVE_FILE:
             handle_remove_file(connection, address, msg_obj)
-        elif msg_type == CLIENT_SESSION_ALERT:
-            handle_client_session_alert(connection, address, msg_obj)
+        # ----------------------- C->H Messages ----------------------- #
+        # elif msg_type == CLIENT_SESSION_ALERT:
+        #     handle_client_session_alert(connection, address, msg_obj)
         elif msg_type == STAT_FILE_REQUEST:
-            # fixme
+            # todo:2 REALLY? This still isnt here? I guess list files does it...
             pass
-            # handle_recv_file(connection, address, msg_obj)
         elif msg_type == LIST_FILES_REQUEST:
             list_files_handler(connection, address, msg_obj)
         elif msg_type == CLIENT_FILE_PUT:
