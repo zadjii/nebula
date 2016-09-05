@@ -1,14 +1,9 @@
 import socket
-from threading import Thread
-
-
 from connections.RawConnection import RawConnection
-from host.function.network_updates import filter_func
 from util import mylog
 from host import HOST_PORT, HOST_WS_PORT
 from connections.WebSocketConnection import MyBigFuckingLieServerProtocol, \
     WebsocketConnection
-#
 import txaio
 try:
     import asyncio
@@ -16,11 +11,6 @@ except ImportError:  # Trollius >= 0.3 was renamed
     import trollius as asyncio
 from autobahn.asyncio.websocket import WebSocketServerFactory
 from time import sleep
-# import sys
-#
-# from twisted.python import log
-# from twisted.internet import reactor
-# from autobahn.twisted.websocket import WebSocketServerFactory
 
 
 class NetworkThread(object):
@@ -35,7 +25,6 @@ class NetworkThread(object):
         else:
             self.ipv4_address = ip_address
 
-        # self.ipv6_address = ipv6_address
         self.port = HOST_PORT
         self.ws_port = HOST_WS_PORT
         self.setup_socket(ip_address, self._use_ipv6)
@@ -46,6 +35,8 @@ class NetworkThread(object):
         self.ws_server_protocol_instance = None
         self.ws_internal_server_socket = None
         self.ws_internal_port = HOST_WS_PORT + 1
+        # This V is done when the ws_work_thread is started,
+        #   to keep in another thread
         # self.setup_web_socket(ipv6_address)
 
     def setup_socket(self, ip_address, use_ipv6=True):
@@ -55,6 +46,8 @@ class NetworkThread(object):
             succeeded = False
             while not succeeded:
                 try:
+                    self.server_sock.setsockopt(socket.SOL_SOCKET,
+                                                socket.SO_REUSEADDR, 1)
                     self.server_sock.bind((ip_address, self.port, 0, 0))
                     succeeded = True
                     break
@@ -85,7 +78,13 @@ class NetworkThread(object):
         factory.protocol = MyBigFuckingLieServerProtocol
         MyBigFuckingLieServerProtocol.net_thread = self
 
-        self.ws_coro = self.ws_event_loop.create_server(factory, ip_address, self.ws_port)
+        # reuse address is needed so that we can swap networks relatively
+        # seamlessly. I'm not sure what side effect it may have, todo:19
+        self.ws_coro = self.ws_event_loop.create_server(factory
+                                                        , ip_address
+                                                        , self.ws_port
+                                                        , reuse_address=True)
+
         mylog('Bound websocket to (ip, port)=({},{})'
               .format(ip_address, self.ws_port))
 
@@ -152,10 +151,8 @@ class NetworkThread(object):
             self.ws_event_loop.stop()
         if self.ws_internal_server_socket is not None:
             self.ws_internal_server_socket.close()
-        # todo: this is still not in the right place.
-        # cont    Need to figure out how to gracefully shutdown the server.
-        # if self.server_sock is not None:
-        #     self.server_sock.shutdown(socket.SHUT_RDWR)
+        if self.server_sock is not None:
+            self.server_sock.close()
         mylog('Shut down server socket on {}'.format(
             self.ipv6_address if self._use_ipv6 else self.ipv4_address))
 

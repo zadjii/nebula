@@ -86,7 +86,7 @@ def validate_or_get_client_session(db, uuid, cloud_uname, cloud_cname):
         clouds = get_clouds_by_name(db, cloud_uname, cloud_cname)
         # okay, so weirdness. Technically, nebs is going to be asking each
         # remote if any of these clouds were the right one.
-        # and tachnically, there could be two different remotes with the same
+        # and technically, there could be two different remotes with the same
         # un/cn pair on them. So one of them could be true, the other not.
         # they could both be true. one could even fake that it's true to spoof
         # the real one.
