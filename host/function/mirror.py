@@ -3,7 +3,6 @@ import socket
 import getpass
 from sys import stdin
 import platform
-from werkzeug.security import generate_password_hash
 from connections.RawConnection import RawConnection
 
 from host import Cloud, REMOTE_PORT, HOST_PORT, HOST_WS_PORT
@@ -38,7 +37,7 @@ def ask_remote_for_id(host, port, db):
               ' Don\'t really know what to do...')
         return -1, None
     else:
-        mylog('\x1b[35m MY IPV6\'s ARE {} \x1b[0m'.format(ipv6_addresses))
+        mylog('MY IPV6\'s ARE {}'.format(ipv6_addresses), '35')
 
     ipv6_addr = ipv6_addresses[0]  # arbitrarily take the first one
 
@@ -85,6 +84,7 @@ def client_request_cloud(cloud, session_id, db):
     sslSocket = setup_remote_socket(cloud.remote_host, cloud.remote_port)
     raw_conn = RawConnection(sslSocket)
 
+    # todo:15
     msg = ClientMirrorMessage(session_id, cloud.my_id_from_remote, 'todo_cloud_uname', cloud.name)
     raw_conn.send_obj(msg)
 
@@ -99,7 +99,7 @@ def handle_go_retrieve(response, cloud, db):
     other_port = response.port
     other_id = response.id
     if other_address == '0' and other_port == 0:
-        print 'No other hosts in cloud'
+        mylog('No other hosts in cloud')
         # note: falling out of this function takes us to the code that
         #       sends the MIRRORING_COMPLETE message.
         return
@@ -110,21 +110,26 @@ def handle_go_retrieve(response, cloud, db):
     host_sock.connect((other_address, other_port, 0, 0))
     host_conn = RawConnection(host_sock)
     # host_sock = setup_remote_socket(other_address, other_port)
-    # todo initialize our ssl context here
+    # todo:8 initialize our ssl context here
 
-    # send_msg(make_host_host_fetch(cloud.my_id_from_remote, cloud.name, '/'),
-    #          host_sock)
-    msg = HostHostFetchMessage(cloud.my_id_from_remote, cloud.name, '/')
+    cloud_uname = None  # todo:15
+    cname = cloud.name
+    my_id = cloud.my_id_from_remote
+    msg = HostHostFetchMessage(my_id, other_id, cloud_uname, cname, '/')
     host_conn.send_obj(msg)
     print 'Sent HOST_HOST_FETCH as a mirror request.'
 
-    # Here we recv a whole bunch of files from the host
-    # response = recv_msg(host_sock)
     resp_obj = host_conn.recv_obj()
     resp_type = resp_obj.type
-    # print 'host_host_fetch response:{}'.format(response)
-    check_response(HOST_FILE_TRANSFER, resp_type)
-    recv_file_tree(resp_obj, cloud, host_conn, db)
+
+    if resp_type == HOST_VERIFY_HOST_FAILURE:
+        mylog('Other host failed to verify our request, "{}"'.format(resp_obj.message), '31')
+    elif resp_type != HOST_FILE_TRANSFER:
+        mylog('Other host did not respond successfully, \n\t response was="{}"'.format(resp_obj))
+    else:
+        # Here we recv a whole bunch of files from the host
+        recv_file_tree(resp_obj, cloud, host_conn, db)
+    mylog('Bottom of go_retrieve')
 
 
 def mirror_usage():

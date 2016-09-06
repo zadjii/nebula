@@ -129,7 +129,7 @@ class Host:
         # for (conn, addr) in self.active_network_obj.connection_queue[:]:
             filter_func(conn, addr)
             num_conns -= 1
-            mylog('processed {} from {}'.format(conn, addr))
+            mylog('processed {} from {}'.format(conn.__class__, addr))
 
     def is_ipv6(self):
         return self.active_network_obj.is_ipv6()

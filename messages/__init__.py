@@ -1,5 +1,6 @@
-# last generated 2016-04-10 21:56:22.306000
+# last generated 2016-09-05 19:18:53.815000
 from messages.BaseMessage import BaseMessage
+from messages.HostVerifyHostFailureMessage import HostVerifyHostFailureMessage
 from messages.InvalidPermissionsMessage import InvalidPermissionsMessage
 from messages.NoActiveHostMessage import NoActiveHostMessage
 from messages.InvalidStateMessage import InvalidStateMessage
@@ -18,7 +19,6 @@ from messages.RemoteHandshakeMessage import RemoteHandshakeMessage
 from messages.RemHandshakeGoFetchMessage import RemHandshakeGoFetchMessage
 from messages.RequestCloudMessage import RequestCloudMessage
 from messages.GoRetrieveHereMessage import GoRetrieveHereMessage
-from messages.PrepareForFetchMessage import PrepareForFetchMessage
 from messages.HostHostFetchMessage import HostHostFetchMessage
 from messages.HostFileTransferMessage import HostFileTransferMessage
 from messages.MakeCloudRequestMessage import MakeCloudRequestMessage
@@ -37,7 +37,6 @@ from messages.ListFilesResponseMessage import ListFilesResponseMessage
 from messages.ReadFileRequestMessage import ReadFileRequestMessage
 from messages.ReadFileResponseMessage import ReadFileResponseMessage
 from messages.ClientSessionRequestMessage import ClientSessionRequestMessage
-from messages.ClientSessionAlertMessage import ClientSessionAlertMessage
 from messages.ClientSessionResponseMessage import ClientSessionResponseMessage
 from messages.ClientFilePutMessage import ClientFilePutMessage
 from messages.ClientFileTransferMessage import ClientFileTransferMessage
@@ -52,4 +51,6 @@ from messages.ClientGetCloudHostsRequestMessage import ClientGetCloudHostsReques
 from messages.ClientGetCloudHostsResponseMessage import ClientGetCloudHostsResponseMessage
 from messages.HostVerifyClientRequestMessage import HostVerifyClientRequestMessage
 from messages.HostVerifyClientSuccessMessage import HostVerifyClientSuccessMessage
+from messages.HostVerifyHostRequestMessage import HostVerifyHostRequestMessage
+from messages.HostVerifyHostSuccessMessage import HostVerifyHostSuccessMessage
 

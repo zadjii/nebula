@@ -16,7 +16,7 @@ from remote.function.client_session_setup import setup_client_session,\
 from remote.function.create import create
 from remote.function.get_hosts import get_hosts_response
 from remote.function.mirror import mirror_complete, host_request_cloud, \
-    client_mirror
+    client_mirror, host_verify_host
 from remote.function.new_user import new_user
 from remote.util import get_user_from_session
 
@@ -61,6 +61,8 @@ def filter_func(connection, address):
         client_mirror(connection, address, msg_obj)
     elif msg_type == HOST_VERIFY_CLIENT_REQUEST:
         host_verify_client(connection, address, msg_obj)
+    elif msg_type == HOST_VERIFY_HOST_REQUEST:
+        host_verify_host(connection, address, msg_obj)
     else:
         print 'I don\'t know what to do with', msg_obj
     connection.close()

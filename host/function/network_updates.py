@@ -1,6 +1,7 @@
 import sys
 from datetime import datetime
 
+from common_util import ResultAndData, send_error_and_close
 from host import get_db, Cloud, IncomingHostEntry
 from host.function.network.client import handle_recv_file_from_client, \
     handle_read_file_request, list_files_handler
@@ -8,43 +9,86 @@ from host.function.network.client import handle_recv_file_from_client, \
 from host.function.recv_files import recv_file_tree
 from host.function.send_files import send_tree
 from host.util import check_response, mylog, validate_host_id
+from messages import HostVerifyHostFailureMessage, HostVerifyHostRequestMessage
 from msg_codes import *
 
 __author__ = 'Mike'
 
-
-def prepare_for_fetch(connection, address, msg_obj):
-    db = get_db()
-    # todo I definitely need to confirm that this is
-    # cont   the remote responsible for the cloud
-    other_id = msg_obj.id
-    cloudname = msg_obj.cname
-    incoming_address = msg_obj.ip
-
-    matching_cloud = db.session.query(Cloud).filter_by(name=cloudname).first()
-    if matching_cloud is None:
-        raise Exception(
-            'Remote told me to prepare for cloudname=\'' + cloudname + '\''
-            + ', however, I don\'t have a matching cloud.'
-        )
-    entry = IncomingHostEntry()
-    entry.their_id_from_remote = other_id
-    entry.created_on = datetime.utcnow()
-    entry.their_address = incoming_address
-    db.session.add(entry)
-    matching_cloud.incoming_hosts.append(entry)
-    db.session.commit()
-    mylog('Prepared for arrival from {} looking for cloud "{}"'.format(
-        entry.their_address, matching_cloud.name
-    ))
+# todo:14 remove this codepath.
+# def prepare_for_fetch(connection, address, msg_obj):
+#     db = get_db()
+#     # todo I definitely need to confirm that this is
+#     # cont   the remote responsible for the cloud
+#     other_id = msg_obj.id
+#     cloudname = msg_obj.cname
+#     incoming_address = msg_obj.ip
+#
+#     matching_cloud = db.session.query(Cloud).filter_by(name=cloudname).first()
+#     if matching_cloud is None:
+#         raise Exception(
+#             'Remote told me to prepare for cloudname=\'' + cloudname + '\''
+#             + ', however, I don\'t have a matching cloud.'
+#         )
+#     entry = IncomingHostEntry()
+#     entry.their_id_from_remote = other_id
+#     entry.created_on = datetime.utcnow()
+#     entry.their_address = incoming_address
+#     db.session.add(entry)
+#     matching_cloud.incoming_hosts.append(entry)
+#     db.session.commit()
+#     mylog('Prepared for arrival from {} looking for cloud "{}"'.format(
+#         entry.their_address, matching_cloud.name
+#     ))
+def verify_host(db, cloud_uname, cname, local_id, other_id):
+    """
+    Returns either (False, error_string) or (True, matching_mirror)
+    """
+    rd = ResultAndData(False, None)
+    # I'm naming this a mirror because that's what it is.
+    # The other host was told to come look for a particular mirror here.
+    # if that mirror isn't here, (but another mirror of that cloud is), don't
+    # process this request.
+    mirror = db.session.query(Cloud).filter_by(my_id_from_remote=local_id).first()
+    if mirror is None:
+        err = 'That mirror isn\'t on this host.'
+        rd = ResultAndData(False, err)
+    else:
+        rd = mirror.get_remote_conn()
+        if rd.success:
+            rem_conn = rd.data
+            msg = HostVerifyHostRequestMessage(local_id, other_id, cloud_uname, cname)
+            try:
+                rem_conn.send_obj(msg)
+                response = rem_conn.recv_obj()
+                if response.type == HOST_VERIFY_HOST_SUCCESS:
+                    rd = ResultAndData(True, mirror)
+                elif response.type == HOST_VERIFY_HOST_FAILURE:
+                    rd = ResultAndData(False, 'Remote responded with failure: "{}"'.format(response.message))
+                else:
+                    rd = ResultAndData(False, 'Unknown error while attempting to verify host')
+            except Exception, e:
+                rd = ResultAndData(False, e)
+    return rd
 
 
 def handle_fetch(connection, address, msg_obj):
     db = get_db()
-    other_id = msg_obj.id
+    # the id's are swapped because they are named from the origin host's POV.
+    other_id = msg_obj.my_id
+    local_id = msg_obj.other_id
     cloudname = msg_obj.cname
+    cloud_uname = None  # todo:15
     requested_root = msg_obj.root
 
+    # todo:14
+    # Go to the remote, ask them if the fetching host is ok'd to be here.
+    rd = verify_host(db, cloud_uname, cloudname, local_id, other_id)
+    if not rd.success:
+        err = HostVerifyHostFailureMessage(rd.data)
+        send_error_and_close(err, connection)
+        return
+
+    matching_mirror = rd.data
     # fuck this is super wrong. fixme.
     # validate host id gets it's clouds, but we don't want that.
     # rd = validate_host_id(db, other_id, connection)
@@ -170,11 +214,8 @@ def filter_func(connection, address):
 
     # NOTE: NEVER REMOTE. NEVER ALLOW REMOTE->HOST.
     try:
-        if msg_type == PREPARE_FOR_FETCH:
-            # todo:14 remove. This is a R->H message.
-            prepare_for_fetch(connection, address, msg_obj)
         # H->H Messages
-        elif msg_type == HOST_HOST_FETCH:
+        if msg_type == HOST_HOST_FETCH:
             handle_fetch(connection, address, msg_obj)
         elif msg_type == HOST_FILE_PUSH:
             handle_recv_file(connection, address, msg_obj)

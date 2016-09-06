@@ -25,8 +25,12 @@
 5   , REQUEST_CLOUD         , int:id    , string:cname  , string:uname  , string:passw
 6   , GO_RETRIEVE_HERE      , int:id    , ip            , int:port # note: purposefully no wsport, this is for H->H only.
 
-7   , PREPARE_FOR_FETCH     , int:id    , string:cname  , ip
-8   , HOST_HOST_FETCH       , int:id    , string:cname  , string:root
+# Note: Prepare for fetch is now deprecated, see GH:14
+# fixme remove from rest of codebase
+# 7   , PREPARE_FOR_FETCH     , int:id    , string:cname  , ip
+
+# HHF is my_id asking other_id for the files at root and below on cloud (uname, cname)
+8   , HOST_HOST_FETCH       , int:my_id    , int:other_id    , string:cloud_uname, string:cname  , string:root
 9   , HOST_FILE_TRANSFER    , int:id    , string:cname  , string:fpath, int:fsize, bool:isdir
 
 10  , MAKE_CLOUD_REQUEST #todo not done
@@ -41,24 +45,27 @@
 
 # 16 GHRp - Manual
 
+# fixme remove from rest of codebase
 #17  , COME_FETCH #still left here for some reason. Dunno really why. cause I was dumb?
 
 18  , REMOVE_FILE           , int:id    , string:cname  , string:fpath
 19  , HOST_FILE_PUSH        , int:tid   , string:cname  , string:fpath # target id? I don't remember....
 
 20  , STAT_FILE_REQUEST     , sid       , string:cname  , string:fpath
-
 # 21 SFRp - Manual
-22  , LIST_FILES_REQUEST    , sid       , string:cname, string:fpath
 
+22  , LIST_FILES_REQUEST    , sid       , string:cname, string:fpath
 # 23 LFRp - Manual
 
 24  , READ_FILE_REQUEST     , sid       , string:cname, string:fpath
 25  , READ_FILE_RESPONSE    , sid       , string:fpath, int:fsize #todo not done
 
 26  , CLIENT_SESSION_REQUEST    , string:uname  , string:passw
-27  , CLIENT_SESSION_ALERT      , sid           , int:uid       ,  ip
 28  , CLIENT_SESSION_RESPONSE   , sid
+
+# Note: Client alert is now deprecated, it was a R->H message
+# fixme remove from rest of codebase
+# 27  , CLIENT_SESSION_ALERT      , sid           , int:uid       ,  ip
 
 29  , CLIENT_FILE_PUT           , sid, string:cname, string:fpath
 30  , CLIENT_FILE_TRANSFER      , sid, string:cname, string:fpath, int:fsize, bool:isdir
@@ -87,6 +94,9 @@
 
 40  , HOST_VERIFY_CLIENT_REQUEST, int:id, sid, string:cloud_uname, string:cname
 41  , HOST_VERIFY_CLIENT_SUCCESS, int:id, sid, string:cloud_uname, string:cname
+
+42  , HOST_VERIFY_HOST_REQUEST, int:my_id, int:their_id, string:cloud_uname, string:cname
+43  , HOST_VERIFY_HOST_SUCCESS, int:my_id, int:their_id, string:cloud_uname, string:cname
 
 ################################################################################
 #manually updated ones:
@@ -171,6 +181,9 @@
 -9  , INVALID_STATE, string:message
 -10 , NO_ACTIVE_HOST, string:cloud_uname, string:cname
 -11 , INVALID_PERMISSIONS, string:message
+# sent both by remote->host during the HVHRq,
+#   then also from H->H in during HOST_HOST_FETCH
+-12 , HOST_VERIFY_HOST_FAILURE, string:message
 
 
 # ideas for this file:

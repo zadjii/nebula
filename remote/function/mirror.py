@@ -1,6 +1,10 @@
-from messages import PrepareForFetchMessage, GoRetrieveHereMessage
+from common_util import send_error_and_close, mylog
+from messages import GoRetrieveHereMessage, \
+    HostVerifyHostFailureMessage, HostVerifyHostSuccessMessage
 from msg_codes import send_generic_error_and_close
 from remote import get_db, Host, Cloud, Session
+from remote.models.HostHostFetchMapping import HostHostFetchMapping
+from remote.util import get_cloud_by_name
 
 
 def mirror_complete(connection, address, msg_obj):
@@ -53,7 +57,7 @@ def host_request_cloud(connection, address, msg_obj):
     # todo  validate the user is an owner of the cloud
     # Here we've established that they are an owner.
     # print 'Here, they will have successfully been able to mirror?'
-    respond_to_mirror_request(connection, address, host_id, match)
+    respond_to_mirror_request(db, connection, address, matching_host, match)
 
 
 def client_mirror(connection, address, msg_obj):
@@ -87,10 +91,10 @@ def client_mirror(connection, address, msg_obj):
         print [owner.username for owner in match.owners.all()]
         raise Exception(user.name + ' is not an owner of ' + cloudname)
     # user is an owner, and the host exists
-    respond_to_mirror_request(connection,address,host_id,match)
+    respond_to_mirror_request(db, connection, address, matching_host, match)
 
 
-def respond_to_mirror_request(connection, address, requester_id, cloud):
+def respond_to_mirror_request(db, connection, address, new_host, cloud):
     """Assumes that the requester has already been validated"""
     ip = '0'
     port = 0
@@ -102,31 +106,86 @@ def respond_to_mirror_request(connection, address, requester_id, cloud):
         # ip = rand_host.ip
         ip = rand_host.ipv6
         port = rand_host.port
-        # msg = PrepareForFetchMessage(host_id, cloudname, address[0]) # ipv4, old
-        msg = PrepareForFetchMessage(requester_id, cloud.name, ip) # ipv6
-        # fixme ssl up in here
-        # rand_host.send_msg(msg)
-        # mylog('Not telling [{}]<{}> about [{}]<{}>'.format(
-        #     rand_host.id, rand_host.ipv6, matching_host.id, matching_host.ipv6))
-        # prep_for_fetch_msg = make_prepare_for_fetch_json(host_id, cloudname, address[0])
-        # rand_host.send_msg(prep_for_fetch_msg)
 
-        # port = rand_host.port
-        # print 'rand host is ({},{})'.format(ip, port)
-        # context = SSL.Context(SSL.SSLv23_METHOD)
-        # context.use_privatekey_file(KEY_FILE)
-        # context.use_certificate_file(CERT_FILE)
-        # s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        #
-        # # s = SSL.Connection(context, s)
-        # # whatever fuck it lets just assume it's good todo
-        #
-        # s.connect((ip, port))
-        # send_msg(prep_for_fetch_msg, s)
-        # print 'nebr completed talking to rand_host'
-        # s.close()
-    msg = GoRetrieveHereMessage(0, ip, port)
+        # todo:14 - Remove PrepareForFetch.
+        # Here we have to do what we did with HostClientVerify.
+        # The remote now makes an entry saying that the requester is going to
+        # rand_host. When the rand_host gets the HostHostFetch, then they'll ask
+        # the remote if that host was told to fetch from rand_host.
+        # we'll look up the entry, and return success/fail.
+        # HostHostFetch may in the future be also used for bulk syncing the
+        # mirror. We'd have to make sure a similar entry exists in that
+        # scenario.
+        mapping = HostHostFetchMapping(rand_host, new_host, cloud)
+        db.session.add(mapping)
+        db.session.commit()
+        mylog('Created a host mapping [{}]->[{}] for {}'.format(
+            rand_host.id
+            , new_host.id
+            , (cloud.creator_name(), cloud.name)), '34;103')
+        # msg = PrepareForFetchMessage(requester_id, cloud.name, ip) # ipv6
+
+    msg = GoRetrieveHereMessage(0 if rand_host is None else rand_host.id, ip, port)
     connection.send_obj(msg)
     # send_msg(make_go_retrieve_here_json(0, ip, port), connection)
 
     print 'nebr has reached the end of host_request_cloud'
+
+
+def host_verify_host(connection, address, msg_obj):
+    db = get_db()
+    # the receiver recieved the HHF message, the sender sent it.
+    # the receiver is the old mirror, the sender is the new mirror
+    reciever_id = msg_obj.my_id
+    sender_id = msg_obj.their_id
+    cloud_uname = msg_obj.cloud_uname
+    cloudname = msg_obj.cname
+    cloud = get_cloud_by_name(db, cloud_uname, cloudname)
+    if cloud is None:
+        msg = 'No matching cloud {}'.format((cloud_uname, cloudname))
+        err = HostVerifyHostFailureMessage(msg)
+        send_error_and_close(err, connection)
+        return
+
+    mappings = db.session.query(HostHostFetchMapping)
+    # mylog('mappings 1 = {}'.format([(mapping.old_host_id, mapping.new_host_id)
+    #                                 for mapping in mappings.all()]))
+    mappings = mappings.filter_by(
+        old_host_id=reciever_id
+        , new_host_id=sender_id
+        , cloud_id=cloud.id)
+
+    # mylog('mappings 2 = {}'.format([(mapping.old_host_id, mapping.new_host_id)
+    #                                 for mapping in mappings.all()]))
+
+    # mylog('Number of mappings={}'.format(mappings.count()))
+    found_mapping = None
+
+    for mapping in mappings.all():
+        if mapping.has_timed_out():
+            # mylog('a mapping timed out, deleting')
+            db.session.delete(mapping)
+        elif found_mapping is None:
+            found_mapping = mapping
+            # mylog('found matching mapping')
+        else:  # a valid mapping that's a duplicate
+            # mylog('duplicate mapping, deleting')
+            db.session.delete(mapping)
+    db.session.commit()
+    if found_mapping is not None:
+        msg = HostVerifyHostSuccessMessage(reciever_id, sender_id, cloud_uname, cloudname)
+        connection.send_obj(msg)
+    else:
+        msg = 'No matching host mapping [{}]->[{}] for {}'.format(
+            reciever_id
+            , sender_id
+            , (cloud_uname, cloudname))
+        mylog('ERR:{}, {}'.format(msg, mappings.all()))
+        err = HostVerifyHostFailureMessage(msg)
+        send_error_and_close(err, connection)
+        return
+
+
+
+
+
