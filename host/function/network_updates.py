@@ -14,31 +14,6 @@ from msg_codes import *
 
 __author__ = 'Mike'
 
-# todo:14 remove this codepath.
-# def prepare_for_fetch(connection, address, msg_obj):
-#     db = get_db()
-#     # todo I definitely need to confirm that this is
-#     # cont   the remote responsible for the cloud
-#     other_id = msg_obj.id
-#     cloudname = msg_obj.cname
-#     incoming_address = msg_obj.ip
-#
-#     matching_cloud = db.session.query(Cloud).filter_by(name=cloudname).first()
-#     if matching_cloud is None:
-#         raise Exception(
-#             'Remote told me to prepare for cloudname=\'' + cloudname + '\''
-#             + ', however, I don\'t have a matching cloud.'
-#         )
-#     entry = IncomingHostEntry()
-#     entry.their_id_from_remote = other_id
-#     entry.created_on = datetime.utcnow()
-#     entry.their_address = incoming_address
-#     db.session.add(entry)
-#     matching_cloud.incoming_hosts.append(entry)
-#     db.session.commit()
-#     mylog('Prepared for arrival from {} looking for cloud "{}"'.format(
-#         entry.their_address, matching_cloud.name
-#     ))
 def verify_host(db, cloud_uname, cname, local_id, other_id):
     """
     Returns either (False, error_string) or (True, matching_mirror)
@@ -80,7 +55,6 @@ def handle_fetch(connection, address, msg_obj):
     cloud_uname = None  # todo:15
     requested_root = msg_obj.root
 
-    # todo:14
     # Go to the remote, ask them if the fetching host is ok'd to be here.
     rd = verify_host(db, cloud_uname, cloudname, local_id, other_id)
     if not rd.success:
@@ -89,56 +63,16 @@ def handle_fetch(connection, address, msg_obj):
         return
 
     matching_mirror = rd.data
-    # fuck this is super wrong. fixme.
-    # validate host id gets it's clouds, but we don't want that.
-    # rd = validate_host_id(db, other_id, connection)
-    # validate_host_id will raise an exception if there is no cloud
-    # matching_id_clouds = rd.data
 
-    # fixme just temporarily re-enabling the old codepath until I figure this out.
-    matching_id_clouds = db.session.query(Cloud)\
-        .filter(Cloud.my_id_from_remote != other_id)\
-        .filter_by(completed_mirroring=True)
-    if matching_id_clouds.count() <= 0:
-        send_generic_error_and_close(connection)
-        raise Exception(
-            'Received a message intended from id={},'
-            ' but I don\'t have any clouds with that DON\'T have that id'
-            .format(other_id)
-        )
-
-    matching_cloud = matching_id_clouds.filter_by(name=cloudname).first()
-    if matching_cloud is None:
-        send_generic_error_and_close(connection)
-        raise Exception(
-            'host came asking for cloudname=\'' + cloudname + '\''
-            + ', however, I don\'t have a matching cloud.'
-        )
     their_ip = address[0]
-    mylog('skipping IncomingHost authorization in handle_fetch')
     mylog('The connected host is via IP="{}"'.format(their_ip))
-    # matching_entry = db.session.query(IncomingHostEntry).filter_by(their_address=their_ip).first()
-    #
-    # # todo: I haven't confirmed their ID yet...
-    # # cont just that I have a cloud that DOESNT have that id
-    # if matching_entry is None:
-    #     send_unprepared_host_error_and_close(connection)
-    #     raise Exception(
-    #         'host came asking for cloudname=\'' + cloudname + '\''
-    #         + ', but I was not told to expect them.'
-    #     )
 
-    # connection.send('CONGRATULATIONS! You did it!')
-    print 'I SUCCESSFULLY TALKED TO ANOTHER HOST!!!!'
-
-    send_tree(other_id, matching_cloud, requested_root, connection)
+    send_tree(other_id, matching_mirror, requested_root, connection)
+    mylog('Bottom of handle_fetch', '32')
 
 
 def handle_recv_file(connection, address, msg_obj):
     db = get_db()
-    # my_id = msg_obj['tid']
-    # cloudname = msg_obj['cname']
-    # updated_file = msg_obj['fpath']
     my_id = msg_obj.tid
     cloudname = msg_obj.cname
     updated_file = msg_obj.fpath
