@@ -107,12 +107,12 @@ def respond_to_mirror_request(db, connection, address, new_host, cloud):
         ip = rand_host.ipv6
         port = rand_host.port
 
-        # todo:14 - Remove PrepareForFetch.
         # Here we have to do what we did with HostClientVerify.
         # The remote now makes an entry saying that the requester is going to
         # rand_host. When the rand_host gets the HostHostFetch, then they'll ask
         # the remote if that host was told to fetch from rand_host.
         # we'll look up the entry, and return success/fail.
+        #
         # HostHostFetch may in the future be also used for bulk syncing the
         # mirror. We'd have to make sure a similar entry exists in that
         # scenario.
@@ -123,7 +123,7 @@ def respond_to_mirror_request(db, connection, address, new_host, cloud):
             rand_host.id
             , new_host.id
             , (cloud.creator_name(), cloud.name)), '34;103')
-        # msg = PrepareForFetchMessage(requester_id, cloud.name, ip) # ipv6
+        # see `host_verify_host`
 
     msg = GoRetrieveHereMessage(0 if rand_host is None else rand_host.id, ip, port)
     connection.send_obj(msg)
