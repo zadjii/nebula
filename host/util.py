@@ -1,5 +1,6 @@
 import socket
 import ssl
+import os
 from netifaces import interfaces, ifaddresses, AF_INET6
 # from host import Cloud
 from host.models.Client import Client
@@ -30,26 +31,28 @@ def get_matching_clouds(db, host_id):
         rd = ResultAndData(True, matching_id_clouds)
     return rd
 
-def ip6_list():
+
+def all_ip6_list():
     ip_list = []
     for interface in interfaces():
         for link in ifaddresses(interface)[AF_INET6]:
             ip_list.append(link['addr'])
+    # add ::1 to the end of the list so if we're in debug mode, its only a last resort.
+    if '::1' in ip_list:
+        ip_list.remove('::1')
+        ip_list.append('::1')
     return ip_list
+
 
 def get_ipv6_list():
     """Returns all suitable (public) ipv6 addresses for this host"""
-    return [ip for ip in ip6_list() if (not '%' in ip) and (not ip == '::1') ]
-    #addr_info = socket.getaddrinfo(socket.gethostname(), None)
-    #ipv6_addresses = []
-    #for iface in addr_info:
-    #    if iface[0] == socket.AF_INET6:
-    #        if iface[4][3] == 0: # if the zoneid is 0, indicating global ipv6
-    #            ipv6_addresses.append(iface[4])
-    #valid_global_ipv6s = [ipaddr[0] for ipaddr in ipv6_addresses]
-    #if (len(valid_global_ipv6s)) == 0:
-    #    valid_global_ipv6s = ['::1']  # FIXME wow I shouldn't have to explain why this is bad.
-    #return valid_global_ipv6s
+    valid_ips = [ip for ip in all_ip6_list() if ('%' not in ip)]
+    # todo: remove this from the Release build  of nebula, so the conditional
+    #   is never even checked.
+    if os.environ['NEBULA_LOCAL_DEBUG']:
+        return valid_ips
+    else:
+        return [ip for ip in valid_ips if (not ip == '::1')]
 
 
 def check_response(expected, recieved):
