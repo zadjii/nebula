@@ -1,4 +1,6 @@
+import os
 import sys
+import signal
 from connections.WebSocketConnection import MyBigFuckingLieServerProtocol
 from connections.RawConnection import RawConnection
 from host import HOST_WS_HOST, HOST_WS_PORT, get_db
@@ -31,6 +33,8 @@ class Host:
         self.active_network_thread = None
         self.active_ws_thread = None
         self.network_queue = []  # all the queued connections to handle.
+        self._shutdown_requested = False
+        self._local_update_thread = None
 
     def start(self, argv):
         set_mylog_name('nebs')
@@ -48,11 +52,21 @@ class Host:
         finally:
             self.shutdown()
 
-        print 'Both the local update checking thread and the network thread have exited.'
+        mylog('Both the local update checking thread and the network thread'
+              ' have exited.')
         sys.exit()
 
     def do_local_updates(self):
-        local_update_thread(self)
+        # signal.signal(signal.CTRL_C_EVENT, self.shutdown())
+        signal.signal(signal.SIGINT, self.shutdown)
+        signal.signal(signal.SIGTERM, self.shutdown)
+
+        # local_update_thread(self)
+        self._local_update_thread = Thread(
+            target=local_update_thread, args=[self]
+        )
+        self._local_update_thread.start()
+        self._local_update_thread.join()
 
     def spawn_net_thread(self, ipv6_address):
         if self.active_network_obj is not None:
@@ -77,9 +91,15 @@ class Host:
         else:
             return None
 
+    def is_shutdown_requested(self):
+        return self._shutdown_requested
+
     def shutdown(self):
+        self._shutdown_requested = True
         if self.active_network_obj is not None:
             self.active_network_obj.shutdown()
+        if self._local_update_thread is not None:
+            self._local_update_thread.join()
 
     def change_ip(self, new_ip, clouds):
         if new_ip is None:

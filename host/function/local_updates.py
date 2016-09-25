@@ -195,7 +195,7 @@ def local_update_thread(host_obj):
     #     host_obj.send_remote_handshake(cloud)
     last_handshake = datetime.utcnow()
     db.session.close()
-    while True:
+    while not host_obj.is_shutdown_requested():
         # process all of the incoming requests first
         host_obj.process_connections()
 
@@ -239,5 +239,4 @@ def local_update_thread(host_obj):
         db.session.close()
         time.sleep(1)  # todo: This should be replaced with something
         # cont that actually alerts the process as opposed to just sleep/wake
-
 

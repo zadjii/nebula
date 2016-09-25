@@ -37,7 +37,8 @@ def all_ip6_list():
     for interface in interfaces():
         for link in ifaddresses(interface)[AF_INET6]:
             ip_list.append(link['addr'])
-    # add ::1 to the end of the list so if we're in debug mode, its only a last resort.
+    # add ::1 to the end of the list so if we're in debug mode,
+    #  its only a last resort.
     if '::1' in ip_list:
         ip_list.remove('::1')
         ip_list.append('::1')
@@ -49,7 +50,7 @@ def get_ipv6_list():
     valid_ips = [ip for ip in all_ip6_list() if ('%' not in ip)]
     # todo: remove this from the Release build  of nebula, so the conditional
     #   is never even checked.
-    if os.environ['NEBULA_LOCAL_DEBUG']:
+    if os.environ.get('NEBULA_LOCAL_DEBUG', False):
         return valid_ips
     else:
         return [ip for ip in valid_ips if (not ip == '::1')]
@@ -57,7 +58,8 @@ def get_ipv6_list():
 
 def check_response(expected, recieved):
     if not(int(expected) == int(recieved)):
-        raise Exception('Received wrong msg-code, expected',expected,', received',recieved)
+        raise Exception('Received wrong msg-code, '
+                        'expected {}, recieved {}'.format(expected, recieved))
 
 
 def get_clouds_by_name(db, uname, cname):

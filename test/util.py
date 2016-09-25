@@ -88,7 +88,8 @@ def make_fresh_test_env():
         # host_1 = hosts[1]
         print '\x1b[30;42m##### READY TO GO #####\x1b[0m'
         host_0.wait()
-        host_1.wait()
+        # host_1.wait() # host 1 actually probably died a while ago, it just
+        # mirrors then stops
         remote.wait()
     except Exception, e:
         teardown_children([host_0, host_1, remote])
