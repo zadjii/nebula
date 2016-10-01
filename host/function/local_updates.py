@@ -61,7 +61,7 @@ def update_peer(cloud, host, updates):
     complete_sending_files(host_id, cloud, None, raw_connection)
 
 
-def local_file_create(directory_path, dir_node, filename, db):
+def local_file_create(host_obj, directory_path, dir_node, filename, db):
     # print '\t\tAdding',filename,'to filenode for',dir_node.name
     file_pathname = os.path.join(directory_path, filename)
     file_stat = os.stat(file_pathname)
@@ -80,17 +80,27 @@ def local_file_create(directory_path, dir_node, filename, db):
         filenode.cloud = dir_node
     dir_node.children.append(filenode)
     db.session.commit()
+
+    # Theoretically, the private data should have already been loaded or created.
+    # I guess the first time that the private data is generated, this happens.
+    # Might actually cause the host to write the .nebs, then read it right back in.
+    # Not really the worst.
+    if host_obj.is_private_data_file(file_pathname, filenode.cloud):
+        host_obj.reload_private_data(filenode.cloud)
+
     updates = [(FILE_CREATE, file_pathname)]
     if S_ISDIR(mode):  # It's a directory, recurse into it
         # use the directory's node as the new root.
-        rec_updates = recursive_local_modifications_check(file_pathname, filenode, db)
+        rec_updates = recursive_local_modifications_check(host_obj, file_pathname, filenode, db)
         updates.extend(rec_updates)
         db.session.commit()
     return updates
 
 
-def local_file_update(directory_path, dir_node, filename, filenode, db):
+def local_file_update(host_obj, directory_path, dir_node, filename, filenode, db):
     file_pathname = os.path.join(directory_path, filename)
+    if host_obj.is_private_data_file(file_pathname, filenode.cloud):
+        host_obj.reload_private_data(filenode.cloud)
     file_stat = os.stat(file_pathname)
     file_modified = datetime.utcfromtimestamp( file_stat.st_mtime)
     mode = file_stat.st_mode
@@ -112,7 +122,7 @@ def local_file_update(directory_path, dir_node, filename, filenode, db):
         # mylog('[{}]<{}> wasnt updated'.format(filenode.id, file_pathname))
     if S_ISDIR(mode):  # It's a directory, recurse into it
         # use the directory's node as the new root.
-        rec_updates = recursive_local_modifications_check(file_pathname, filenode, db)
+        rec_updates = recursive_local_modifications_check(host_obj, file_pathname, filenode, db)
         db.session.commit()
         updates.extend(rec_updates)
     return updates
@@ -123,7 +133,7 @@ FILE_UPDATE = 1
 FILE_DELETE = 2
 
 
-def recursive_local_modifications_check(directory_path, dir_node, db):
+def recursive_local_modifications_check(host_obj, directory_path, dir_node, db):
     files = sorted(os.listdir(directory_path), key=lambda filename: filename, reverse=False)
     nodes = dir_node.children.all()
     nodes = sorted(nodes, key=lambda node: node.name, reverse=False)
@@ -135,12 +145,12 @@ def recursive_local_modifications_check(directory_path, dir_node, db):
     updates = []
     while (i < num_files) and (j < num_nodes):
         if files[i] == nodes[j].name:
-            update_updates = local_file_update(directory_path, dir_node, files[i], nodes[j], db)
+            update_updates = local_file_update(host_obj, directory_path, dir_node, files[i], nodes[j], db)
             updates.extend(update_updates)
             i += 1
             j += 1
         elif files[i] < nodes[j].name:
-            create_updates = local_file_create(directory_path, dir_node, files[i], db)
+            create_updates = local_file_create(host_obj, directory_path, dir_node, files[i], db)
             updates.extend(create_updates)
             i += 1
         elif files[i] > nodes[j].name:  # redundant if clause, there for clarity
@@ -149,7 +159,7 @@ def recursive_local_modifications_check(directory_path, dir_node, db):
             j += 1
     while i < num_files:  # create the rest of the files
         # print 'finishing', (num_files-i), 'files'
-        create_updates = local_file_create(directory_path, dir_node, files[i], db)
+        create_updates = local_file_create(host_obj, directory_path, dir_node, files[i], db)
         updates.extend(create_updates)
         i += 1
     # todo handle j < num_nodes, bulk end deletes
@@ -160,9 +170,9 @@ def recursive_local_modifications_check(directory_path, dir_node, db):
     return updates
 
 
-def check_local_modifications(cloud, db):
+def check_local_modifications(host_obj, cloud, db):
     root = cloud.root_directory
-    updates = recursive_local_modifications_check(root, cloud, db)
+    updates = recursive_local_modifications_check(host_obj, root, cloud, db)
     if len(updates) > 0:
         send_updates(cloud, updates)
 
@@ -220,14 +230,19 @@ def local_update_thread(host_obj):
         if num_clouds_mirrored < mirrored_clouds.count():
             mylog('checking for updates on {}'.format([cloud.my_id_from_remote for cloud in all_mirrored_clouds]))
             num_clouds_mirrored = mirrored_clouds.count()
-            # if the number of clouds is different, handshake all of them
+            # if the number of clouds is different:
+            # - handshake all of them
+            # - Load the private data for any new ones into memory
             for cloud in all_mirrored_clouds:
+                # load_private_data doesn't duplicate existing data
+                host_obj.load_private_data(cloud)
                 host_obj.send_remote_handshake(cloud)
+
             last_handshake = datetime.utcnow()
 
         # scan the tree for updates
         for cloud in all_mirrored_clouds:
-            check_local_modifications(cloud, db)
+            check_local_modifications(host_obj, cloud, db)
 
         # if more that 30s have passed since the last handshake, handshake
         delta = datetime.utcnow() - last_handshake

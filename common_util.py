@@ -42,3 +42,24 @@ def enable_vt_support():
 def send_error_and_close(message, connection):
     connection.send_obj(message)
     connection.close()
+
+
+def get_path_elements(filepath):
+    drive, path = os.path.splitdrive(filepath)
+    # note: Don't do these two.
+    # path, ext = os.path.splitext(path)
+    # path = os.path.normpath(path)
+    # note: a trailing slash fucks this shit up. If it's a dir, just don't leave
+    # the training slash.
+    dirs = []
+    while(True):
+        head, tail = os.path.split(path)
+        if tail != '':
+            dirs.append(tail)
+        else:
+            if head != '':
+                dirs.append(head)
+            break
+        path = head
+    dirs.reverse()
+    return dirs

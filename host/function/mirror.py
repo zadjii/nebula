@@ -234,6 +234,7 @@ def mirror(argv):
     #     , new_rem_sock
     # )
     remote_conn.send_obj(msg)
+
     cloud.completed_mirroring = True
     db.session.commit()
 

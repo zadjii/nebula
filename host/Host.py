@@ -1,27 +1,18 @@
+import collections
 import os
-import sys
 import signal
-from connections.WebSocketConnection import MyBigFuckingLieServerProtocol
-from connections.RawConnection import RawConnection
-from host import HOST_WS_HOST, HOST_WS_PORT, get_db
-from host.NetworkThread import NetworkThread
-from host.function.dbg_nodes import dbg_nodes
-from host.models import Cloud
-from host.util import set_mylog_name, mylog, get_ipv6_list, setup_remote_socket, \
-    enable_vt_support
-from messages.HostHandshakeMessage import  HostHandshakeMessage
+import sys
 from threading import Thread
-from host.function.mirror import mirror
-from host.function.tree import db_tree, tree
-from host.function.list_clouds import list_clouds
+
+from connections.RawConnection import RawConnection
+from host import get_db
+from host.NetworkThread import NetworkThread
+from host.PrivateData import PrivateData
 from host.function.local_updates import local_update_thread
 from host.function.network_updates import filter_func
-
-# try:
-#     import asyncio
-# except ImportError:  # Trollius >= 0.3 was renamed
-#     import trollius as asyncio
-# from autobahn.asyncio.websocket import WebSocketServerFactory
+from host.models.Cloud import Cloud
+from host.util import set_mylog_name, mylog, get_ipv6_list, setup_remote_socket
+from messages.HostHandshakeMessage import  HostHandshakeMessage
 import platform
 
 __author__ = 'Mike'
@@ -35,10 +26,22 @@ class Host:
         self.network_queue = []  # all the queued connections to handle.
         self._shutdown_requested = False
         self._local_update_thread = None
+        self._private_data = {} # cloud.my_id_from_remote -> PrivateData mapping
+        # self._private_data = collections.MutableMapping()
 
     def start(self, argv):
         set_mylog_name('nebs')
         # todo process start() args here
+
+        # read in all the .nebs
+        db = get_db()
+        for cloud in db.session.query(Cloud).all():
+            self.load_private_data(cloud)
+
+        # if the mirror was completed before we started, great. We add their
+        # .nebs at launch, no problem.
+        # what if we complete mirroring while we're running?
+        #   regardless if it has a .nebs (existing) or not (new/1st mirror)
 
         ipv6_addresses = get_ipv6_list()
         if len(ipv6_addresses) < 1:
@@ -154,51 +157,44 @@ class Host:
     def is_ipv6(self):
         return self.active_network_obj.is_ipv6()
 
+    def has_private_data(self, cloud):
+        return cloud.my_id_from_remote in self._private_data
 
-def start(argv):
-    host_controller = Host()
-    host_controller.start(argv=argv)
+    def get_private_data(self, cloud):
+        if self.has_private_data(cloud):
+            return self._private_data[cloud.my_id_from_remote]
+        return None
 
+    def load_private_data(self, cloud):
+        """
+        Doesn't create duplicate data for existing PrivateData
+        :param cloud:
+        :return:
+        """
+        if not self.has_private_data(cloud):
+            # the PrivateData ctor reads existing ones, or creates new ones.
+            if cloud.completed_mirroring:
+                self._private_data[cloud.my_id_from_remote] = PrivateData(cloud)
 
-commands = {
-    'mirror': mirror
-    , 'start': start
-    , 'list-clouds': list_clouds
-    , 'tree': tree
-    , 'db-tree': db_tree
-    , 'dbg-nodes': dbg_nodes
-}
-command_descriptions = {
-    'mirror': '\t\tmirror a remote cloud to this device'
-    , 'start': '\t\tstart the main thread checking for updates'
-    , 'list-clouds': '\tlist all current clouds'
-    , 'tree': '\t\tdisplays the file structure of a cloud on this host.'
-    , 'db-tree': '\tdisplays the db structure of a cloud on this host.'
-}
+    def reload_private_data(self, cloud):
+        """
+        Updates the PrivateData for this cloud. If it already exists, replaces it.
+        :param cloud:
+        :return:
+        """
+        # the PrivateData ctor reads existing ones, or creates new ones.
+        if cloud.completed_mirroring:
+            self._private_data[cloud.my_id_from_remote] = PrivateData(cloud)
 
+    def is_private_data_file(self, path, cloud=None):
+        if cloud is None:
+            # todo: this is pretty untested. Write some tests that make sure
+            db = get_db()
+            for cloud2 in db.session.query(Cloud).all():
+                if cloud2.root_directory == os.path.commonprefix(cloud2.root_directory, path):
+                    cloud = cloud2
+                    break
+        if cloud is None:
+            return None
+        return os.path.join(cloud.root_directory, '.nebs') == path
 
-def usage(argv):
-    print 'usage: nebs <command>'
-    print ''
-    print 'The available commands are:'
-    for command in command_descriptions.keys():
-        print '\t', command, command_descriptions[command]
-
-
-def nebs_main(argv):
-    # if there weren't any args, print the usage and return
-    if len(argv) < 2:
-        usage(argv)
-        sys.exit(0)
-
-    command = argv[1]
-
-    selected = commands.get(command, usage)
-    enable_vt_support()
-    result = selected(argv[2:])
-    result = 0 if result is None else result
-    sys.exit(result)
-
-
-if __name__ == '__main__':
-    nebs_main(sys.argv)
