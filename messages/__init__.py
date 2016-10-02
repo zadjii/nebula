@@ -1,5 +1,7 @@
-# last generated 2016-09-05 19:18:53.815000
+# last generated 2016-10-01 23:26:41.788000
 from messages.BaseMessage import BaseMessage
+from messages.SystemFileWriteErrorMessage import SystemFileWriteErrorMessage
+from messages.UnknownIoErrorMessage import UnknownIoErrorMessage
 from messages.HostVerifyHostFailureMessage import HostVerifyHostFailureMessage
 from messages.InvalidPermissionsMessage import InvalidPermissionsMessage
 from messages.NoActiveHostMessage import NoActiveHostMessage
@@ -28,6 +30,7 @@ from messages.MakeUserResponseMessage import MakeUserResponseMessage
 from messages.MirroringCompleteMessage import MirroringCompleteMessage
 from messages.GetHostsRequestMessage import GetHostsRequestMessage
 from messages.GetHostsResponseMessage import GetHostsResponseMessage
+from messages.FileTransferSuccessMessage import FileTransferSuccessMessage
 from messages.RemoveFileMessage import RemoveFileMessage
 from messages.HostFilePushMessage import HostFilePushMessage
 from messages.StatFileRequestMessage import StatFileRequestMessage

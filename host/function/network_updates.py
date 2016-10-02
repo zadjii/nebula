@@ -1,10 +1,5 @@
-import sys
-from datetime import datetime
-
 from common_util import ResultAndData, send_error_and_close
-from host import get_db, Cloud, IncomingHostEntry
-from host.function.network.client import handle_recv_file_from_client, \
-    handle_read_file_request, list_files_handler
+from host import get_db, Cloud
 # from host.function.network.ls_handler import list_files_handler
 from host.function.recv_files import recv_file_tree
 from host.function.send_files import send_tree
@@ -46,7 +41,7 @@ def verify_host(db, cloud_uname, cname, local_id, other_id):
     return rd
 
 
-def handle_fetch(connection, address, msg_obj):
+def handle_fetch(host_obj, connection, address, msg_obj):
     db = get_db()
     # the id's are swapped because they are named from the origin host's POV.
     other_id = msg_obj.my_id
@@ -71,7 +66,7 @@ def handle_fetch(connection, address, msg_obj):
     mylog('Bottom of handle_fetch', '32')
 
 
-def handle_recv_file(connection, address, msg_obj):
+def handle_recv_file(host_obj, connection, address, msg_obj):
     db = get_db()
     my_id = msg_obj.tid
     cloudname = msg_obj.cname
@@ -111,12 +106,12 @@ def handle_recv_file(connection, address, msg_obj):
     # print 'host_host_fetch response:{}'.format(response)
     check_response(HOST_FILE_TRANSFER, resp_type)
 
-    recv_file_tree(resp_obj, matching_cloud, connection, db)
+    recv_file_tree(host_obj, resp_obj, matching_cloud, connection, db)
     mylog('[{}]bottom of handle_recv_file(...,{})'
           .format(my_id, msg_obj.__dict__))
 
 
-def handle_remove_file(connection, address, msg_obj):
+def handle_remove_file(host_obj, connection, address, msg_obj):
     db = get_db()
     my_id = msg_obj.tid
     cloudname = msg_obj.cname
@@ -135,44 +130,6 @@ def handle_remove_file(connection, address, msg_obj):
             'host came asking for cloudname=\'' + cloudname + '\''
             + ', however, I don\'t have a matching cloud.'
         )
-
-def filter_func(connection, address):
-    # fixme: Failing to decode the message should not bring the entire system down.
-    # cont: should gracefully ignore and close connection
-    msg_obj = connection.recv_obj()
-    mylog('<{}>msg:{}'.format(address, msg_obj.__dict__))
-    msg_type = msg_obj.type
-    # print 'The message is', msg_obj
-    # todo we should make sure the connection was from the remote or a client
-    # cont   that we were told about here, before doing ANY processing.
-
-    # NOTE: NEVER REMOTE. NEVER ALLOW REMOTE->HOST.
-    try:
-        # H->H Messages
-        if msg_type == HOST_HOST_FETCH:
-            handle_fetch(connection, address, msg_obj)
-        elif msg_type == HOST_FILE_PUSH:
-            handle_recv_file(connection, address, msg_obj)
-        elif msg_type == REMOVE_FILE:
-            handle_remove_file(connection, address, msg_obj)
-        # ----------------------- C->H Messages ----------------------- #
-        # elif msg_type == CLIENT_SESSION_ALERT:
-        #     handle_client_session_alert(connection, address, msg_obj)
-        elif msg_type == STAT_FILE_REQUEST:
-            # todo:2 REALLY? This still isnt here? I guess list files does it...
-            pass
-        elif msg_type == LIST_FILES_REQUEST:
-            list_files_handler(connection, address, msg_obj)
-        elif msg_type == CLIENT_FILE_PUT:
-            handle_recv_file_from_client(connection, address, msg_obj)
-        elif msg_type == READ_FILE_REQUEST:
-            handle_read_file_request(connection, address, msg_obj)
-        else:
-            mylog('I don\'t know what to do with {},\n{}'.format(msg_obj, msg_obj.__dict__))
-    except Exception, e:
-        sys.stderr.write(e.message + '\n')
-
-    connection.close()
 
 # todo make this work... later
 # def filter_func2(connection, address):

@@ -48,6 +48,10 @@
 # fixme remove from rest of codebase
 #17  , COME_FETCH #still left here for some reason. Dunno really why. cause I was dumb?
 
+# Used for both H->H and C->H transfers. Should be sent in response to each file.
+#todo:23
+17  , FILE_TRANSFER_SUCCESS , string:cloud_uname, string:cname, string:fpath
+
 18  , REMOVE_FILE           , int:id    , string:cname  , string:fpath
 19  , HOST_FILE_PUSH        , int:tid   , string:cname  , string:fpath # target id? I don't remember....
 
@@ -93,7 +97,8 @@
 39  , CLIENT_GET_CLOUD_HOSTS_RESPONSE     , sid, blob:hosts
 
 40  , HOST_VERIFY_CLIENT_REQUEST, int:id, sid, string:cloud_uname, string:cname
-41  , HOST_VERIFY_CLIENT_SUCCESS, int:id, sid, string:cloud_uname, string:cname
+# The user ID is to tell the host the user's ID, for file auth purposes
+41  , HOST_VERIFY_CLIENT_SUCCESS, int:id, sid, string:cloud_uname, string:cname, int:user_id
 
 42  , HOST_VERIFY_HOST_REQUEST, int:my_id, int:their_id, string:cloud_uname, string:cname
 43  , HOST_VERIFY_HOST_SUCCESS, int:my_id, int:their_id, string:cloud_uname, string:cname
@@ -184,6 +189,9 @@
 # sent both by remote->host during the HVHRq,
 #   then also from H->H in during HOST_HOST_FETCH
 -12 , HOST_VERIFY_HOST_FAILURE, string:message
+-13 , UNKNOWN_IO_ERROR, string:message
+# Used to reject client writes of .nebs files. Clients can read, but not write.
+-14 , SYSTEM_FILE_WRITE_ERROR, string:message
 
 
 # ideas for this file:

@@ -81,9 +81,10 @@ def local_file_create(host_obj, directory_path, dir_node, filename, db):
     dir_node.children.append(filenode)
     db.session.commit()
 
-    # Theoretically, the private data should have already been loaded or created.
-    # I guess the first time that the private data is generated, this happens.
-    # Might actually cause the host to write the .nebs, then read it right back in.
+    # Theoretically, the private data should have already been loaded or
+    # created. I guess the first time that the private data is generated, this
+    # happens. Might actually cause the host to write the .nebs, then read it
+    # right back in.
     # Not really the worst.
     if host_obj.is_private_data_file(file_pathname, filenode.cloud):
         host_obj.reload_private_data(filenode.cloud)
@@ -91,7 +92,10 @@ def local_file_create(host_obj, directory_path, dir_node, filename, db):
     updates = [(FILE_CREATE, file_pathname)]
     if S_ISDIR(mode):  # It's a directory, recurse into it
         # use the directory's node as the new root.
-        rec_updates = recursive_local_modifications_check(host_obj, file_pathname, filenode, db)
+        rec_updates = recursive_local_modifications_check(host_obj,
+                                                          file_pathname,
+                                                          filenode,
+                                                          db)
         updates.extend(rec_updates)
         db.session.commit()
     return updates
@@ -99,8 +103,6 @@ def local_file_create(host_obj, directory_path, dir_node, filename, db):
 
 def local_file_update(host_obj, directory_path, dir_node, filename, filenode, db):
     file_pathname = os.path.join(directory_path, filename)
-    if host_obj.is_private_data_file(file_pathname, filenode.cloud):
-        host_obj.reload_private_data(filenode.cloud)
     file_stat = os.stat(file_pathname)
     file_modified = datetime.utcfromtimestamp( file_stat.st_mtime)
     mode = file_stat.st_mode
@@ -117,6 +119,8 @@ def local_file_update(host_obj, directory_path, dir_node, filename, filenode, db
         filenode.last_modified = file_modified
         db.session.commit()
         updates.append((FILE_UPDATE, file_pathname))
+        if host_obj.is_private_data_file(file_pathname, filenode.cloud):
+            host_obj.reload_private_data(filenode.cloud)
 
         # else:
         # mylog('[{}]<{}> wasnt updated'.format(filenode.id, file_pathname))

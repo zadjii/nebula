@@ -4,16 +4,25 @@ import signal
 import sys
 from threading import Thread
 
+from common_util import mylog, ResultAndData
 from connections.RawConnection import RawConnection
 from host import get_db
 from host.NetworkThread import NetworkThread
-from host.PrivateData import PrivateData
+from host.PrivateData import PrivateData, NO_ACCESS, READ_ACCESS
 from host.function.local_updates import local_update_thread
-from host.function.network_updates import filter_func
+from host.function.network.client import list_files_handler, \
+    handle_recv_file_from_client, handle_read_file_request
+from host.function.network_updates import handle_fetch, handle_recv_file, \
+    handle_remove_file
 from host.models.Cloud import Cloud
-from host.util import set_mylog_name, mylog, get_ipv6_list, setup_remote_socket
+from host.util import set_mylog_name, mylog, get_ipv6_list, setup_remote_socket, \
+    get_client_session
+from messages import InvalidPermissionsMessage
 from messages.HostHandshakeMessage import  HostHandshakeMessage
 import platform
+
+from msg_codes import HOST_HOST_FETCH, HOST_FILE_PUSH, REMOVE_FILE, \
+    STAT_FILE_REQUEST, LIST_FILES_REQUEST, CLIENT_FILE_PUT, READ_FILE_REQUEST
 
 __author__ = 'Mike'
 
@@ -150,7 +159,7 @@ class Host:
         while num_conns > 0:
             (conn, addr) = self.active_network_obj.connection_queue.pop(0)
         # for (conn, addr) in self.active_network_obj.connection_queue[:]:
-            filter_func(conn, addr)
+            self.filter_func(conn, addr)
             num_conns -= 1
             mylog('processed {} from {}'.format(conn.__class__, addr))
 
@@ -187,6 +196,12 @@ class Host:
             self._private_data[cloud.my_id_from_remote] = PrivateData(cloud)
 
     def is_private_data_file(self, path, cloud=None):
+        """
+
+        :param path: The FULL path. Not the cloud-relative one.
+        :param cloud:
+        :return:
+        """
         if cloud is None:
             # todo: this is pretty untested. Write some tests that make sure
             db = get_db()
@@ -195,6 +210,72 @@ class Host:
                     cloud = cloud2
                     break
         if cloud is None:
-            return None
+            return False
         return os.path.join(cloud.root_directory, '.nebs') == path
+
+    def get_client_permissions(self, client_sid, cloud, relative_path):
+        db = get_db()
+        rd = get_client_session(db, client_sid, None, cloud.name)  # todo:15 use un/cn
+        # mylog('get_client_permissions [{}] {}'.format(0, rd))
+        if rd.success:
+            client = rd.data
+            private_data = self.get_private_data(cloud)
+            if private_data is not None:
+                return private_data.get_permissions(client.user_id, relative_path)
+            else:
+                mylog('There has no private data for {}'.format(cloud.name), '31')
+        return NO_ACCESS
+
+    def filter_func(self, connection, address):
+        # fixme: Failing to decode the message should not bring the entire system down.
+        # cont: should gracefully ignore and close connection
+        msg_obj = connection.recv_obj()
+        mylog('<{}>msg:{}'.format(address, msg_obj.__dict__))
+        msg_type = msg_obj.type
+        # print 'The message is', msg_obj
+        # todo we should make sure the connection was from the remote or a client
+        # cont   that we were told about here, before doing ANY processing.
+
+        # NOTE: NEVER REMOTE. NEVER ALLOW REMOTE->HOST.
+        try:
+            # H->H Messages
+            if msg_type == HOST_HOST_FETCH:
+                handle_fetch(self, connection, address, msg_obj)
+            elif msg_type == HOST_FILE_PUSH:
+                handle_recv_file(self, connection, address, msg_obj)
+            elif msg_type == REMOVE_FILE:
+                handle_remove_file(self, connection, address, msg_obj)
+            # ----------------------- C->H Messages ----------------------- #
+            # elif msg_type == CLIENT_SESSION_ALERT:
+            #     handle_client_session_alert(connection, address, msg_obj)
+            elif msg_type == STAT_FILE_REQUEST:
+                # todo:2 REALLY? This still isnt here? I guess list files does it...
+                pass
+            elif msg_type == LIST_FILES_REQUEST:
+                list_files_handler(self, connection, address, msg_obj)
+            elif msg_type == CLIENT_FILE_PUT:
+                handle_recv_file_from_client(self, connection, address, msg_obj)
+            elif msg_type == READ_FILE_REQUEST:
+                handle_read_file_request(self, connection, address, msg_obj)
+            else:
+                mylog('I don\'t know what to do with {},\n{}'.format(msg_obj, msg_obj.__dict__))
+        except Exception, e:
+            sys.stderr.write(e.message + '\n')
+
+        connection.close()
+
+    def client_access_check_or_close(self, connection, client_sid, cloud, rel_path, required_access=READ_ACCESS):
+        # type: (AbstractConnection, str, Cloud, str, int) -> ResultAndData
+        permissions = self.get_client_permissions(client_sid, cloud, rel_path)
+        rd = ResultAndData(True, permissions)
+        if permissions < required_access:
+            err = 'Session does not have sufficient permission to access <{}>'.format(rel_path)
+            mylog(err, '31')
+            response = InvalidPermissionsMessage(err)
+            connection.send_obj(response)
+            connection.close()
+            rd = ResultAndData(False, err)
+        mylog('c access check {} {} {}'.format(client_sid, rel_path, rd.success), '30;43')
+        return rd
+
 

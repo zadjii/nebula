@@ -5,39 +5,40 @@ from stat import S_ISDIR
 
 from common_util import mylog, send_error_and_close
 from host import get_db, Cloud
+from host.PrivateData import READ_ACCESS
 from host.function.recv_files import recv_file_tree
 from host.util import check_response, validate_or_get_client_session
 from messages import FileDoesNotExistErrorMessage, FileIsDirErrorMessage, \
     ReadFileResponseMessage, ListFilesResponseMessage, InvalidStateMessage, \
     ClientAuthErrorMessage
-from msg_codes import send_generic_error_and_close, CLIENT_FILE_TRANSFER
+from msg_codes import CLIENT_FILE_TRANSFER
 
 
-def handle_recv_file_from_client(connection, address, msg_obj):
-    return client_message_wrapper(connection, address, msg_obj
+def handle_recv_file_from_client(host_obj, connection, address, msg_obj):
+    return client_message_wrapper(host_obj, connection, address, msg_obj
                                   , do_recv_file_from_client)
 
 
-def do_recv_file_from_client(connection, address, msg_obj, client):
+def do_recv_file_from_client(host_obj, connection, address, msg_obj, client):
     db = get_db()
     cloud = client.cloud
     cloudname = cloud.name
-    # todo: maybe add a quick response to tell the client the reansfer is okay.
+    # todo: maybe add a quick response to tell the client the transfer is okay.
     resp_obj = connection.recv_obj()
     resp_type = resp_obj.type
     check_response(CLIENT_FILE_TRANSFER, resp_type)
 
-    recv_file_tree(resp_obj, cloud, connection, db)
+    recv_file_tree(host_obj, resp_obj, cloud, connection, db)
     mylog('[{}]bottom of handle_recv_file_from_client(...,{})'
           .format(client.uuid, msg_obj.__dict__))
 
 
-def handle_read_file_request(connection, address, msg_obj):
-    return client_message_wrapper(connection, address, msg_obj
+def handle_read_file_request(host_obj, connection, address, msg_obj):
+    return client_message_wrapper(host_obj, connection, address, msg_obj
                                   , do_client_read_file)
 
 
-def do_client_read_file(connection, address, msg_obj, client):
+def do_client_read_file(host_obj, connection, address, msg_obj, client):
     db = get_db()
     cloud = client.cloud
 
@@ -64,7 +65,13 @@ def do_client_read_file(connection, address, msg_obj, client):
         connection.send_obj(err_msg)
         # connection.close()
         return
+
     relative_pathname = os.path.relpath(filepath, cloud.root_directory)
+
+    rd = host_obj.client_access_check_or_close(connection, client.uuid, cloud,
+                                               relative_pathname, READ_ACCESS)
+    if not rd.success:
+        return
 
     req_file_is_dir = S_ISDIR(req_file_stat.st_mode)
     if req_file_is_dir:
@@ -75,12 +82,14 @@ def do_client_read_file(connection, address, msg_obj, client):
         # send RFP - ReadFileResponse
         req_file_size = req_file_stat.st_size
         requested_file = open(filepath, 'rb')
-        response = ReadFileResponseMessage(client.uuid, relative_pathname, req_file_size)
+        response = ReadFileResponseMessage(client.uuid, relative_pathname,
+                                           req_file_size)
         connection.send_obj(response)
-        mylog('sent RFRp:{}, now sending file bytes'.format(response.serialize()))
+        mylog(
+            'sent RFRp:{}, now sending file bytes'.format(response.serialize()))
         l = 1
         total_len = 0
-        num_MB = int(math.floor(req_file_size/(1024 * 1024)))
+        num_MB = int(math.floor(req_file_size / (1024 * 1024)))
         transfer_size = 1024 + (10 * 1024 * num_MB)
         num_transfers = 0
         # send file bytes
@@ -92,7 +101,8 @@ def do_client_read_file(connection, address, msg_obj, client):
             num_transfers += 1
             if (num_transfers % 128 == 0) and num_transfers > 1:
                 mylog('sent {} blobs of <{}> ({}/{}B total)'
-                      .format(num_transfers, filepath, total_len, req_file_size))
+                      .format(num_transfers, filepath, total_len,
+                              req_file_size))
                 time.sleep(.1)
 
         mylog(
@@ -105,36 +115,13 @@ def do_client_read_file(connection, address, msg_obj, client):
           .format(client.uuid, msg_obj))
 
 
-# def list_files_handler(connection, address, msg_obj):
-#     session_id = msg_obj.sid
-#     cloudname = msg_obj.cname
-#     cloud_uname = None # todo:15
-#     rel_path = msg_obj.fpath
-#     db = get_db()
-#
-#     rd = validate_or_get_client_session(db, session_id, cloud_uname, cloudname)
-#     if not rd.success:
-#         response = ClientAuthErrorMessage(rd.data)
-#         send_error_and_close(response, connection)
-#         return
-#     else:
-#         client = rd.data
-#         cloud = client.cloud
-#         if cloud is None:
-#             # todo:17 The cloud could have been deleted while a client had it
-#             err = InvalidStateMessage('Somehow the client object did not have '
-#                                       'a cloud associated with it.')
-#             send_error_and_close(err, connection)
-#             return
-#         full_path = cloud.translate_relative_path(rel_path)
-#         resp = ListFilesResponseMessage(cloudname, session_id, rel_path,
-#                                         full_path)
-#         connection.send_obj(resp)
+def list_files_handler(host_obj, connection, address, msg_obj):
+    mylog('list_files_handler')
+    return client_message_wrapper(host_obj, connection, address, msg_obj,
+                                  do_client_list_files)
 
-def list_files_handler(connection, address, msg_obj):
-    return client_message_wrapper(connection, address, msg_obj, do_client_list_files)
 
-def client_message_wrapper(connection, address, msg_obj, callback):
+def client_message_wrapper(host_obj, connection, address, msg_obj, callback):
     session_id = msg_obj.sid
     cloudname = msg_obj.cname
     cloud_uname = None  # todo:15
@@ -149,21 +136,32 @@ def client_message_wrapper(connection, address, msg_obj, callback):
         mylog('valid client session')
         client = rd.data
         cloud = client.cloud
+        mylog('client.cloud={}'.format(client.cloud))
         if cloud is None:
             # todo:17 The cloud could have been deleted while a client had it
             err = InvalidStateMessage('Somehow the client object did not have '
                                       'a cloud associated with it.')
+            mylog(err.message, '31')
             send_error_and_close(err, connection)
             return
-        callback(connection, address, msg_obj, client)
+
+        callback(host_obj, connection, address, msg_obj, client)
 
 
-def do_client_list_files(connection, address, msg_obj, client):
+def do_client_list_files(host_obj, connection, address, msg_obj, client):
+    mylog('do_client_list_files')
     cloud = client.cloud
     cloudname = cloud.name
     rel_path = msg_obj.fpath
     session_id = client.uuid
     full_path = cloud.translate_relative_path(rel_path)
-    resp = ListFilesResponseMessage(cloudname, session_id, rel_path,
-                                    full_path)
-    connection.send_obj(resp)
+    rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
+                                               rel_path, READ_ACCESS)
+    if rd.success:
+        mylog('Responding successfully to ClientListFiles')
+        resp = ListFilesResponseMessage(cloudname, session_id, rel_path,
+                                        full_path)
+        connection.send_obj(resp)
+    else:
+        # the access check will send error
+        pass

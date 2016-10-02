@@ -143,7 +143,13 @@ class PrivateData(object):
         if self._file_exists():
             mylog('Reading .nebs for cloud: '
                   '[{}]"{}"'.format(cloud.my_id_from_remote, cloud.name))
-            self.read_json(self.read_backend())
+            rd = self.read_backend()
+            if rd.success:
+                mylog('read backend data')
+                self.read_json(rd.data)
+            else:
+                mylog('Error reading backend data: {}'.format(rd.data))
+                raise Exception  # todo:fixme
         else:
             mylog('Creating .nebs for cloud: '
                   '[{}]"{}"'.format(cloud.my_id_from_remote, cloud.name))
@@ -165,9 +171,10 @@ class PrivateData(object):
         :param filepath:
         :return:
         """
-
+        # mylog('Getting {}\'s permissions for {}'.format(user_id, filepath))
         # break the path into elements, start from the root, work down
         path_elems = get_path_elements(filepath)
+        # mylog('path elems:{}'.format(path_elems))
         i = 0
         curr_path = self._cloud.root_directory
         current_perms = NO_ACCESS
@@ -177,6 +184,7 @@ class PrivateData(object):
                 file_perms = self._files[curr_path]
                 new_perms = self._file_get_permissions(user_id, file_perms)
                 current_perms |= new_perms
+            i += 1
         return current_perms
 
     def _file_get_permissions(self, user_id, file_permissions):
@@ -259,6 +267,9 @@ class PrivateData(object):
             path = self._file_location()
             out_file = open(path, mode='w')
             out_file.write(data)
+            out_file.close()
+            mylog('Wrote backend for [{}]"{}"'.format(
+                self._cloud.my_id_from_remote, self._cloud.name), '32')
             rd = ResultAndData(True, None)
         except IOError, e:
             rd = ResultAndData(False, e)

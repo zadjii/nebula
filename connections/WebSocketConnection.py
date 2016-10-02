@@ -5,7 +5,6 @@ import sys
 
 from connections.AbstractConnection import AbstractConnection
 from host import HOST_WS_PORT, HOST_PORT
-from host.function.network_updates import filter_func
 # from messages import decode_msg_size
 from host.util import mylog, get_ipv6_list
 from messages.util import get_msg_size, decode_msg_size

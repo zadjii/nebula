@@ -162,6 +162,6 @@ def host_verify_client(connection, address, msg_obj):
         send_error_and_close(err, connection)
         return
     else:
-        response = HostVerifyClientSuccessMessage(mirror_id, session_id, cloud_uname, cloudname)
+        response = HostVerifyClientSuccessMessage(mirror_id, session_id, cloud_uname, cloudname, sess_obj.user.id)
         connection.send_obj(response)
 

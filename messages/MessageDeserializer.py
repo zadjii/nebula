@@ -1,9 +1,11 @@
-# last generated 2016-09-05 19:18:54.191000
+# last generated 2016-10-01 23:26:42.145000
 import json
 from msg_codes import *
 from messages import *
 _decoder_table = {
-    HOST_VERIFY_HOST_FAILURE: HostVerifyHostFailureMessage.deserialize # -12
+    SYSTEM_FILE_WRITE_ERROR: SystemFileWriteErrorMessage.deserialize # -14
+    , UNKNOWN_IO_ERROR: UnknownIoErrorMessage.deserialize # -13
+    , HOST_VERIFY_HOST_FAILURE: HostVerifyHostFailureMessage.deserialize # -12
     , INVALID_PERMISSIONS: InvalidPermissionsMessage.deserialize # -11
     , NO_ACTIVE_HOST: NoActiveHostMessage.deserialize # -10
     , INVALID_STATE: InvalidStateMessage.deserialize # -9
@@ -31,6 +33,7 @@ _decoder_table = {
     , MIRRORING_COMPLETE: MirroringCompleteMessage.deserialize # 14
     , GET_HOSTS_REQUEST: GetHostsRequestMessage.deserialize # 15
     , GET_HOSTS_RESPONSE: GetHostsResponseMessage.deserialize # 16
+    , FILE_TRANSFER_SUCCESS: FileTransferSuccessMessage.deserialize # 17
     , REMOVE_FILE: RemoveFileMessage.deserialize # 18
     , HOST_FILE_PUSH: HostFilePushMessage.deserialize # 19
     , STAT_FILE_REQUEST: StatFileRequestMessage.deserialize # 20

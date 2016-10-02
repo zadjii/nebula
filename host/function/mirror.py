@@ -128,7 +128,7 @@ def handle_go_retrieve(response, cloud, db):
         mylog('Other host did not respond successfully, \n\t response was="{}"'.format(resp_obj))
     else:
         # Here we recv a whole bunch of files from the host
-        recv_file_tree(resp_obj, cloud, host_conn, db)
+        recv_file_tree(None, resp_obj, cloud, host_conn, db)
     mylog('Bottom of go_retrieve')
 
 
