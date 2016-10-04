@@ -124,8 +124,9 @@ def respond_to_mirror_request(db, connection, address, new_host, cloud):
             , new_host.id
             , (cloud.creator_name(), cloud.name)), '34;103')
         # see `host_verify_host`
-
-    msg = GoRetrieveHereMessage(0 if rand_host is None else rand_host.id, ip, port)
+    target_host_id = 0 if rand_host is None else rand_host.id
+    owner_ids = [owner.id for owner in cloud.owners]
+    msg = GoRetrieveHereMessage(target_host_id, ip, port, owner_ids)
     connection.send_obj(msg)
     # send_msg(make_go_retrieve_here_json(0, ip, port), connection)
 

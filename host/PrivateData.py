@@ -9,7 +9,6 @@ import base64
 import uuid
 
 from common_util import mylog, ResultAndData, get_path_elements
-from host.models.Cloud import Cloud
 import os
 import json
 
@@ -28,18 +27,23 @@ READ_ACCESS = 1
 WRITE_ACCESS = 2
 RDWR_ACCESS = READ_ACCESS | WRITE_ACCESS
 
+PUBLIC_ID = 0
+OWNERS_ID = 1
+FIRST_GROUP_ID = 2
 
 class Group(object):
-    def __init__(self, id, users):
+    def __init__(self, id, name, user_ids):
         self.id = id
-        self._user_ids = [user.id for user in users]
+        self._user_ids = user_ids
+        self.name = name
 
-    def has_user(self, user):
-        return user.id in self._user_ids
+    def has_user(self, user_id):
+        # type: (int) -> bool
+        return user_id in self._user_ids
 
-    def add_user(self, user):
-        if not self.has_user(user):
-            self._user_ids.append(user.id)
+    def add_user(self, user_id):
+        if not self.has_user(user_id):
+            self._user_ids.append(user_id)
 
     def is_public(self):
         return self._user_ids == []
@@ -47,12 +51,23 @@ class Group(object):
     def to_serializable(self):
         return {
             'id': self.id
+            , 'name': self.name
             , 'user_ids': self._user_ids
         }
 
     def from_serializable(self, obj):
         self.id = obj['id']
         self._user_ids = obj['user_ids']
+        self.name = obj['name']
+
+
+def make_public_group():
+    return Group(PUBLIC_ID, 'public', [])
+
+
+def make_owners_group(owner_ids):
+    # type: ([int]) -> Group
+    return Group(OWNERS_ID, 'owners', owner_ids)
 
 
 class Link(object):
@@ -97,25 +112,44 @@ class FilePermissions(object):
         self._filepath = path  # the cloud relative path
 
     def add_user(self, user_id, permissions):
+        # type: (int, int) -> ResultAndData
         rd = ResultAndData(False, None)
-        if user_id in self._users:
-            old_perm = self._users[user_id]
-            self._users[user_id] = permissions
+        if user_id in self.get_user_ids():
+            old_perm = self._users[str(user_id)]
+            self._users[str(user_id)] = permissions
             rd = ResultAndData(True, old_perm)
         else:
-            self._users[user_id] = permissions
+            self._users[str(user_id)] = permissions
+            rd = ResultAndData(True, None)
+        return rd
+
+    def add_group(self, group_id, permissions):
+        # type: (int, int) -> ResultAndData
+        rd = ResultAndData(False, None)
+        if group_id in self.get_group_ids():
+            old_perm = self._groups[str(group_id)]
+            self._groups[str(group_id)] = permissions
+            rd = ResultAndData(True, old_perm)
+        else:
+            self._groups[str(group_id)] = permissions
             rd = ResultAndData(True, None)
         return rd
 
     def get_group_ids(self):
-        return self._groups.keys()
+        # type: () -> [int]
+        return [int(gid) for gid in self._groups.keys()]
+
+    def get_user_ids(self):
+        # type: () -> [int]
+        return [int(uid) for uid in self._users.keys()]
 
     def get_group_permissions(self, group_id):
+        # type: (int) -> int
         if group_id in self.get_group_ids():
-            return self._groups[group_id]
+            return self._groups[str(group_id)]
         return NO_ACCESS
 
-    def to_serializabe(self):
+    def to_serializable(self):
         return {
             'path': self._filepath
             , 'groups': self._groups
@@ -128,16 +162,14 @@ class FilePermissions(object):
         self._users = obj['users']
 
 
-
 class PrivateData(object):
-
-    def __init__(self, cloud):
+    def __init__(self, cloud, owner_ids):
         self._cloud = cloud
         self._version = (CURRENT_MAJOR_VERSION, CURRENT_MINOR_VERSION)
         self._links = []
-        self._groups = []
+        self._groups = [make_public_group(), make_owners_group(owner_ids)]
         self._files = {}
-        self._next_group_id = 1
+        self._next_group_id = FIRST_GROUP_ID
         # try reading the .nebs from the cloud.
         # if it doesn't exist, then write out the defaults.
         if self._file_exists():
@@ -151,14 +183,41 @@ class PrivateData(object):
                 mylog('Error reading backend data: {}'.format(rd.data))
                 raise Exception  # todo:fixme
         else:
+            if owner_ids is None:
+                mylog('We\'re creating the .nebs for the cloud, but we '
+                      'specified no owners. \n'
+                      'This will prevent anyone from accessing this cloud. \n'
+                      'This is likely a programming error. \n'
+                      'Make sure when the cloud is mirrored, we gave it \n'
+                      'owner_ids, and that if this file accidentally gets \n'
+                      'deleted, we recover it intelligently.', '31')
+                # assert?
             mylog('Creating .nebs for cloud: '
                   '[{}]"{}"'.format(cloud.my_id_from_remote, cloud.name))
+            root_path = os.path.join(cloud.root_directory, './')
+            root_path = os.path.normpath(root_path)
+            root_perms = FilePermissions(root_path)
+            root_perms.add_group(OWNERS_ID, RDWR_ACCESS)
+            self._files[root_path] = root_perms
             self.commit()
 
     def get_group(self, group_id):
+        mylog('{}'.format([group.id for group in self._groups]))
         for g in self._groups:
+            mylog('wat?? {}-{}, {}'.format(g, g.id, group_id))
             if g.id == group_id:
+                mylog('woo a group {}'.format(g.__dict__))
                 return g
+            else:
+                mylog('{} {} {} {} {} {}'.format(
+                    g.id == group_id
+                    , g.id is group_id
+                    , g.id
+                    , group_id
+                    , str(g.id)
+                    , str(group_id)
+                ))
+        mylog('yikes no group')
         return None
 
     def get_permissions(self, user_id, filepath):
@@ -174,28 +233,44 @@ class PrivateData(object):
         # mylog('Getting {}\'s permissions for {}'.format(user_id, filepath))
         # break the path into elements, start from the root, work down
         path_elems = get_path_elements(filepath)
-        # mylog('path elems:{}'.format(path_elems))
+        # mylog('path elems0:{}'.format(path_elems))
+        if path_elems[0] != '.':
+            path_elems.insert(0, '.')
+        # mylog('path elems1:{}'.format(path_elems))
         i = 0
         curr_path = self._cloud.root_directory
         current_perms = NO_ACCESS
         while i < len(path_elems) and current_perms < RDWR_ACCESS:
             curr_path = os.path.join(curr_path, path_elems[i])
+            curr_path = os.path.normpath(curr_path)
             if curr_path in self._files:
+                mylog('curr_path<{}> is in files'.format(curr_path))
                 file_perms = self._files[curr_path]
                 new_perms = self._file_get_permissions(user_id, file_perms)
-                current_perms |= new_perms
+                current_perms = current_perms | new_perms
             i += 1
+            mylog('perms for {}={}'.format(curr_path, current_perms))
         return current_perms
 
     def _file_get_permissions(self, user_id, file_permissions):
+        # type: (int, FilePermissions) -> int
         perms = NO_ACCESS
         for gid in file_permissions.get_group_ids():
+            mylog('processing group {}'.format(gid))
             group = self.get_group(gid)
             if group is not None:
+                mylog('\tprocessing group {}, {}, {}'.format(group.name, group.id, group._user_ids))
                 if group.has_user(user_id):
-                    perms = perms | file_permissions.get_group_permissions(gid)
+                    group_perms = file_permissions.get_group_permissions(gid)
+                    mylog('user is in group {} which has permissions {}'.format(gid, group_perms))
+                    perms = perms | group_perms
                     if perms == RDWR_ACCESS:
                         return perms
+
+        if (user_id in file_permissions.get_user_ids()):
+            mylog('User has individual permmissions')
+            perms |= file_permissions._users[user_id]
+        return perms
 
     def commit(self):
         """
@@ -244,14 +319,14 @@ class PrivateData(object):
 
         new_groups = []
         for group in json_obj[GROUPS_KEY]:
-            new_group = Group(0, [])
+            new_group = Group(0, '', [])
             new_group.from_serializable(group)
             new_groups.append(new_group)
             if new_group.id > self._next_group_id:
                 self._next_group_id = new_group.id + 1
         self._groups = new_groups
 
-        new_files = []
+        new_files = {}
         for file in json_obj[FILES_KEY]:
             new_file = FilePermissions(None)
             new_file.from_serializable(file)

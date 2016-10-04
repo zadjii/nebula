@@ -42,12 +42,13 @@ class Client(db.Base):
 
     user_id = Column(Integer)
 
-    def __init__(self, uuid, user_id):
+    # def __init__(self, uuid, user_id):
+    def __init__(self, ):
         now = datetime.utcnow()
         self.created_on = now
         self.last_refresh = now
-        self.uuid = uuid
-        self.user_id = user_id
+        # self.uuid = uuid
+        # self.user_id = user_id
 
     def has_timed_out(self):
         delta = datetime.utcnow() - self.last_refresh

@@ -183,7 +183,7 @@ class Host:
         if not self.has_private_data(cloud):
             # the PrivateData ctor reads existing ones, or creates new ones.
             if cloud.completed_mirroring:
-                self._private_data[cloud.my_id_from_remote] = PrivateData(cloud)
+                self._private_data[cloud.my_id_from_remote] = PrivateData(cloud, None)
 
     def reload_private_data(self, cloud):
         """
@@ -193,7 +193,7 @@ class Host:
         """
         # the PrivateData ctor reads existing ones, or creates new ones.
         if cloud.completed_mirroring:
-            self._private_data[cloud.my_id_from_remote] = PrivateData(cloud)
+            self._private_data[cloud.my_id_from_remote] = PrivateData(cloud, None)
 
     def is_private_data_file(self, path, cloud=None):
         """
@@ -221,6 +221,7 @@ class Host:
             client = rd.data
             private_data = self.get_private_data(cloud)
             if private_data is not None:
+                mylog('Looking up [{}]\'s permission to access <{}>'.format(client.user_id, relative_path))
                 return private_data.get_permissions(client.user_id, relative_path)
             else:
                 mylog('There has no private data for {}'.format(cloud.name), '31')
@@ -260,7 +261,7 @@ class Host:
             else:
                 mylog('I don\'t know what to do with {},\n{}'.format(msg_obj, msg_obj.__dict__))
         except Exception, e:
-            sys.stderr.write(e.message + '\n')
+            sys.stderr.write(e.message)
 
         connection.close()
 
@@ -275,7 +276,8 @@ class Host:
             connection.send_obj(response)
             connection.close()
             rd = ResultAndData(False, err)
-        mylog('c access check {} {} {}'.format(client_sid, rel_path, rd.success), '30;43')
+        bg = '102' if rd.success else '101'
+        mylog('c access check {} {} {}'.format(client_sid, rel_path, rd.success), '30;{}'.format(bg))
         return rd
 
 

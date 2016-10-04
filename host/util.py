@@ -119,7 +119,10 @@ def validate_or_get_client_session(db, uuid, cloud_uname, cloud_cname):
                 conn.send_obj(msg)
                 response = conn.recv_obj()
                 if response.type == HOST_VERIFY_CLIENT_SUCCESS:
-                    client = Client(uuid, response.user_id)
+                    # client = Client(uuid, response.user_id)
+                    client = Client()
+                    client.uuid = uuid
+                    client.user_id = response.user_id
                     db.session.add(client)
                     cloud.clients.append(client)
                     db.session.commit()

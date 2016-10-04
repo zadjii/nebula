@@ -23,7 +23,9 @@
 4   , REM_HANDSHAKE_GO_FETCH #todo not done
 
 5   , REQUEST_CLOUD         , int:id    , string:cname  , string:uname  , string:passw
-6   , GO_RETRIEVE_HERE      , int:id    , ip            , int:port # note: purposefully no wsport, this is for H->H only.
+# note: purposefully no wsport, this is for H->H only.
+# The owner_ids are used to set up the first mirror's PrivateData file.
+6   , GO_RETRIEVE_HERE      , int:id    , ip            , int:port      , blob:owner_ids
 
 # Note: Prepare for fetch is now deprecated, see GH:14
 # fixme remove from rest of codebase

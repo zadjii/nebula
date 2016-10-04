@@ -7,6 +7,7 @@ from connections.RawConnection import RawConnection
 
 from host import Cloud, REMOTE_PORT, HOST_PORT, HOST_WS_PORT
 from host import get_db
+from host.PrivateData import PrivateData
 from host.function.recv_files import recv_file_tree
 from host.util import check_response, setup_remote_socket, mylog, get_ipv6_list
 from messages import *
@@ -94,6 +95,7 @@ def client_request_cloud(cloud, session_id, db):
 
 
 def handle_go_retrieve(response, cloud, db):
+    # type: (GoRetrieveHereMessage, Cloud, SimpleDB) -> None
     check_response(GO_RETRIEVE_HERE, response.type)
     other_address = response.ip
     other_port = response.port
@@ -102,9 +104,15 @@ def handle_go_retrieve(response, cloud, db):
         mylog('No other hosts in cloud')
         # note: falling out of this function takes us to the code that
         #       sends the MIRRORING_COMPLETE message.
+        # Set up the private data for this cloud. We do this here, because this
+        #   sentinel case (== no other hosts) means that no other host has
+        # created a .nebs file yet, so we're responsible.
+        owner_ids = response.owner_ids
+        private_data = PrivateData(cloud, owner_ids)
+        # just instantiating the private data is enough to write the backend
         return
 
-    print 'requesting host at [{}]({},{})'.format(other_id, other_address, other_port)
+    mylog('requesting host at [{}]({},{})'.format(other_id, other_address, other_port))
 
     host_sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
     host_sock.connect((other_address, other_port, 0, 0))
@@ -117,7 +125,7 @@ def handle_go_retrieve(response, cloud, db):
     my_id = cloud.my_id_from_remote
     msg = HostHostFetchMessage(my_id, other_id, cloud_uname, cname, '/')
     host_conn.send_obj(msg)
-    print 'Sent HOST_HOST_FETCH as a mirror request.'
+    mylog('Sent HOST_HOST_FETCH as a mirror request.')
 
     resp_obj = host_conn.recv_obj()
     resp_type = resp_obj.type
