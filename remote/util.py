@@ -4,14 +4,14 @@ from remote.models.Cloud import Cloud
 
 
 def get_user_from_session(db, session_id):
-    rd = ERROR()
+    rd = Error()
     sess_obj = db.session.query(Session).filter_by(uuid=session_id).first()
     if sess_obj is None:
-        rd = ERROR('No session exists on remote for sid:{}'.format(session_id))
+        rd = Error('No session exists on remote for sid:{}'.format(session_id))
     else:
         user = sess_obj.user
         if user is None:
-            rd = ERROR('No user exists on remote\'s session, sid:{}'.format(session_id))
+            rd = Error('No user exists on remote\'s session, sid:{}'.format(session_id))
         else:
             rd = ResultAndData(True, user)
     return rd

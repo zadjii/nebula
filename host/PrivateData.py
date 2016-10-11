@@ -1,5 +1,3 @@
-
-
 """
 PrivateData is the model that backs .nebs data.
 
@@ -143,6 +141,12 @@ class FilePermissions(object):
         # type: () -> [int]
         return [int(uid) for uid in self._users.keys()]
 
+    def get_user_permissions(self, user_id):
+        # type: (int) -> int
+        if user_id in self.get_user_ids():
+            return self._users[str(user_id)]
+        return NO_ACCESS
+
     def get_group_permissions(self, group_id):
         # type: (int) -> int
         if group_id in self.get_group_ids():
@@ -202,22 +206,9 @@ class PrivateData(object):
             self.commit()
 
     def get_group(self, group_id):
-        mylog('{}'.format([group.id for group in self._groups]))
         for g in self._groups:
-            mylog('wat?? {}-{}, {}'.format(g, g.id, group_id))
             if g.id == group_id:
-                mylog('woo a group {}'.format(g.__dict__))
                 return g
-            else:
-                mylog('{} {} {} {} {} {}'.format(
-                    g.id == group_id
-                    , g.id is group_id
-                    , g.id
-                    , group_id
-                    , str(g.id)
-                    , str(group_id)
-                ))
-        mylog('yikes no group')
         return None
 
     def get_permissions(self, user_id, filepath):
@@ -230,13 +221,11 @@ class PrivateData(object):
         :param filepath:
         :return:
         """
-        # mylog('Getting {}\'s permissions for {}'.format(user_id, filepath))
         # break the path into elements, start from the root, work down
         path_elems = get_path_elements(filepath)
-        # mylog('path elems0:{}'.format(path_elems))
+        # make sure to always use the cloud root.
         if path_elems[0] != '.':
             path_elems.insert(0, '.')
-        # mylog('path elems1:{}'.format(path_elems))
         i = 0
         curr_path = self._cloud.root_directory
         current_perms = NO_ACCESS
@@ -244,32 +233,27 @@ class PrivateData(object):
             curr_path = os.path.join(curr_path, path_elems[i])
             curr_path = os.path.normpath(curr_path)
             if curr_path in self._files:
-                mylog('curr_path<{}> is in files'.format(curr_path))
                 file_perms = self._files[curr_path]
                 new_perms = self._file_get_permissions(user_id, file_perms)
-                current_perms = current_perms | new_perms
+                current_perms |= new_perms
             i += 1
-            mylog('perms for {}={}'.format(curr_path, current_perms))
         return current_perms
 
     def _file_get_permissions(self, user_id, file_permissions):
         # type: (int, FilePermissions) -> int
         perms = NO_ACCESS
         for gid in file_permissions.get_group_ids():
-            mylog('processing group {}'.format(gid))
             group = self.get_group(gid)
             if group is not None:
-                mylog('\tprocessing group {}, {}, {}'.format(group.name, group.id, group._user_ids))
                 if group.has_user(user_id):
                     group_perms = file_permissions.get_group_permissions(gid)
-                    mylog('user is in group {} which has permissions {}'.format(gid, group_perms))
-                    perms = perms | group_perms
+                    perms |= group_perms
                     if perms == RDWR_ACCESS:
                         return perms
 
-        if (user_id in file_permissions.get_user_ids()):
-            mylog('User has individual permmissions')
-            perms |= file_permissions._users[user_id]
+        if user_id in file_permissions.get_user_ids():
+            perms |= file_permissions.get_user_permissions(user_id)
+
         return perms
 
     def commit(self):
@@ -293,7 +277,8 @@ class PrivateData(object):
             if maj_ver == 0:
                 rd = self.read_v0(json_obj)
             else:
-                message = 'Failed to decode .nebs data with invalid version {}'.format(maj_ver)
+                message = 'Failed to decode .nebs data with invalid version ' \
+                          '{}'.format(maj_ver)
                 mylog(message, '31')
                 rd = ResultAndData(False, message)
 
@@ -381,7 +366,7 @@ class PrivateData(object):
 
     def get_next_group_id(self):
         id = self._next_group_id
-        self._next_group_id+=1
+        self._next_group_id += 1
         return id
 
 

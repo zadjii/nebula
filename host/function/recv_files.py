@@ -81,43 +81,25 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
             # print '<{}>read:{}B, total:{}B, expected total:{}B'.format(
             #     msg_rel_path, nbytes, total_read, msg_file_size
             # )
-        # print 'complete file data \'{}\''.format(data_buffer)
         exists = os.path.exists(full_path)
-        # mylog('{} Exists={}'.format(full_path, exists))
 
-        # file_handle = open(full_path, mode='wb+' if exists else 'ab+')
         file_handle = None
         # try:
         file_handle = open(full_path, mode='wb')
         # except (OSError, IOError) as e:
         # todo:23
         #     mylog('FUCK')
-        #     mylog('{}'.format(e))
-        #     mylog('{}'.format(e.__dict__))
-        #     mylog('{}'.format(e.message))
-        #     raise e
-
-        # mylog('successfully opened the file')
         file_handle.seek(0, 0)  # seek to 0B relative to start
-        done = False
-        total_written = 0
-        while not done:
-            # nbytes_written = file_handle.write(data_buffer[total_written:])
-            file_handle.write(data_buffer)
-            mylog('successfully wrote to the file')
-            # if nbytes_written is None:
-            #     break
-            # total_written += nbytes_written
-            # done = total_written <= 0
-            done = True
+
+        file_handle.write(data_buffer)
         file_handle.close()
-        mylog('[{}]I think I wrote the file to {}'.format(cloud.my_id_from_remote, full_path))
+        mylog('[{}] wrote the file to {}'.format(cloud.my_id_from_remote, full_path), '30;42')
 
     updated_node = cloud.create_or_update_node(msg_rel_path, msg, db)
     if updated_node is not None:
         old_modified_on = updated_node.last_modified
         updated_node.last_modified = datetime.utcfromtimestamp(os.path.getmtime(full_path))
-        mylog('update mtime {}=>{}'.format(old_modified_on, updated_node.last_modified))
+        # mylog('update mtime {}=>{}'.format(old_modified_on, updated_node.last_modified))
         db.session.commit()
 
     # new_num_nodes = db.session.query(FileNode).count()

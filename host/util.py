@@ -19,12 +19,12 @@ def validate_host_id(db, host_id, conn):
 
 
 def get_matching_clouds(db, host_id):
-    rd = ERROR()
+    rd = Error()
     matching_id_clouds = db.session.query(Cloud)\
         .filter(Cloud.my_id_from_remote == host_id)
 
     if matching_id_clouds.count() <= 0:
-        rd = ERROR('Received a message intended for id={},'
+        rd = Error('Received a message intended for id={},'
                    ' but I don\'t have any clouds with that id'
                    .format(host_id))
     else:
@@ -70,17 +70,17 @@ def get_clouds_by_name(db, uname, cname):
 
 
 def get_client_session(db, uuid, cloud_uname, cloud_cname):
-    rd = ERROR()
+    rd = Error()
     matching_clients = db.session.query(Client).filter_by(uuid=uuid).all()
     if len(matching_clients) < 1:
-        rd = ERROR('No matching session')
+        rd = Error('No matching session')
     else:
         for client in matching_clients:
             if client.cloud.name == cloud_cname: # todo:15 use uname/cname
                 rd = ResultAndData(True, client)
                 break
         if not rd.success:
-            rd = ERROR('No matching session')
+            rd = Error('No matching session')
     return rd
 
 
@@ -134,7 +134,7 @@ def validate_or_get_client_session(db, uuid, cloud_uname, cloud_cname):
                 else:
                     continue
         if not verified_cloud:
-            rd = ERROR()
+            rd = Error()
             mylog('validate_or_get_client_session[{}]={}'.format(4, rd))
     if not rd.success:
         rd = ResultAndData(False,

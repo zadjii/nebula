@@ -6,16 +6,18 @@ from remote_autopop_000 import repop as remote_autopop
 
 __author__ = 'Mike'
 
-
-def repop_dbs():
-    # print os.curdir
-    # print os.listdir(os.curdir)
+def reset_dbs():
     if os.name == 'nt':
         reset_dbs = Popen('reset_dbs.bat')
     else:
         reset_dbs = Popen('bash ./reset_dbs.sh', shell=True)
     reset_dbs.wait()
     print '#' * 80
+
+def repop_dbs():
+    # print os.curdir
+    # print os.listdir(os.curdir)
+    reset_dbs()
 
     # autopop = Popen('python db_autopopulate_000.py', shell=True)
     # autopop.wait()

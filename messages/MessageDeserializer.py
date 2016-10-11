@@ -1,9 +1,10 @@
-# last generated 2016-10-01 23:26:42.145000
+# last generated 2016-10-10 23:18:11.708000
 import json
 from msg_codes import *
 from messages import *
 _decoder_table = {
-    SYSTEM_FILE_WRITE_ERROR: SystemFileWriteErrorMessage.deserialize # -14
+    MIRROR_FAILURE: MirrorFailureMessage.deserialize # -15
+    , SYSTEM_FILE_WRITE_ERROR: SystemFileWriteErrorMessage.deserialize # -14
     , UNKNOWN_IO_ERROR: UnknownIoErrorMessage.deserialize # -13
     , HOST_VERIFY_HOST_FAILURE: HostVerifyHostFailureMessage.deserialize # -12
     , INVALID_PERMISSIONS: InvalidPermissionsMessage.deserialize # -11
@@ -43,6 +44,7 @@ _decoder_table = {
     , READ_FILE_REQUEST: ReadFileRequestMessage.deserialize # 24
     , READ_FILE_RESPONSE: ReadFileResponseMessage.deserialize # 25
     , CLIENT_SESSION_REQUEST: ClientSessionRequestMessage.deserialize # 26
+    , CLIENT_SESSION_REFRESH: ClientSessionRefreshMessage.deserialize # 27
     , CLIENT_SESSION_RESPONSE: ClientSessionResponseMessage.deserialize # 28
     , CLIENT_FILE_PUT: ClientFilePutMessage.deserialize # 29
     , CLIENT_FILE_TRANSFER: ClientFileTransferMessage.deserialize # 30
@@ -59,6 +61,7 @@ _decoder_table = {
     , HOST_VERIFY_CLIENT_SUCCESS: HostVerifyClientSuccessMessage.deserialize # 41
     , HOST_VERIFY_HOST_REQUEST: HostVerifyHostRequestMessage.deserialize # 42
     , HOST_VERIFY_HOST_SUCCESS: HostVerifyHostSuccessMessage.deserialize # 43
+    , MIRROR_SUCCESS: MirrorSuccessMessage.deserialize # 44
 }
 
 

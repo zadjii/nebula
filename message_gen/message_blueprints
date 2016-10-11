@@ -73,6 +73,10 @@
 # fixme remove from rest of codebase
 # 27  , CLIENT_SESSION_ALERT      , sid           , int:uid       ,  ip
 
+# C->R, refreshes the remote's timeout of the client session.
+#   Should be used in tandem whenever the client reads/writes from the host.
+27, CLIENT_SESSION_REFRESH  , sid
+
 29  , CLIENT_FILE_PUT           , sid, string:cname, string:fpath
 30  , CLIENT_FILE_TRANSFER      , sid, string:cname, string:fpath, int:fsize, bool:isdir
 
@@ -105,6 +109,7 @@
 42  , HOST_VERIFY_HOST_REQUEST, int:my_id, int:their_id, string:cloud_uname, string:cname
 43  , HOST_VERIFY_HOST_SUCCESS, int:my_id, int:their_id, string:cloud_uname, string:cname
 
+44  , MIRROR_SUCCESS
 ################################################################################
 #manually updated ones:
 ################################################################################
@@ -194,6 +199,8 @@
 -13 , UNKNOWN_IO_ERROR, string:message
 # Used to reject client writes of .nebs files. Clients can read, but not write.
 -14 , SYSTEM_FILE_WRITE_ERROR, string:message
+# used to indicate that a mirror attempt was unsuccessful
+-15 , MIRROR_FAILURE, string:message
 
 
 # ideas for this file:

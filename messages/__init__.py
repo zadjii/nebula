@@ -1,5 +1,6 @@
-# last generated 2016-10-01 23:26:41.788000
+# last generated 2016-10-10 23:18:11.361000
 from messages.BaseMessage import BaseMessage
+from messages.MirrorFailureMessage import MirrorFailureMessage
 from messages.SystemFileWriteErrorMessage import SystemFileWriteErrorMessage
 from messages.UnknownIoErrorMessage import UnknownIoErrorMessage
 from messages.HostVerifyHostFailureMessage import HostVerifyHostFailureMessage
@@ -40,6 +41,7 @@ from messages.ListFilesResponseMessage import ListFilesResponseMessage
 from messages.ReadFileRequestMessage import ReadFileRequestMessage
 from messages.ReadFileResponseMessage import ReadFileResponseMessage
 from messages.ClientSessionRequestMessage import ClientSessionRequestMessage
+from messages.ClientSessionRefreshMessage import ClientSessionRefreshMessage
 from messages.ClientSessionResponseMessage import ClientSessionResponseMessage
 from messages.ClientFilePutMessage import ClientFilePutMessage
 from messages.ClientFileTransferMessage import ClientFileTransferMessage
@@ -56,4 +58,5 @@ from messages.HostVerifyClientRequestMessage import HostVerifyClientRequestMessa
 from messages.HostVerifyClientSuccessMessage import HostVerifyClientSuccessMessage
 from messages.HostVerifyHostRequestMessage import HostVerifyHostRequestMessage
 from messages.HostVerifyHostSuccessMessage import HostVerifyHostSuccessMessage
+from messages.MirrorSuccessMessage import MirrorSuccessMessage
 

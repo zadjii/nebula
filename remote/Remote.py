@@ -138,6 +138,9 @@ def start(argv):
         (connection, address) = s.accept()
         raw_connection = RawConnection(connection)
         mylog('Connected by {}'.format(address))
+        # This is kinda really dumb.
+        # I guess the thread just catches any exceptions and prevents the main
+        #   from crashing> otherwise it has no purpose
         # spawn a new thread to handle this connection
         thread = Thread(target=filter_func, args=[raw_connection, address])
         thread.start()

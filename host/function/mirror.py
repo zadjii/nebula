@@ -1,8 +1,11 @@
+import os
 from datetime import datetime
 import socket
 import getpass
 from sys import stdin
 import platform
+
+from common_util import ResultAndData
 from connections.RawConnection import RawConnection
 
 from host import Cloud, REMOTE_PORT, HOST_PORT, HOST_WS_PORT
@@ -77,8 +80,9 @@ def request_cloud(cloud, test_enabled, db):
     msg = RequestCloudMessage(cloud.my_id_from_remote, cloud.name, username, password)
     raw_conn.send_obj(msg)
 
-    resp_obj = raw_conn.recv_obj()
-    handle_go_retrieve(resp_obj, cloud, db)
+    # resp_obj = raw_conn.recv_obj()
+    # handle_go_retrieve(resp_obj, cloud, db)
+    return finish_request_cloud(db, raw_conn, cloud)
 
 
 def client_request_cloud(cloud, session_id, db):
@@ -89,13 +93,24 @@ def client_request_cloud(cloud, session_id, db):
     msg = ClientMirrorMessage(session_id, cloud.my_id_from_remote, 'todo_cloud_uname', cloud.name)
     raw_conn.send_obj(msg)
 
-    resp_obj = raw_conn.recv_obj()
-    handle_go_retrieve(resp_obj, cloud, db)
-    sslSocket.close()
+    return finish_request_cloud(db, raw_conn, cloud)
+
+
+def finish_request_cloud(db, connection, cloud):
+    resp_obj = connection.recv_obj()
+    if not resp_obj.type == GO_RETRIEVE_HERE:
+        msg = 'Error while mirroring, {}'.format(resp_obj.__dict__)
+        mylog(msg, '31')
+        rd = ResultAndData(False, msg)
+    else:
+        handle_go_retrieve(resp_obj, cloud, db)
+        rd = ResultAndData(True, None)
+    return rd
 
 
 def handle_go_retrieve(response, cloud, db):
     # type: (GoRetrieveHereMessage, Cloud, SimpleDB) -> None
+
     check_response(GO_RETRIEVE_HERE, response.type)
     other_address = response.ip
     other_port = response.port
@@ -207,13 +222,16 @@ def mirror(argv):
             cloudname = arg
             args_eaten = 1
         argv = argv[args_eaten:]
-    # TODO: disallow relative paths. Absolute paths or bust.
     if cloudname is None:
         raise Exception('Must specify a cloud name to mirror')
     if host is None:
         raise Exception('Must specify a host to mirror from')
-    print 'attempting to get cloud named \'' + cloudname + '\' from',\
-        'host at [',host,'] on port[',port,'], into root [',root,']'
+
+    abs_root = os.path.abspath(root)
+
+    mylog('attempting to get cloud named "{}" from remote at [{}]:{} into root'
+          ' directory <{}>'.format(cloudname, host, port, abs_root))
+
     # okay, so manually decipher the FQDN if they input one.
     # fixme verify that directory is empty, don't do anything if it isn't
     status, my_id = ask_remote_for_id(host, port, db)
@@ -226,7 +244,9 @@ def mirror(argv):
     cloud.remote_host = host
     cloud.remote_port = port
     db.session.add(cloud)
-    cloud.root_directory = root
+
+    cloud.root_directory = abs_root
+
     cloud.name = cloudname
     db.session.commit()
     if session_id is None:
@@ -237,10 +257,7 @@ def mirror(argv):
     new_rem_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
     remote_conn = RawConnection(new_rem_sock)
     msg = MirroringCompleteMessage(cloud.my_id_from_remote, cloud.name)
-    # send_msg(
-    #     make_mirroring_complete(cloud.my_id_from_remote, cloud.name)
-    #     , new_rem_sock
-    # )
+
     remote_conn.send_obj(msg)
 
     cloud.completed_mirroring = True

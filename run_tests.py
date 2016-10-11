@@ -14,10 +14,10 @@ if __name__ == '__main__':
     # test_msgs_2.test_msgs()
     test_nebs.basic_test()
 
-    print '#' * 80
-    repop_dbs()
+    # print '#' * 80
+    # repop_dbs()
     # test_client_setup.client_setup_test()
     # god this test is broken ass shit.
-    print '#' * 80
+    # print '#' * 80
 
 

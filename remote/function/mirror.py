@@ -1,6 +1,7 @@
 from common_util import send_error_and_close, mylog
-from messages import GoRetrieveHereMessage, \
-    HostVerifyHostFailureMessage, HostVerifyHostSuccessMessage
+from messages import GoRetrieveHereMessage, HostVerifyHostFailureMessage, \
+    HostVerifyHostSuccessMessage, InvalidStateMessage, MirrorFailureMessage, \
+    AuthErrorMessage
 from msg_codes import send_generic_error_and_close
 from remote import get_db, Host, Cloud, Session
 from remote.models.HostHostFetchMapping import HostHostFetchMapping
@@ -14,17 +15,23 @@ def mirror_complete(connection, address, msg_obj):
 
     matching_host = db.session.query(Host).get(host_id)
     if matching_host is None:
-        send_generic_error_and_close(connection)
-        raise Exception('There was no host with the ID[{}], wtf'.format(host_id))
+        msg = 'There was no host with the ID[{}]'.format(host_id)
+        resp = InvalidStateMessage(msg)
+        connection.send_obj(resp)
+        connection.close()
+        return
 
     matching_cloud = db.session.query(Cloud).filter_by(name=cloudname).first()
     if matching_cloud is None:
-        send_generic_error_and_close(connection)
-        raise Exception('No cloud with name ' + cloudname)
+        msg = 'No cloud with name {}'.format(cloudname)
+        resp = InvalidStateMessage(msg)
+        connection.send_obj(resp)
+        connection.close()
+        return
 
     matching_cloud.hosts.append(matching_host)
     db.session.commit()
-    print 'Host[{}] finished mirroring cloud \'{}\''.format(host_id, cloudname)
+    mylog('Host[{}] finished mirroring cloud \'{}\''.format(host_id, cloudname))
 
 
 def host_request_cloud(connection, address, msg_obj):
@@ -34,29 +41,41 @@ def host_request_cloud(connection, address, msg_obj):
     username = msg_obj.uname
     password = msg_obj.passw
 
-    print('User provided {},{},{},{}'.format(
-        host_id, cloudname, username, password
-    ))
+    # print('User provided {},{},{},{}'.format(
+    #     host_id, cloudname, username, password
+    # ))
     matching_host = db.session.query(Host).get(host_id)
     if matching_host is None:
-        send_generic_error_and_close(connection)
-        raise Exception('There was no host with the ID[{}], wtf'.format(host_id))
+        msg = 'There was no host with the ID[{}]'.format(host_id)
+        resp = InvalidStateMessage(msg)
+        connection.send_obj(resp)
+        connection.close()
+        return
 
     match = db.session.query(Cloud).filter_by(name=cloudname).first()
     if match is None:
-        send_generic_error_and_close(connection)
-        raise Exception('No cloud with name ' + cloudname)
+        msg = 'No cloud with name {}'.format(cloudname)
+        resp = MirrorFailureMessage(msg)
+        connection.send_obj(resp)
+        connection.close()
+        return
 
     # user = db.session.query(User).filter_by(username=username).first()
     user = match.owners.filter_by(username=username).first()
     if user is None:
-        send_generic_error_and_close(connection)
-        print [owner.username for owner in match.owners.all()]
-        raise Exception(username + ' is not an owner of ' + cloudname)
-    # todo validate their password
-    # todo  validate the user is an owner of the cloud
-    # Here we've established that they are an owner.
-    # print 'Here, they will have successfully been able to mirror?'
+        msg = '{} is not an owner of {}'.format(user.username, cloudname)
+        resp = MirrorFailureMessage(msg)
+        connection.send_obj(resp)
+        connection.close()
+        return
+    verify_password = user.check_password(password)
+    if not verify_password:
+        msg = 'Invalid username/password'
+        resp = AuthErrorMessage()
+        connection.send_obj(resp)
+        connection.close()
+        return
+
     respond_to_mirror_request(db, connection, address, matching_host, match)
 
 
@@ -70,26 +89,42 @@ def client_mirror(connection, address, msg_obj):
 
     matching_host = db.session.query(Host).get(host_id)
     if matching_host is None:
-        send_generic_error_and_close(connection)
-        raise Exception('There was no host with the ID[{}], wtf'.format(host_id))
+        msg = 'There was no host with the ID[{}]'.format(host_id)
+        resp = InvalidStateMessage(msg)
+        connection.send_obj(resp)
+        connection.close()
+        return
+
     # todo: It'll be easier on the DB to find the user first, then filter their
-    # owned clouds to find the match
+    #   owned clouds to find the match
 
     match = db.session.query(Cloud).filter_by(name=cloudname).first()
     if match is None:
-        send_generic_error_and_close(connection)
-        raise Exception('No cloud with name ' + cloudname)
+        msg = 'No cloud with name {}'.format(cloudname)
+        resp = MirrorFailureMessage(msg)
+        connection.send_obj(resp)
+        connection.close()
+        return
 
     session = db.session.query(Session).filter_by(uuid=session_id).first()
     if session is None:
-        send_generic_error_and_close(connection)
-        raise Exception('provided session ID does not exist')
+        msg = 'provided session ID does not exist'
+        resp = InvalidStateMessage(msg)
+        connection.send_obj(resp)
+        connection.close()
+        return
+
     user = session.user
-    cloud_user = match.owners.filter_by(username=user.name).first()
+    cloud_user = match.owners.filter_by(username=user.username).first()
     if cloud_user is None:
-        send_generic_error_and_close(connection)
-        print [owner.username for owner in match.owners.all()]
-        raise Exception(user.name + ' is not an owner of ' + cloudname)
+        # send_generic_error_and_close(connection)
+        # print [owner.username for owner in match.owners.all()]
+        # raise Exception(user.name + ' is not an owner of ' + cloudname)
+        msg = '{} is not an owner of {}'.format(user.username, cloudname)
+        resp = MirrorFailureMessage(msg)
+        connection.send_obj(resp)
+        connection.close()
+        return
     # user is an owner, and the host exists
     respond_to_mirror_request(db, connection, address, matching_host, match)
 
@@ -126,9 +161,9 @@ def respond_to_mirror_request(db, connection, address, new_host, cloud):
         # see `host_verify_host`
     target_host_id = 0 if rand_host is None else rand_host.id
     owner_ids = [owner.id for owner in cloud.owners]
+    # GoRetrieveHere kinda acts as the MirrorSuccess message I guess...
     msg = GoRetrieveHereMessage(target_host_id, ip, port, owner_ids)
     connection.send_obj(msg)
-    # send_msg(make_go_retrieve_here_json(0, ip, port), connection)
 
     print 'nebr has reached the end of host_request_cloud'
 
