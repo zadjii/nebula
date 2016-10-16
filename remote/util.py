@@ -22,3 +22,16 @@ def get_cloud_by_name(db, uname, cname):
     #         if cloud.owner_name() == uname]
     # Hosts don't know about owner names yet, todo:15
     return db.session.query(Cloud).filter_by(name=cname).first()
+
+
+def validate_session_id(db, session_id):
+    # type: (SimpleDB, Any) -> ResultAndData
+
+    sess_obj = db.session.query(Session).filter_by(uuid=session_id).first()
+    if sess_obj is None:
+        msg = 'There is no session of uuid={}'.format(session_id)
+        return Error(msg)
+    if sess_obj.has_timed_out():
+        msg = 'Session timed out uuid={}'.format(session_id)
+        return Error(msg)
+    return Success(sess_obj)

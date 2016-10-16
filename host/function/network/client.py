@@ -3,15 +3,13 @@ import os
 import time
 from stat import S_ISDIR
 
-from common_util import mylog, send_error_and_close
+from common_util import mylog, send_error_and_close, Success, Error
 from host import get_db, Cloud
 from host.PrivateData import READ_ACCESS
 from host.function.recv_files import recv_file_tree
 from host.util import check_response, validate_or_get_client_session
-from messages import FileDoesNotExistErrorMessage, FileIsDirErrorMessage, \
-    ReadFileResponseMessage, ListFilesResponseMessage, InvalidStateMessage, \
-    ClientAuthErrorMessage
-from msg_codes import CLIENT_FILE_TRANSFER
+from messages import *
+from msg_codes import *
 
 
 def handle_recv_file_from_client(host_obj, connection, address, msg_obj):
@@ -165,3 +163,56 @@ def do_client_list_files(host_obj, connection, address, msg_obj, client):
     else:
         # the access check will send error
         pass
+
+
+
+def handle_client_add_owner(host_obj, connection, address, msg_obj):
+    mylog('handle_client_add_owner')
+    return client_message_wrapper(host_obj, connection, address, msg_obj,
+                                  do_client_add_owner)
+
+
+def do_client_add_owner(host_obj, connection, address, msg_obj, client):
+    cloud = client.cloud
+    cloudname = cloud.name
+    session_id = client.uuid
+    new_owner_id = msg_obj.new_user_id
+    private_data = host_obj.get_private_data(cloud)
+    if private_data is None:
+        err = InvalidStateMessage('Somehow the cloud doesn\'t have a '
+                                  'privatedata associated with it')
+        mylog(err.message, '31')
+        send_error_and_close(err, connection)
+        return
+
+    if not private_data.has_owner(client.user_id):
+        msg = 'User [{}] is not an owner of the cloud "{}"'.format(client.user_id, cloudname)
+        err = AddOwnerFailureMessage(msg)
+        mylog(err.message, '31')
+        send_error_and_close(err, connection)
+        return
+    rd = cloud.get_remote_conn()
+    if rd.success:
+        remote_conn = rd.data
+        request = msg_obj
+        # todo:24 too lazy to do now
+        remote_conn.send_obj(request)
+        response = remote_conn.recv_obj()
+        if response.type == ADD_OWNER_SUCCESS:
+            rd = Success()
+        else:
+            rd = Error(response.message)
+    if not rd.success:
+        msg = 'failed to validate the ADD_OWNER request with the remote, msg={}'.format(rd.data)
+        err = AddOwnerFailureMessage(msg)
+        mylog(err.message, '31')
+        send_error_and_close(err, connection)
+    else:
+        private_data.add_owner(new_owner_id)
+        private_data.commit()
+        mylog('Added user [{}] to the owners of {}'.format(new_owner_id, cloudname))
+        # todo:15
+        response = AddOwnerSuccessMessage(session_id, new_owner_id, 'todo-uname', cloudname)
+        connection.send_obj(response)
+
+

@@ -5,7 +5,7 @@ import getpass
 from sys import stdin
 import platform
 
-from common_util import ResultAndData
+from common_util import ResultAndData, Error
 from connections.RawConnection import RawConnection
 
 from host import Cloud, REMOTE_PORT, HOST_PORT, HOST_WS_PORT
@@ -97,6 +97,7 @@ def client_request_cloud(cloud, session_id, db):
 
 
 def finish_request_cloud(db, connection, cloud):
+    # type: (SimpleDB, AbstractConnection, Cloud) -> ResultAndData
     resp_obj = connection.recv_obj()
     if not resp_obj.type == GO_RETRIEVE_HERE:
         msg = 'Error while mirroring, {}'.format(resp_obj.__dict__)
@@ -249,21 +250,25 @@ def mirror(argv):
 
     cloud.name = cloudname
     db.session.commit()
+    rd = Error()
     if session_id is None:
-        request_cloud(cloud, test_enabled, db)
+        rd = request_cloud(cloud, test_enabled, db)
     else:
-        client_request_cloud(cloud, session_id, db)
+        rd = client_request_cloud(cloud, session_id, db)
     mylog('finished requesting cloud')
-    new_rem_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
-    remote_conn = RawConnection(new_rem_sock)
-    msg = MirroringCompleteMessage(cloud.my_id_from_remote, cloud.name)
 
-    remote_conn.send_obj(msg)
+    if rd.success:
+        # complete mirroring
+        new_rem_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
+        remote_conn = RawConnection(new_rem_sock)
+        msg = MirroringCompleteMessage(cloud.my_id_from_remote, cloud.name)
+        remote_conn.send_obj(msg)
 
-    cloud.completed_mirroring = True
-    db.session.commit()
+        cloud.completed_mirroring = True
+        db.session.commit()
 
-    new_rem_sock.close()
+        new_rem_sock.close()
+
     # todo goto code that checks if a nebs.start process is running
 
     mylog('nebs reached bottom of mirror()')

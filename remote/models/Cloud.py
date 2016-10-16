@@ -64,12 +64,25 @@ class Cloud(db.Base):
     def is_public(self):
         return self.privacy == PUBLIC_CLOUD
 
+    def has_owner(self, user):
+        return self.owners.filter_by(id=user.id).first() is not None
+
+    def has_contributor(self, user):
+        return self.contributors.filter_by(id=user.id).first() is not None
+
+    def add_owner(self, user):
+        if not self.has_owner(user):
+            self.owners.append(user)
+
+    def add_contributor(self, user):
+        if not self.has_contributor(user):
+            self.contributors.append(user)
+
     def can_access(self, user):
         if self.is_hidden():
-            return self.owners.filter_by(id=user.id).first() is not None
+            return self.has_owner(user)
         elif self.is_private():
-            return self.owners.filter_by(id=user.id).first() is not None \
-                or self.contributors.filter_by(id=user.id).first() is not None
+            return self.has_owner(user) or self.has_contributor(user)
         else:
             return True
 

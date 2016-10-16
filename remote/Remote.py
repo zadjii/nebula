@@ -5,6 +5,7 @@ from threading import Thread
 
 from OpenSSL import SSL
 
+from common_util import send_error_and_close
 from connections.RawConnection import RawConnection
 from host.util import set_mylog_name, mylog
 from messages import *
@@ -18,7 +19,8 @@ from remote.function.get_hosts import get_hosts_response
 from remote.function.mirror import mirror_complete, host_request_cloud, \
     client_mirror, host_verify_host
 from remote.function.new_user import new_user
-from remote.util import get_user_from_session
+from remote.util import get_user_from_session, validate_session_id, \
+    get_cloud_by_name
 
 __author__ = 'Mike'
 
@@ -63,6 +65,10 @@ def filter_func(connection, address):
         host_verify_client(connection, address, msg_obj)
     elif msg_type == HOST_VERIFY_HOST_REQUEST:
         host_verify_host(connection, address, msg_obj)
+    elif msg_type == CLIENT_ADD_OWNER:
+        client_add_owner(connection, address, msg_obj)
+    elif msg_type == ADD_CONTRIBUTOR:
+        add_contributor(connection, address, msg_obj)
     else:
         print 'I don\'t know what to do with', msg_obj
     connection.close()
@@ -120,6 +126,55 @@ def new_host_handler(connection, address, msg_obj):
     connection.send_obj(msg)
 
 
+def client_add_owner(connection, address, msg_obj):
+    # type: (AbstractConnection, object, ClientAddOwnerMessage) -> None
+    if not msg_obj.type == CLIENT_ADD_OWNER:
+        msg = 'Somehow tried to client_add_owner without CLIENT_ADD_OWNER'
+        err = InvalidStateMessage(msg)
+        send_error_and_close(err, connection)
+        return
+
+    db = get_db()
+    session_id = msg_obj.sid
+    cloudname = msg_obj.cname
+    cloud_uname = msg_obj.cloud_uname
+    new_user_id = msg_obj.new_user_id
+
+    rd = validate_session_id(db, session_id)
+    if not rd.success:
+        err = AddOwnerFailureMessage(rd.data)
+        send_error_and_close(err, connection)
+        return
+    else:
+        sess_obj = rd.data
+        user = sess_obj.user
+
+    cloud = get_cloud_by_name(db, cloud_uname, cloudname)
+    if cloud is None:
+        msg = 'No matching cloud {}'.format((cloud_uname, cloudname))
+        err = AddOwnerFailureMessage(msg)
+        send_error_and_close(err, connection)
+        return
+
+    if not cloud.has_owner(user):
+        msg = 'User "{}" is not an owner of the cloud "{}"'.format(user.username, (cloud_uname, cloudname))
+        err = AddOwnerFailureMessage(msg)
+        send_error_and_close(err, connection)
+        return
+    new_owner = db.session.query(User).get(new_user_id)
+    if new_owner is None:
+        msg = 'No matching user {}'.format(new_user_id)
+        err = AddOwnerFailureMessage(msg)
+        send_error_and_close(err, connection)
+        return
+
+    cloud.add_owner(new_owner)
+    db.session.commit()
+    response = AddOwnerSuccessMessage(session_id, new_user_id, cloud_uname, cloudname)
+    connection.send_obj(response)
+    connection.close()
+
+
 def start(argv):
     set_mylog_name('nebr')
     context = SSL.Context(SSL.SSLv23_METHOD)
@@ -130,7 +185,7 @@ def start(argv):
     s = SSL.Connection(context, s)
     address = (HOST, PORT) # ipv4
     # address = (HOST, PORT, 0, 0) # ipv6
-    s.bind(address) 
+    s.bind(address)
     mylog('Listening on {}'.format(address))
 
     s.listen(5)

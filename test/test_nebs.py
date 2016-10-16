@@ -35,6 +35,9 @@ bridesmaids_1_root = os.path.join(test_root, 'bridesmaids_1')
 bachelorette_0_root = os.path.join(test_root, 'bachelorette_0')
 bachelorette_1_root = os.path.join(test_root, 'bachelorette_1')
 
+num_successes = 0
+num_fails = 0
+
 # DONT USE DIRECTLY
 def _log_message(text, fmt):
     frameinfo = getframeinfo(currentframe().f_back.f_back)
@@ -48,9 +51,13 @@ def _log_message(text, fmt):
 
 def log_success(text):
     _log_message(text, '32')
+    global num_successes
+    num_successes += 1
 
 def log_fail(text):
     _log_message(text, '31')
+    global num_fails
+    num_fails += 1
 
 def log_warn(text):
     _log_message(text, '33')
@@ -126,6 +133,21 @@ def basic_test():
         test_client_mirror()
     finally:
         pass
+
+    global num_fails, num_successes
+    total_logs = num_fails + num_successes
+    log_text('-'*80, '31' if num_fails > 0 else '32')
+    log_text('')
+    if num_fails > 0:
+        log_text('Tests finished running with errors', '31')
+    else:
+        log_text('Tests finished running with no errors!', '32')
+    log_text('')
+    log_text('{}/{} successful logged messages'.format(num_successes, total_logs), '32')
+    log_text('{}/{} logged error messages'.format(num_fails, total_logs), '31')
+    log_text('')
+    log_text('-'*80, '31' if num_fails > 0 else '32')
+
     close_env()
 
 
@@ -200,6 +222,7 @@ def test_client_mirror():
         log_success('Succeeded mirroring wedding 0')
 
     claire.mirror('Mike-Griese', 'AfterglowWedding2017', wedding_1_root)
+    sleep(1)
     rd = check_file_contents(wedding_1_root, wedding_test_file_0, wedding_test_text_0)
     if not rd.success:
         log_fail('Failed mirroring wedding 1')
@@ -221,6 +244,73 @@ def test_client_mirror():
         log_fail('Unfortunately Alli mirrored wedding 2')
     else:
         log_success('Alli did not mirror wedding 2')
+
+    log_text('#### mirror the rest of the clouds ####')
+
+    claire.mirror('Mike-Griese', 'AfterglowWedding2017', wedding_2_root)
+    sleep(1)
+    rd = check_file_contents(wedding_2_root, wedding_test_file_0, wedding_test_text_0)
+    if not rd.success:
+        log_fail('Failed mirroring wedding 2')
+        return
+    else:
+        log_success('Succeeded mirroring wedding 2')
+
+    claire.mirror('Claire-Bovee', 'Claires-Bridesmaids', bridesmaids_0_root)
+    handle = open(os.path.join(bridesmaids_0_root, wedding_test_file_0), mode='wb')
+    handle.write(wedding_test_text_0)
+    handle.close()
+    log_text('#### Created test data in bridesmaids_0_root ####')
+    handle = open(os.path.join(bachelorette_1_root, wedding_test_file_0), mode='wb')
+    handle.write(wedding_test_text_0)
+    handle.close()
+    log_text('#### Created test data in bachelorette_1_root ####')
+    sleep(2)
+
+    log_text('#### Add an owner to the cloud and try mirroring with them ####')
+    # todo: add code to add hannah to the owners of Claires-Bridesmaids
+    # todo: actually get hannah's ID from the nebr. BUt for now we know it's [6]
+    claire_clone = HostSession(claire.sid)
+    rd = claire_clone.get_host('Claire-Bovee', 'Claires-Bridesmaids')
+    if not rd.success:
+        log_fail('failed to get_host')
+        return
+    rd = claire_clone.add_owner(6)
+    if not rd.success:
+        log_fail('failed to add_owner')
+        return
+
+    hannah.mirror('Hannah-Bovee', 'Claires-Bridesmaids', bridesmaids_1_root)
+    sleep(1)
+    rd = check_file_contents(bridesmaids_1_root, wedding_test_file_0, wedding_test_text_0)
+    if not rd.success:
+        log_fail('Failed mirroring bridesmaids 1')
+        return
+    else:
+        log_success('Succeeded mirroring bridesmaids 1')
+
+    log_text('#### Mirror a cloud, then mirror into a dir that already has a file ####')
+    hannah.mirror('Hannah-Bovee', 'Claires_Bachelorette_Party', bachelorette_0_root)
+    sleep(1)
+    alli.mirror('Hannah-Bovee', 'Claires_Bachelorette_Party', bachelorette_1_root)
+    rd = check_file_contents(bachelorette_1_root, wedding_test_file_0, wedding_test_text_0)
+    if not rd.success:
+        log_fail('Failed mirroring bachelorette 1')
+        return
+    else:
+        log_success('Succeeded mirroring bachelorette 1')
+    sleep(1)
+    rd = check_file_contents(bachelorette_0_root, wedding_test_file_0, wedding_test_text_0)
+    if not rd.success:
+        log_fail('Failed mirroring bachelorette 0')
+        # This is because the new process doesn't see that the file changed.
+        #   It was already there. Mirror needs to be updated to account for this
+        # todo:25
+        return
+    else:
+        log_success('Succeeded mirroring bachelorette 0')
+
+
 
 
 def check_file_contents(root, path, data):
@@ -455,6 +545,7 @@ class HostSession(object):
         msg = ClientFileTransferMessage(self.sid, self.cname, path, len(data), False)
         conn.send_obj(msg)
         conn.send_next_data(data)
+        conn.send_obj(ClientFileTransferMessage(self.sid, self.cname, None, None, None))
         return ResultAndData(True, 'Write doesnt check success LOL todo')
 
     def read_file(self, path):
@@ -466,6 +557,16 @@ class HostSession(object):
             fsize = resp.fsize
             data = conn.recv_next_data(fsize)
             return Success(data)
+        else:
+            return Error(resp)
+
+    def add_owner(self, new_owner_id):
+        msg = ClientAddOwnerMessage(self.sid, new_owner_id, self.cloud_uname, self.cname)
+        conn = self.connect()
+        conn.send_obj(msg)
+        resp = conn.recv_obj()
+        if resp.type == ADD_OWNER_SUCCESS:
+            return Success()
         else:
             return Error(resp)
 

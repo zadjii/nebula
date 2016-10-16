@@ -4,7 +4,7 @@ from remote import User, Cloud, Session, get_db
 from msg_codes import *
 from messages import *
 from remote.models.ClientCloudHostMapping import ClientCloudHostMapping
-from remote.util import get_cloud_by_name
+from remote.util import get_cloud_by_name, validate_session_id
 
 __author__ = 'Mike'
 
@@ -137,17 +137,14 @@ def host_verify_client(connection, address, msg_obj):
     session_id = msg_obj.sid
     mirror_id = msg_obj.id
 
-    sess_obj = db.session.query(Session).filter_by(uuid=session_id).first()
-    if sess_obj is None:
-        msg = 'There is no session of uuid={}'.format(session_id)
-        err = HostVerifyClientFailureMessage(msg)
+    rd = validate_session_id(db, session_id)
+    if not rd.success:
+        err = HostVerifyClientFailureMessage(rd.data)
         send_error_and_close(err, connection)
         return
-    if sess_obj.has_timed_out():
-        msg = 'Session timed out uuid={}'.format(session_id)
-        err = HostVerifyClientFailureMessage(msg)
-        send_error_and_close(err, connection)
-        return
+    else:
+        sess_obj = rd.data
+
     cloud = get_cloud_by_name(db, cloud_uname, cloudname)
     if cloud is None:
         msg = 'No matching cloud {}'.format((cloud_uname, cloudname))

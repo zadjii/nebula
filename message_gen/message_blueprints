@@ -110,6 +110,21 @@
 43  , HOST_VERIFY_HOST_SUCCESS, int:my_id, int:their_id, string:cloud_uname, string:cname
 
 44  , MIRROR_SUCCESS
+
+# sent from C->H->R
+45  , CLIENT_ADD_OWNER  , sid   , new_user_id, cloud_uname, cname
+46  , ADD_OWNER_SUCCESS , sid   , new_user_id, cloud_uname, cname
+
+47  , GET_USER_ID       , string:username
+# id<0 indicates error
+48  , USER_ID_RESPONSE  , string:username, int:id
+
+# C->H
+49  , CLIENT_ADD_CONTRIBUTOR, sid   , new_user_id, cloud_uname, cname, fpath, permissions
+# H->R
+50  , ADD_CONTRIBUTOR   , host_id   , new_user_id, cloud_uname, cname
+# R->H->C
+51  , ADD_CONTRIBUTOR_SUCCESS   , new_user_id, cloud_uname, cname
 ################################################################################
 #manually updated ones:
 ################################################################################
@@ -200,7 +215,9 @@
 # Used to reject client writes of .nebs files. Clients can read, but not write.
 -14 , SYSTEM_FILE_WRITE_ERROR, string:message
 # used to indicate that a mirror attempt was unsuccessful
--15 , MIRROR_FAILURE, string:message
+-15 , MIRROR_FAILURE    , string:message
+-16  , ADD_OWNER_FAILURE    , string:message
+-17  , ADD_CONTRIBUTOR_FAILURE    , string:message
 
 
 # ideas for this file:

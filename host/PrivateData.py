@@ -239,6 +239,23 @@ class PrivateData(object):
             i += 1
         return current_perms
 
+    def has_owner(self, user_id):
+        owners_group = self.get_group(OWNERS_ID)
+        if owners_group is not None:
+            return owners_group.has_user(user_id)
+        else:
+            mylog('There is no owners group for this cloud. This is likely a programming error', '31')
+        return False
+
+    def add_owner(self, user_id):
+        if not self.has_owner(user_id):
+            owners_group = self.get_group(OWNERS_ID)
+            if owners_group is not None:
+                owners_group.add_user(user_id)
+            else:
+                mylog('There is no owners group for this cloud. This is likely a programming error', '31')
+
+
     def _file_get_permissions(self, user_id, file_permissions):
         # type: (int, FilePermissions) -> int
         perms = NO_ACCESS

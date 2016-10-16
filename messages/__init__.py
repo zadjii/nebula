@@ -1,5 +1,7 @@
 # last generated 2016-10-10 23:18:11.361000
 from messages.BaseMessage import BaseMessage
+from messages.AddContributorFailureMessage import AddContributorFailureMessage
+from messages.AddOwnerFailureMessage import AddOwnerFailureMessage
 from messages.MirrorFailureMessage import MirrorFailureMessage
 from messages.SystemFileWriteErrorMessage import SystemFileWriteErrorMessage
 from messages.UnknownIoErrorMessage import UnknownIoErrorMessage
@@ -59,4 +61,11 @@ from messages.HostVerifyClientSuccessMessage import HostVerifyClientSuccessMessa
 from messages.HostVerifyHostRequestMessage import HostVerifyHostRequestMessage
 from messages.HostVerifyHostSuccessMessage import HostVerifyHostSuccessMessage
 from messages.MirrorSuccessMessage import MirrorSuccessMessage
+from messages.ClientAddOwnerMessage import ClientAddOwnerMessage
+from messages.AddOwnerSuccessMessage import AddOwnerSuccessMessage
+from messages.GetUserIdMessage import GetUserIdMessage
+from messages.UserIdResponseMessage import UserIdResponseMessage
+from messages.ClientAddContributorMessage import ClientAddContributorMessage
+from messages.AddContributorMessage import AddContributorMessage
+from messages.AddContributorSuccessMessage import AddContributorSuccessMessage
 

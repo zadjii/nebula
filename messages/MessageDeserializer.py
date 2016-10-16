@@ -3,7 +3,9 @@ import json
 from msg_codes import *
 from messages import *
 _decoder_table = {
-    MIRROR_FAILURE: MirrorFailureMessage.deserialize # -15
+    ADD_CONTRIBUTOR_FAILURE: AddContributorFailureMessage.deserialize # -17
+    , ADD_OWNER_FAILURE: AddOwnerFailureMessage.deserialize # -16
+    , MIRROR_FAILURE: MirrorFailureMessage.deserialize # -15
     , SYSTEM_FILE_WRITE_ERROR: SystemFileWriteErrorMessage.deserialize # -14
     , UNKNOWN_IO_ERROR: UnknownIoErrorMessage.deserialize # -13
     , HOST_VERIFY_HOST_FAILURE: HostVerifyHostFailureMessage.deserialize # -12
@@ -62,6 +64,13 @@ _decoder_table = {
     , HOST_VERIFY_HOST_REQUEST: HostVerifyHostRequestMessage.deserialize # 42
     , HOST_VERIFY_HOST_SUCCESS: HostVerifyHostSuccessMessage.deserialize # 43
     , MIRROR_SUCCESS: MirrorSuccessMessage.deserialize # 44
+    , CLIENT_ADD_OWNER: ClientAddOwnerMessage.deserialize # 45
+    , ADD_OWNER_SUCCESS: AddOwnerSuccessMessage.deserialize # 46
+    , GET_USER_ID: GetUserIdMessage.deserialize # 47
+    , USER_ID_RESPONSE: UserIdResponseMessage.deserialize # 48
+    , CLIENT_ADD_CONTRIBUTOR: ClientAddContributorMessage.deserialize # 49
+    , ADD_CONTRIBUTOR: AddContributorMessage.deserialize # 50
+    , ADD_CONTRIBUTOR_SUCCESS: AddContributorSuccessMessage.deserialize # 51
 }
 
 

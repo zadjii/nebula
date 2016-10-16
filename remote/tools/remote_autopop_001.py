@@ -70,12 +70,11 @@ def repop():
     bachelorette = Cloud()
     db.session.add(bachelorette)
     bachelorette.name = 'Claires_Bachelorette_Party'
-    bridesmaids.created_on = datetime.utcnow()
-    bridesmaids.last_update = datetime.utcnow()
-    bridesmaids.max_size = FOUR_GB
-    bridesmaids.owners.append(hoon)
-    bridesmaids.owners.append(alli)
-
+    bachelorette.created_on = datetime.utcnow()
+    bachelorette.last_update = datetime.utcnow()
+    bachelorette.max_size = FOUR_GB
+    bachelorette.owners.append(hoon)
+    bachelorette.owners.append(alli)
 
     db.session.commit()
     print 'Remote DB populated with 001 data - "Wedding"'
