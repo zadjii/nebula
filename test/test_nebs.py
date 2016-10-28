@@ -10,6 +10,7 @@ import signal
 from common_util import ResultAndData, enable_vt_support, Success, Error
 from connections.RawConnection import RawConnection
 from host import REMOTE_HOST, REMOTE_PORT
+from host.PrivateData import RDWR_ACCESS, READ_ACCESS, SHARE_ACCESS
 from host.util import setup_remote_socket
 from messages import *
 from msg_codes import *
@@ -37,16 +38,18 @@ bachelorette_1_root = os.path.join(test_root, 'bachelorette_1')
 
 num_successes = 0
 num_fails = 0
+fail_messages = []
 
 # DONT USE DIRECTLY
 def _log_message(text, fmt):
     frameinfo = getframeinfo(currentframe().f_back.f_back)
-
-    print('[{}:{}]\x1b[{}m{}\x1b[0m'.format(
+    output = '[{}:{}]\x1b[{}m{}\x1b[0m'.format(
         os.path.basename(frameinfo.filename)
         , frameinfo.lineno
         , fmt
-        , text))
+        , text)
+    print(output)
+    return output
 
 
 def log_success(text):
@@ -55,9 +58,10 @@ def log_success(text):
     num_successes += 1
 
 def log_fail(text):
-    _log_message(text, '31')
-    global num_fails
+    output = _log_message(text, '31')
+    global num_fails, fail_messages
     num_fails += 1
+    fail_messages.append(output)
 
 def log_warn(text):
     _log_message(text, '33')
@@ -131,9 +135,13 @@ def basic_test():
         test_client_setup()
         test_client_io()
         test_client_mirror()
+        # test_client_mirror calls test_contributors
     finally:
         pass
+    # let it settle down before wrapping up.
+    sleep(5)
 
+    # print summary of tests
     global num_fails, num_successes
     total_logs = num_fails + num_successes
     log_text('-'*80, '31' if num_fails > 0 else '32')
@@ -145,6 +153,10 @@ def basic_test():
     log_text('')
     log_text('{}/{} successful logged messages'.format(num_successes, total_logs), '32')
     log_text('{}/{} logged error messages'.format(num_fails, total_logs), '31')
+    if num_fails > 0:
+        global fail_messages
+        for msg in fail_messages:
+            log_text('\t{}'.format(msg))
     log_text('')
     log_text('-'*80, '31' if num_fails > 0 else '32')
 
@@ -222,7 +234,7 @@ def test_client_mirror():
         log_success('Succeeded mirroring wedding 0')
 
     claire.mirror('Mike-Griese', 'AfterglowWedding2017', wedding_1_root)
-    sleep(1)
+    sleep(2)
     rd = check_file_contents(wedding_1_root, wedding_test_file_0, wedding_test_text_0)
     if not rd.success:
         log_fail('Failed mirroring wedding 1')
@@ -248,7 +260,7 @@ def test_client_mirror():
     log_text('#### mirror the rest of the clouds ####')
 
     claire.mirror('Mike-Griese', 'AfterglowWedding2017', wedding_2_root)
-    sleep(1)
+    sleep(2)
     rd = check_file_contents(wedding_2_root, wedding_test_file_0, wedding_test_text_0)
     if not rd.success:
         log_fail('Failed mirroring wedding 2')
@@ -268,13 +280,12 @@ def test_client_mirror():
     sleep(2)
 
     log_text('#### Add an owner to the cloud and try mirroring with them ####')
-    # todo: add code to add hannah to the owners of Claires-Bridesmaids
-    # todo: actually get hannah's ID from the nebr. BUt for now we know it's [6]
     claire_clone = HostSession(claire.sid)
     rd = claire_clone.get_host('Claire-Bovee', 'Claires-Bridesmaids')
     if not rd.success:
         log_fail('failed to get_host')
         return
+    # todo: actually get hannah's ID from the nebr. But for now we know it's [6]
     rd = claire_clone.add_owner(6)
     if not rd.success:
         log_fail('failed to add_owner')
@@ -291,25 +302,204 @@ def test_client_mirror():
 
     log_text('#### Mirror a cloud, then mirror into a dir that already has a file ####')
     hannah.mirror('Hannah-Bovee', 'Claires_Bachelorette_Party', bachelorette_0_root)
-    sleep(1)
+    sleep(2)
     alli.mirror('Hannah-Bovee', 'Claires_Bachelorette_Party', bachelorette_1_root)
     rd = check_file_contents(bachelorette_1_root, wedding_test_file_0, wedding_test_text_0)
     if not rd.success:
-        log_fail('Failed mirroring bachelorette 1')
-        return
+        log_fail('Failed mirroring bachelorette 1 (This failure is expected)')
+        # This is because the new process doesn't see that the file changed.
+        #   It was already there. Mirror needs to be updated to account for this
+        # todo:25
+        # return
     else:
         log_success('Succeeded mirroring bachelorette 1')
     sleep(1)
     rd = check_file_contents(bachelorette_0_root, wedding_test_file_0, wedding_test_text_0)
     if not rd.success:
-        log_fail('Failed mirroring bachelorette 0')
+        log_fail('Failed mirroring bachelorette 0 (This failure is expected)')
         # This is because the new process doesn't see that the file changed.
         #   It was already there. Mirror needs to be updated to account for this
         # todo:25
-        return
+        # return
     else:
         log_success('Succeeded mirroring bachelorette 0')
 
+    sleep(3)  # let everything settle
+    test_contributors()
+
+
+def test_contributors():
+    log_text('### Contributors Test ###', '7')
+    log_text('#### This tests adding contributors, and testing their permissions ####')
+
+    rd = retrieve_client_session('Mike-Griese', 'Mike Griese')
+    if not rd.success:
+        return
+    mike = rd.data
+    log_success('successfully created Mike client')
+
+    rd = retrieve_client_session('Claire-Bovee', 'Claire Bovee')
+    if not rd.success:
+        return
+    claire = rd.data
+    log_success('successfully created Claire client')
+
+    rd = retrieve_client_session('Hannah-Bovee', 'Hannah Bovee')
+    if not rd.success:
+        return
+    hannah = rd.data
+    log_success('successfully created Hannah client')
+
+    rd = retrieve_client_session('Alli-Anderson', 'Alli Anderson')
+    if not rd.success:
+        return
+    alli = rd.data
+    log_success('successfully created Alli client')
+
+    rd = retrieve_client_session('Mr-Bovee', 'Mr Bovee')
+    if not rd.success:
+        return
+    mr_b = rd.data
+    log_success('successfully created mr_b client')
+
+    rd = mike.get_host('Mike-Griese', 'AfterglowWedding2017')
+    if not rd.success:
+        log_fail('')
+        return
+    claire_afterglow = HostSession(claire.sid)
+    rd = claire_afterglow.get_host('Mike-Griese', 'AfterglowWedding2017')
+    if not rd.success:
+        log_fail('')
+        return
+    claire_bridesmaids = HostSession(claire.sid)
+    rd = claire_bridesmaids.get_host('Claire-Bovee', 'Claires-Bridesmaids')
+    if not rd.success:
+        log_fail('')
+        return
+    log_success('Got hosts for mike, claire_afterglow, claire_bridesmaids')
+    mike.mkdir('wedding')
+    sleep(1)
+
+    wedding_dir = os.path.join(wedding_0_root, './wedding')
+    # wedding dir was made in one of the 3 hosts
+    if not (os.path.exists(os.path.join(wedding_0_root, './wedding'))
+            or os.path.exists(os.path.join(wedding_1_root, './wedding'))
+            or os.path.exists(os.path.join(wedding_2_root, './wedding'))):
+        log_fail('wedding directory doesnt exist, {}'.format(wedding_dir))
+
+    wedding_readme_text = 'This is the wedding files directory'
+    drafts_readme_text = 'This is where I\'ll prepare wedding docs'
+    # write a file to the created dir
+    mike.write('wedding/README.md', wedding_readme_text)
+    # write a file to a dir that doesnt exist
+    mike.write('drafts/README.md', drafts_readme_text)
+    sleep(1)
+
+    rd = mr_b.get_host('Mike-Griese', 'AfterglowWedding2017')
+    if rd.success:
+        log_fail('Mr B got host before he had access')
+        # todo: this is something to be looked at, ability to get host for a
+        #       client without being a owner/contributor
+    else:
+        log_success('Mr B did not get host')
+
+    # mr_b has:
+    #   /drafts: READ
+    #   /finances: RDWR & Share
+
+    # todo: actually get his ID, but we know it's [7] for now
+    rd = mike.share(7, 'drafts', READ_ACCESS)
+    if not rd.success:
+        log_fail('failed to share drafts with mr_b')
+        return
+
+    rd = mr_b.get_host('Mike-Griese', 'AfterglowWedding2017')
+    if rd.success:
+        log_success('Mr B got host')
+    else:
+        log_fail('Mr B did not get host')
+        return
+
+    rd = mr_b.read_file('drafts/README.md')
+    if not rd.success:
+        log_fail('Mr B failed to read drafts/readme.md')
+    else:
+        if rd.data == drafts_readme_text:
+            log_success('Mr B read drafts/readme.md correctly')
+        else:
+            log_fail('Mr B read drafts/readme.md incorrectly')
+
+    # read file that doesn't exist
+    rd = mr_b.read_file('finances/README.md')
+    if not rd.success:
+        log_success('Mr B failed to read finances/README.md, it doesnt exist')
+    else:
+        log_fail('Mr B was not rejected in reading finances/README.txt')
+
+    mr_b_text = 'I\'m Mr Bovee writing nonsense\n'*1024
+    log_text('#### Contributor DOESNT write to file they cant write to ####', '7')
+    rd = mr_b.write('wedding/garbage.txt', mr_b_text)
+    if rd.success:
+        log_fail('Mr B wrote to wedding/garbage.txt, (This failure is expected)')
+    else:
+        log_success('Mr B failed to write to wedding/garbage.txt')
+
+    rd = mike.share(7, 'finances', RDWR_ACCESS)
+    if not rd.success:
+        log_fail('failed to share finances with mr_b')
+
+    log_text('#### Contributor writes to file they can write to ####', '7')
+    rd = mr_b.write('finances/garbage.txt', mr_b_text)
+    if rd.success:
+        log_success('Mr B Wrote to finances/garbage.txt')
+    else:
+        log_fail('Mr B Failed to write to finances/garbage.txt')
+
+    rd = mike.read_file('finances/garbage.txt')
+    # it's possible Mike has a different host than Mr B
+    if not rd.success:
+        log_fail('Mike failed to read finances/garbage.txt')
+    else:
+        if rd.data == mr_b_text:
+            log_success('Mike read finances/garbage.txt correctly')
+        else:
+            log_fail('Mike read finances/garbage.txt incorrectly,'
+                     ' \nRead:"{}"\nExpected:"{}"'.format(len(rd.data), len(mr_b_text)))
+
+    rd = mr_b.share(6, 'finances', RDWR_ACCESS)
+    if not rd.success:
+        log_success('failed to share finances with hannah')
+    else:
+        log_fail('mr_b shared finances even though he doesnt have share permission')
+
+
+    # take away permission, but add a new one
+    rd = mike.share(7, 'finances', SHARE_ACCESS)
+
+    rd = mr_b.read_file('finances/garbage.txt')
+    if not rd.success:
+        log_success('Mr B failed to read finances/garbage.txt, no longer has permissions')
+    else:
+        log_fail('Mr B was not rejected in reading finances/garbage.txt')
+
+    rd = mr_b.share(6, 'finances', RDWR_ACCESS)
+    if not rd.success:
+        log_success('failed to share finances with hannah, he doesnt have RDWR perm')
+    else:
+        log_fail('mr_b shared finances even though he doesnt have share permission')
+
+    rd = mike.share(7, 'finances', RDWR_ACCESS | SHARE_ACCESS)
+    rd = mr_b.read_file('finances/garbage.txt')
+    if not rd.success:
+        log_fail('Mr B failed to read finances/garbage.txt, no longer has permissions')
+    else:
+        log_success('Mr B was not rejected in reading finances/garbage.txt')
+
+    rd = mr_b.share(6, 'finances', RDWR_ACCESS)
+    if not rd.success:
+        log_fail('failed to share finances with hannah, he should be able to')
+    else:
+        log_success('mr_b shared finances ')
 
 
 
@@ -548,15 +738,30 @@ class HostSession(object):
         conn.send_obj(ClientFileTransferMessage(self.sid, self.cname, None, None, None))
         return ResultAndData(True, 'Write doesnt check success LOL todo')
 
+    def mkdir(self, path):
+        msg = ClientFilePutMessage(self.sid, self.cname, path)
+        conn = create_sock_and_send(self.ip, self.port, msg)
+        msg = ClientFileTransferMessage(self.sid, self.cname, path, 0, True)
+        conn.send_obj(msg)
+        conn.send_obj(ClientFileTransferMessage(self.sid, self.cname, None, None, None))
+        return ResultAndData(True, 'Write doesnt check success LOL todo')
+
     def read_file(self, path):
         msg = ReadFileRequestMessage(self.sid, self.cname, path)
         conn = self.connect()
         conn.send_obj(msg)
+        data_buffer = ''
         resp = conn.recv_obj()
         if resp.type == READ_FILE_RESPONSE:
             fsize = resp.fsize
-            data = conn.recv_next_data(fsize)
-            return Success(data)
+            recieved = 0
+            while recieved < fsize:
+                data = conn.recv_next_data(fsize)
+                if len(data) == 0:
+                    break
+                recieved += len(data)
+                data_buffer += data
+            return Success(data_buffer)
         else:
             return Error(resp)
 
@@ -566,6 +771,18 @@ class HostSession(object):
         conn.send_obj(msg)
         resp = conn.recv_obj()
         if resp.type == ADD_OWNER_SUCCESS:
+            return Success()
+        else:
+            return Error(resp)
+
+    def share(self, new_owner_id, path, permissions):
+        msg = ClientAddContributorMessage(self.sid, new_owner_id,
+                                          self.cloud_uname, self.cname,
+                                          path, permissions)
+        conn = self.connect()
+        conn.send_obj(msg)
+        resp = conn.recv_obj()
+        if resp.type == ADD_CONTRIBUTOR_SUCCESS:
             return Success()
         else:
             return Error(resp)

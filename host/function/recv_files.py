@@ -30,7 +30,7 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
     # that file.
     if is_client:
         # todo: move this below getting the normpath, then re-get the relative path.
-        rd = host_obj.client_access_check_or_close(socket_conn, msg.sid, cloud,
+        rd = host_obj.  client_access_check_or_close(socket_conn, msg.sid, cloud,
                                                    msg_rel_path, WRITE_ACCESS)
         if not rd.success:
             return

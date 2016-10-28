@@ -156,3 +156,6 @@ def setup_remote_socket(host, port):
     # cont  auto-resolve? which would be dope.
     sslSocket = ssl.wrap_socket(s)
     return sslSocket
+
+def permissions_are_sufficient(permissions, requested):
+    return (permissions & requested) == requested

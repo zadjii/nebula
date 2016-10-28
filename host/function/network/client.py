@@ -5,9 +5,10 @@ from stat import S_ISDIR
 
 from common_util import mylog, send_error_and_close, Success, Error
 from host import get_db, Cloud
-from host.PrivateData import READ_ACCESS
+from host.PrivateData import READ_ACCESS, SHARE_ACCESS
 from host.function.recv_files import recv_file_tree
-from host.util import check_response, validate_or_get_client_session
+from host.util import check_response, validate_or_get_client_session, \
+    permissions_are_sufficient
 from messages import *
 from msg_codes import *
 
@@ -179,8 +180,8 @@ def do_client_add_owner(host_obj, connection, address, msg_obj, client):
     new_owner_id = msg_obj.new_user_id
     private_data = host_obj.get_private_data(cloud)
     if private_data is None:
-        err = InvalidStateMessage('Somehow the cloud doesn\'t have a '
-                                  'privatedata associated with it')
+        msg = 'Somehow the cloud doesn\'t have a privatedata associated with it'
+        err = InvalidStateMessage(msg)
         mylog(err.message, '31')
         send_error_and_close(err, connection)
         return
@@ -216,3 +217,69 @@ def do_client_add_owner(host_obj, connection, address, msg_obj, client):
         connection.send_obj(response)
 
 
+def handle_client_add_contributor(host_obj, connection, address, msg_obj):
+    mylog('handle_client_add_contributor')
+    return client_message_wrapper(host_obj, connection, address, msg_obj,
+                                  do_client_add_contributor)
+
+
+def do_client_add_contributor(host_obj, connection, address, msg_obj, client):
+    cloud = client.cloud
+    cloudname = cloud.name
+    session_id = client.uuid
+    new_user_id = msg_obj.new_user_id
+    fpath = msg_obj.fpath
+    new_permissions = msg_obj.permissions
+
+    # TODO: make sure the path is a relative path to the cloud
+
+    # TODO: Normalize the path
+
+    private_data = host_obj.get_private_data(cloud)
+    if private_data is None:
+        msg = 'Somehow the cloud doesn\'t have a privatedata associated with it'
+        err = InvalidStateMessage(msg)
+        mylog(err.message, '31')
+        send_error_and_close(err, connection)
+        return
+    rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
+                                               fpath, SHARE_ACCESS)
+    if not rd.success:
+        # conn was closed by client_access_check_or_close
+        return
+
+    perms = rd.data
+    if not permissions_are_sufficient(perms, new_permissions):
+        msg = 'Client doesn\'t have permission to give to other user'
+        err = AddContributorFailureMessage(msg)
+        mylog(err.message, '31')
+        send_error_and_close(err, connection)
+        return
+    mylog('Client has sharing permission')
+    rd = cloud.get_remote_conn()
+    if rd.success:
+        remote_conn = rd.data
+        # todo:15
+        request = AddContributorMessage(cloud.my_id_from_remote, new_user_id, 'todo-uname', cloudname)
+        # todo:24 too lazy to do now
+        remote_conn.send_obj(request)
+        response = remote_conn.recv_obj()
+        if response.type == ADD_CONTRIBUTOR_SUCCESS:
+            rd = Success()
+        else:
+            rd = Error(response.message)
+    mylog('completed talking to remote, {}'.format(rd))
+    if not rd.success:
+        msg = 'failed to validate the ADD_ADD_CONTRIBUTOR request with the remote, msg={}'.format(rd.data)
+        err = AddContributorFailureMessage(msg)
+        mylog(err.message, '31')
+        send_error_and_close(err, connection)
+    else:
+        private_data.add_user_permission(new_user_id, fpath, new_permissions)
+        private_data.commit()
+        mylog('Added permission {} for user [{}] to file {}:{}'.format(
+            new_permissions, new_user_id, cloudname, fpath
+        ))
+        # todo:15
+        response = AddContributorSuccessMessage(new_user_id, 'todo-uname', cloudname)
+        connection.send_obj(response)

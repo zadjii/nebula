@@ -24,6 +24,8 @@ NO_ACCESS = 0
 READ_ACCESS = 1
 WRITE_ACCESS = 2
 RDWR_ACCESS = READ_ACCESS | WRITE_ACCESS
+SHARE_ACCESS = 4
+FULL_ACCESS = SHARE_ACCESS | WRITE_ACCESS | READ_ACCESS
 
 PUBLIC_ID = 0
 OWNERS_ID = 1
@@ -168,7 +170,9 @@ class FilePermissions(object):
 
 class PrivateData(object):
     def __init__(self, cloud, owner_ids):
-        self._cloud = cloud
+        # self._cloud = cloud
+        self._cloud_id = cloud.id
+        self._cloud_root = cloud.root_directory
         self._version = (CURRENT_MAJOR_VERSION, CURRENT_MINOR_VERSION)
         self._links = []
         self._groups = [make_public_group(), make_owners_group(owner_ids)]
@@ -199,9 +203,11 @@ class PrivateData(object):
             mylog('Creating .nebs for cloud: '
                   '[{}]"{}"'.format(cloud.my_id_from_remote, cloud.name))
             root_path = os.path.join(cloud.root_directory, './')
+
             root_path = os.path.normpath(root_path)
+            root_path = os.path.relpath(root_path, cloud.root_directory)
             root_perms = FilePermissions(root_path)
-            root_perms.add_group(OWNERS_ID, RDWR_ACCESS)
+            root_perms.add_group(OWNERS_ID, FULL_ACCESS)
             self._files[root_path] = root_perms
             self.commit()
 
@@ -227,11 +233,12 @@ class PrivateData(object):
         if path_elems[0] != '.':
             path_elems.insert(0, '.')
         i = 0
-        curr_path = self._cloud.root_directory
+        curr_path = '.' # self._cloud.root_directory
         current_perms = NO_ACCESS
         while i < len(path_elems) and current_perms < RDWR_ACCESS:
             curr_path = os.path.join(curr_path, path_elems[i])
             curr_path = os.path.normpath(curr_path)
+            mylog('checking {}\'s perms for {}'.format(user_id, curr_path))
             if curr_path in self._files:
                 file_perms = self._files[curr_path]
                 new_perms = self._file_get_permissions(user_id, file_perms)
@@ -255,6 +262,20 @@ class PrivateData(object):
             else:
                 mylog('There is no owners group for this cloud. This is likely a programming error', '31')
 
+    def add_user_permission(self, new_user_id, rel_path, new_perms):
+        mylog('add_user_permission')
+        mylog('{}'.format(self._files))
+        if rel_path in self._files:
+            file_perms = self._files[rel_path]
+        else:
+        # if file_perms is None:
+            mylog('Making new FilePermissions object')
+            file_perms = FilePermissions(rel_path)
+        mylog(file_perms.__dict__)
+        file_perms.add_user(new_user_id, new_perms)
+        mylog(file_perms.__dict__)
+        self._files[rel_path] = file_perms
+        mylog('{}'.format(self._files))
 
     def _file_get_permissions(self, user_id, file_permissions):
         # type: (int, FilePermissions) -> int
@@ -345,11 +366,12 @@ class PrivateData(object):
             out_file = open(path, mode='w')
             out_file.write(data)
             out_file.close()
-            mylog('Wrote backend for [{}]"{}"'.format(
-                self._cloud.my_id_from_remote, self._cloud.name), '32')
+            # mylog('Wrote backend for [{}]"{}"'.format(
+            #     self._cloud.my_id_from_remote, self._cloud.name), '32')
             rd = ResultAndData(True, None)
         except IOError, e:
             rd = ResultAndData(False, e)
+            mylog(e)
         return rd
 
     def read_backend(self):
@@ -374,7 +396,7 @@ class PrivateData(object):
         return json.dumps(obj, indent=2)
 
     def _file_location(self):
-        cloud_root = self._cloud.root_directory
+        cloud_root = self._cloud_root
         return os.path.join(cloud_root, '.nebs')
 
     def _file_exists(self):

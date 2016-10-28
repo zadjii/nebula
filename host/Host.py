@@ -12,19 +12,19 @@ from host.PrivateData import PrivateData, NO_ACCESS, READ_ACCESS
 from host.function.local_updates import local_update_thread
 from host.function.network.client import list_files_handler, \
     handle_recv_file_from_client, handle_read_file_request, \
-    handle_client_add_owner
+    handle_client_add_owner, handle_client_add_contributor
 from host.function.network_updates import handle_fetch, handle_recv_file, \
     handle_remove_file
 from host.models.Cloud import Cloud
 from host.util import set_mylog_name, mylog, get_ipv6_list, setup_remote_socket, \
-    get_client_session
+    get_client_session, permissions_are_sufficient
 from messages import InvalidPermissionsMessage
 from messages.HostHandshakeMessage import  HostHandshakeMessage
 import platform
 
 from msg_codes import HOST_HOST_FETCH, HOST_FILE_PUSH, REMOVE_FILE, \
     STAT_FILE_REQUEST, LIST_FILES_REQUEST, CLIENT_FILE_PUT, READ_FILE_REQUEST, \
-    CLIENT_ADD_OWNER
+    CLIENT_ADD_OWNER, CLIENT_ADD_CONTRIBUTOR
 
 __author__ = 'Mike'
 
@@ -265,6 +265,8 @@ class Host:
                 handle_read_file_request(self, connection, address, msg_obj)
             elif msg_type == CLIENT_ADD_OWNER:
                 handle_client_add_owner(self, connection, address, msg_obj)
+            elif msg_type == CLIENT_ADD_CONTRIBUTOR:
+                handle_client_add_contributor(self, connection, address, msg_obj)
             else:
                 mylog('I don\'t know what to do with {},\n{}'.format(msg_obj, msg_obj.__dict__))
         except Exception, e:
@@ -274,9 +276,18 @@ class Host:
 
     def client_access_check_or_close(self, connection, client_sid, cloud, rel_path, required_access=READ_ACCESS):
         # type: (AbstractConnection, str, Cloud, str, int) -> ResultAndData
+        """
+
+        :param connection:
+        :param client_sid:
+        :param cloud:
+        :param rel_path:
+        :param required_access:
+        :return:
+        """
         permissions = self.get_client_permissions(client_sid, cloud, rel_path)
         rd = ResultAndData(True, permissions)
-        if permissions < required_access:
+        if not permissions_are_sufficient(permissions, required_access):
             err = 'Session does not have sufficient permission to access <{}>'.format(rel_path)
             mylog(err, '31')
             response = InvalidPermissionsMessage(err)

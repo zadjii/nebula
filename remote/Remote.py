@@ -68,7 +68,7 @@ def filter_func(connection, address):
     elif msg_type == CLIENT_ADD_OWNER:
         client_add_owner(connection, address, msg_obj)
     elif msg_type == ADD_CONTRIBUTOR:
-        add_contributor(connection, address, msg_obj)
+        host_add_contributor(connection, address, msg_obj)
     else:
         print 'I don\'t know what to do with', msg_obj
     connection.close()
@@ -171,6 +171,47 @@ def client_add_owner(connection, address, msg_obj):
     cloud.add_owner(new_owner)
     db.session.commit()
     response = AddOwnerSuccessMessage(session_id, new_user_id, cloud_uname, cloudname)
+    connection.send_obj(response)
+    connection.close()
+
+
+def host_add_contributor(connection, address, msg_obj):
+    # type: (AbstractConnection, object, AddContributorMessage) -> None
+    if not msg_obj.type == ADD_CONTRIBUTOR:
+        msg = 'Somehow tried to host_add_contributor without ADD_CONTRIBUTOR'
+        err = InvalidStateMessage(msg)
+        send_error_and_close(err, connection)
+        return
+    mylog('host_add_contributor')
+    db = get_db()
+    host_id = msg_obj.host_id
+    cloudname = msg_obj.cname
+    cloud_uname = msg_obj.cloud_uname
+    new_user_id = msg_obj.new_user_id
+
+    cloud = get_cloud_by_name(db, cloud_uname, cloudname)
+    if cloud is None:
+        msg = 'No matching cloud {}'.format((cloud_uname, cloudname))
+        err = AddContributorFailureMessage(msg)
+        send_error_and_close(err, connection)
+        return
+    source_host = cloud.hosts.filter_by(id=host_id).first()
+    if source_host is None:
+        msg = 'No matching host {}'.format(host_id)
+        err = AddContributorFailureMessage(msg)
+        send_error_and_close(err, connection)
+        return
+    new_owner = db.session.query(User).get(new_user_id)
+    if new_owner is None:
+        msg = 'No matching user {}'.format(new_user_id)
+        err = AddContributorFailureMessage(msg)
+        send_error_and_close(err, connection)
+        return
+
+    cloud.add_contributor(new_owner)
+    db.session.commit()
+    response = AddContributorSuccessMessage(new_user_id, cloud_uname, cloudname)
+    mylog('host_add_contributor success')
     connection.send_obj(response)
     connection.close()
 
