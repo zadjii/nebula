@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
 from uuid import uuid4
 
+from common_util import Error
+from common_util import ResultAndData
 from remote import _remote_db as db
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table, BigInteger
 from sqlalchemy.orm import relationship, backref
@@ -37,3 +39,13 @@ class Session(db.Base):
     def has_timed_out(self):
         delta = datetime.utcnow() - self.last_refresh
         return (delta.seconds/60) > 30
+
+    def refresh(self):
+        self.last_refresh = datetime.utcnow()
+
+    def get_user(self):
+        # type: () -> ResultAndData
+        if self.user is None:
+            rd = Error('No user exists on remote\'s session, sid:{}'.format(self.uuid))
+        else:
+            rd = ResultAndData(True, self.user )
