@@ -5,7 +5,7 @@ from threading import Thread
 
 from OpenSSL import SSL
 
-from common_util import send_error_and_close
+from common_util import send_error_and_close, Success, Error
 from connections.RawConnection import RawConnection
 from host.util import set_mylog_name, mylog
 from messages import *
@@ -69,6 +69,8 @@ def filter_func(connection, address):
         client_add_owner(connection, address, msg_obj)
     elif msg_type == ADD_CONTRIBUTOR:
         host_add_contributor(connection, address, msg_obj)
+    elif msg_type == CLIENT_SESSION_REFRESH:
+        client_session_refresh(connection, address, msg_obj)
     else:
         print 'I don\'t know what to do with', msg_obj
     connection.close()
@@ -86,6 +88,18 @@ def host_handshake(connection, address, msg_obj):
         host.ws_port = msg_obj.wsport
         host.last_handshake = datetime.utcnow()
         db.session.commit()
+
+
+def client_session_refresh(connection, address, msg_obj):
+    db = get_db()
+    session_id = msg_obj.sid
+    # refreshes the session
+    rd = validate_session_id(db, session_id)
+    # db.session.commit()
+
+    if not rd.success:
+        mylog('Remote failed to refresh session {}, "{}"'.format(session_id, rd.data))
+    # This particular message doesn't want a response
 
 
 def respond_to_get_clouds(connection, address, msg_obj):
