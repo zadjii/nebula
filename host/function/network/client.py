@@ -144,6 +144,15 @@ def client_message_wrapper(host_obj, connection, address, msg_obj, callback):
             send_error_and_close(err, connection)
             return
 
+        # refresh the session:
+        rd = cloud.get_remote_conn()
+        if rd.success:
+            refresh = ClientSessionRefreshMessage(session_id)
+            rd.data.send_obj(refresh)
+            rd.data.close()
+        else:
+            mylog('Failed to refresh client session.')
+
         callback(host_obj, connection, address, msg_obj, client)
 
 
