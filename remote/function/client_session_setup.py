@@ -1,5 +1,5 @@
 from uuid import uuid4
-from common_util import mylog, send_error_and_close, ResultAndData
+from common_util import mylog, send_error_and_close, ResultAndData, Error, Success
 from remote import User, Cloud, Session, get_db
 from msg_codes import *
 from messages import *
@@ -16,20 +16,54 @@ def setup_client_session(connection, address, msg_obj):
                                   'without CLIENT_SESSION_REQUEST')
         send_error_and_close(err, connection)
         return
-    db = get_db()
-
     username = msg_obj.uname
     password = msg_obj.passw
 
+    # user = db.session.query(User).filter_by(username=username).first()
+    # if user is None:
+    #     mylog('ERR: user was none')
+    #     send_generic_error_and_close(connection)  # todo send proper error
+    #     return
+    # if not user.check_password(password):
+    #     mylog('ERR: user pass wrong')
+    #     send_generic_error_and_close(connection)  # todo send proper error
+    #     return
+    #
+    # # At this point, user exists, provided correct password.
+    # # Now we assign them a session ID.
+    # # THAT'S IT. They'll come ask us for a cloud later.
+    #
+    # session = Session(user)
+    # db.session.add(session)
+    #
+    # # session.user = user
+    # db.session.commit()
+    db = get_db()
+    rd = do_setup_client_session(db, username, password)
+    if rd.success:
+        session = rd.data
+        user = session.user
+        msg = ClientSessionResponseMessage(session.uuid)
+        connection.send_obj(msg)
+        mylog('Session Setup, user,sid={},{}'.format(user.id, session.uuid))
+    else:
+        msg = AuthErrorMessage()  # todo: This should have a message. Really all errors should.
+        connection.send_obj(msg)
+
+
+def do_setup_client_session(db, username, password):
+    # type: (SimpleDB, str, str) -> ResultAndData
+    rd = Error()
     user = db.session.query(User).filter_by(username=username).first()
     if user is None:
-        mylog('ERR: user was none')
-        send_generic_error_and_close(connection)  # todo send proper error
-        return
+        msg = 'ERR: user was none'
+        mylog(msg)
+        return Error(msg)
+
     if not user.check_password(password):
-        mylog('ERR: user pass wrong')
-        send_generic_error_and_close(connection)  # todo send proper error
-        return
+        msg = 'ERR: user pass wrong'
+        mylog(msg)
+        return Error(msg)
 
     # At this point, user exists, provided correct password.
     # Now we assign them a session ID.
@@ -37,14 +71,9 @@ def setup_client_session(connection, address, msg_obj):
 
     session = Session(user)
     db.session.add(session)
-
-    # session.user = user
     db.session.commit()
 
-    msg = ClientSessionResponseMessage(session.uuid)
-    connection.send_obj(msg)
-
-    mylog('Session Setup, user,sid={},{}'.format(user.id, session.uuid))
+    return Success(session)
 
 
 def get_cloud_host(connection, address, msg_obj):

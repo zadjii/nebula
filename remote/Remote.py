@@ -5,7 +5,7 @@ from threading import Thread
 
 from OpenSSL import SSL
 
-from common_util import send_error_and_close, Success, Error
+from common_util import send_error_and_close, Success, Error, enable_vt_support
 from connections.RawConnection import RawConnection
 from host.util import set_mylog_name, mylog
 from messages import *
@@ -232,6 +232,7 @@ def host_add_contributor(connection, address, msg_obj):
 
 def start(argv):
     set_mylog_name('nebr')
+    enable_vt_support()
     context = SSL.Context(SSL.SSLv23_METHOD)
     context.use_privatekey_file(KEY_FILE)
     context.use_certificate_file(CERT_FILE)

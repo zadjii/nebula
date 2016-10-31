@@ -7,7 +7,6 @@ from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.orm import relationship, backref
 
 
-
 class User(_remote_db.Base):
     __tablename__ = 'user'
 
