@@ -76,42 +76,40 @@ def do_setup_client_session(db, username, password):
     return Success(session)
 
 
-def get_cloud_host(connection, address, msg_obj):
-    msg_type = msg_obj.type
-    if msg_type is not CLIENT_GET_CLOUD_HOST_REQUEST:
-        err = InvalidStateMessage('Somehow tried to get_cloud_host '
-                                  'without CLIENT_GET_CLOUD_HOST_REQUEST')
-        send_error_and_close(err, connection)
-        return
-    db = get_db()
-    cloudname = msg_obj.cname
-    session_id = msg_obj.sid
-
+def do_client_get_cloud_host(db, cloud_uname, cloudname, session_id):
+    # type: (SimpleDB, str, str, str, str) -> ResultAndData
+    """
+    If not rd.success, rd.data is a MessageObject
+    else rd.data::ClientCloudHostMapping
+    :param db:
+    :param cloud_uname:
+    :param cloudname:
+    :param session_id:
+    :return:
+    """
     sess_obj = db.session.query(Session).filter_by(uuid=session_id).first()
     if sess_obj is None:
-        # fixme send error
-        mylog('CGCHRq: no session? {}'.format(session_id))
-        return
+        msg = 'CGCHRq: no session? {}'.format(session_id)
+        mylog(msg)
+        return Error(InvalidStateMessage(msg))
 
     user = sess_obj.user
     if user is None:
-        err = InvalidStateMessage('Somehow there is no user for this session')
-        send_error_and_close(err, connection)
-        return
+        msg = 'Somehow there is no user for this session'
+        mylog(msg)
+        return Error(InvalidStateMessage(msg))
 
     cloud = db.session.query(Cloud).filter_by(name=cloudname).first()
     if cloud is None:
-        mylog('ERR: cloud was none')
-        send_generic_error_and_close(connection)  # todo send proper error
-        return
+        msg = 'ERR: cloud was none'
+        mylog(msg)
+        return Error(InvalidStateMessage(msg))
 
     # verify user can access the cloud
     if not cloud.can_access(user):
-        # mylog('ERR: user cannot access')
-        # mylog('{}'.format([owner.username for owner in cloud.owners.all()]))
-        err = InvalidPermissionsMessage('User cannot access this cloud')
-        send_error_and_close(err, connection)
-        return
+        msg = 'User cannot access this cloud'
+        mylog(msg)
+        return Error(InvalidPermissionsMessage(msg))
 
     # at this point, user exists, and has permission for this cloud.
     # Now we find a host for the cloud for this client.
@@ -124,23 +122,45 @@ def get_cloud_host(connection, address, msg_obj):
         host = cloud.active_hosts()[0]  # todo:13 make this random
 
     if host is None:
-        err = NoActiveHostMessage(cloud.creator_name(), cloud.name)
-        send_error_and_close(err, connection)
-        return
+        msg = 'No Active host for {},{}'.format(cloud.creator_name(), cloud.name)
+        mylog(msg)
+        return Error(NoActiveHostMessage(cloud.creator_name(), cloud.name))
+
     # todo:13 confirm that the host is alive, and can handle this response
 
     host_mapping = ClientCloudHostMapping(sess_obj, cloud, host)
     db.session.add(host_mapping)
     db.session.commit()
 
-    # tell client
-    msg = ClientGetCloudHostResponseMessage(session_id, cloud.name, host.ipv6,
-                                            host.port, host.ws_port)
-    connection.send_obj(msg)
-
     mylog(
         'Mapped client,cloud=({},{}) to host={}'.format(sess_obj.id, cloudname,
                                                         host.id))
+    return Success(host_mapping)
+
+
+def get_cloud_host(connection, address, msg_obj):
+    msg_type = msg_obj.type
+    if msg_type is not CLIENT_GET_CLOUD_HOST_REQUEST:
+        err = InvalidStateMessage('Somehow tried to get_cloud_host '
+                                  'without CLIENT_GET_CLOUD_HOST_REQUEST')
+        send_error_and_close(err, connection)
+        return
+    db = get_db()
+    cloudname = msg_obj.cname
+    session_id = msg_obj.sid
+
+    rd = do_client_get_cloud_host(db, 'todo:cloud_uname', cloudname, session_id)
+    if not rd.success:
+        connection.send_obj(rd.data)
+    else:
+        host_mapping = rd.data
+        host = host_mapping.host
+        cloud = host_mapping.cloud
+        # tell client
+        msg = ClientGetCloudHostResponseMessage(session_id, cloud.name, host.ipv6,
+                                                host.port, host.ws_port)
+        connection.send_obj(msg)
+
 
 # Note: I originally had it in my comments for the remote to give the client
 #   some piece of authentication that the host would be able to trust.
