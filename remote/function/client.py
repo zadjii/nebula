@@ -1,4 +1,4 @@
-from host.util import mylog
+from common_util import mylog
 from messages import ClientGetCloudHostsResponseMessage
 from msg_codes import send_generic_error_and_close
 from remote import get_db

@@ -44,8 +44,10 @@ class Session(db.Base):
         self.last_refresh = datetime.utcnow()
 
     def get_user(self):
+        print 'Session get_user, {}'.format(self.uuid)
         # type: () -> ResultAndData
         if self.user is None:
             rd = Error('No user exists on remote\'s session, sid:{}'.format(self.uuid))
         else:
-            rd = ResultAndData(True, self.user )
+            rd = ResultAndData(True, self.user)
+        return rd

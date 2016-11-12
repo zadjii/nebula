@@ -7,7 +7,7 @@ from OpenSSL import SSL
 
 from common_util import send_error_and_close, Success, Error, enable_vt_support
 from connections.RawConnection import RawConnection
-from host.util import set_mylog_name, mylog
+from common_util import set_mylog_name, mylog
 from messages import *
 from msg_codes import *
 from remote import User, Cloud, Host, get_db
@@ -102,28 +102,41 @@ def client_session_refresh(connection, address, msg_obj):
     # This particular message doesn't want a response
 
 
-def respond_to_get_clouds(connection, address, msg_obj):
-    db = get_db()
-    session_id = msg_obj.sid
+def do_client_get_clouds(db, session_id):
+    # type: (SimpleDB, str) -> ResultAndData
+    # type: (SimpleDB, str) -> ResultAndData(True, ([dict], [dict]) )
+    # type: (SimpleDB, str) -> ResultAndData(False, BaseMessage )
     rd = get_user_from_session(db, session_id)
     if not rd.success:
-        mylog('generic CGCHsR error: "{}"'.format(rd.data), '31') # fixme
-        send_generic_error_and_close(connection)
-        return
+        msg = 'generic CGCHsR error: "{}"'.format(rd.data)
+        mylog(msg, '31')
+        return Error(InvalidStateMessage(msg))
     else:
         user = rd.data
 
     mylog('getting clouds for {}'.format(user.username))
-    # owned_names = [c.name for c in user.owned_clouds.all()]
-    # contributed_names = [c.name for c in user.contributed_clouds.all()]
+
     owned_clouds = [c.to_dict() for c in user.owned_clouds.all()]
     contributed_clouds = [c.to_dict() for c in user.contributed_clouds.all()]
-    msg = ClientGetCloudsResponseMessage(
-        session_id
-        , owned_clouds
-        , contributed_clouds
-    )
-    connection.send_obj(msg)
+    return Success((owned_clouds, contributed_clouds))
+
+
+def respond_to_get_clouds(connection, address, msg_obj):
+    db = get_db()
+    session_id = msg_obj.sid
+    rd = do_client_get_clouds(db, session_id)
+    if rd.success:
+        owned_clouds = rd.data[0]
+        contributed_clouds = rd.data[1]
+        msg = ClientGetCloudsResponseMessage(
+            session_id
+            , owned_clouds
+            , contributed_clouds
+        )
+        connection.send_obj(msg)
+    else:
+        connection.send_obj(rd.data)
+
 
 
 def new_host_handler(connection, address, msg_obj):
