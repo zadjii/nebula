@@ -163,6 +163,14 @@ def do_client_list_files(host_obj, connection, address, msg_obj, client):
     rel_path = msg_obj.fpath
     session_id = client.uuid
     full_path = cloud.translate_relative_path(rel_path)
+
+    # todo: I believe this should be more complicated.
+    # Say a person has permission to read some children of the directory,
+    # but not the directory itself. ls returns ACCESS_ERROR currently.
+    # Perhaps it should return the children it can access?
+    # though, is this process recursive? What if I ls "/", but only have access to "/foo/bar/..."?
+    
+
     rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
                                                rel_path, READ_ACCESS)
     if rd.success:
