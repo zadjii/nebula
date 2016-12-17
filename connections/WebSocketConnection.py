@@ -81,7 +81,6 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
     def __init__(self):
         mylog('Top of MBFLSP.__init__', '32;41')
         super(MyBigFuckingLieServerProtocol, self).__init__()
-        mylog('after super')
         self._internal_client_socket = None
         mylog('Bottom of MBFLSP.__init__')
 
@@ -92,7 +91,8 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
             ('localhost'
              , MyBigFuckingLieServerProtocol.net_thread.ws_internal_port))
         MyBigFuckingLieServerProtocol.net_thread.add_ws_conn(self)
-        mylog('what the hell is going on')
+        mylog('Bottom of MBFLSP.onConnect')
+
 
     def onOpen(self):
         mylog("WebSocket connection open.")

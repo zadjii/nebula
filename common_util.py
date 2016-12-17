@@ -22,7 +22,7 @@ def set_mylog_name(name):
 
 def mylog(message, sgr_seq='0'):
     now = datetime.utcnow()
-    now_string = now.strftime('%y-%m-%d %H:%M%S.') + now.strftime('%f')[0:3]
+    now_string = now.strftime('%y%m-%d %H:%M:%S.') + now.strftime('%f')[0:2]
     if mylog_name is not None:
         print '{}|[{}] \x1b[{}m{}\x1b[0m'.format(now_string, mylog_name, sgr_seq, message)
     else:
