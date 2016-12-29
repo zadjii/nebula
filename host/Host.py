@@ -3,7 +3,7 @@ import os
 import signal
 import sys
 from inspect import getframeinfo, currentframe
-from threading import Thread, Event, Lock
+from threading import Thread, Event, Lock, Semaphore
 
 from common_util import mylog, ResultAndData
 from connections.RawConnection import RawConnection
@@ -20,13 +20,14 @@ from host.function.network_updates import handle_fetch, handle_recv_file, \
 from host.models.Cloud import Cloud
 from host.util import set_mylog_name, mylog, get_ipv6_list, setup_remote_socket, \
     get_client_session, permissions_are_sufficient
+from messages.RefreshMessageMessage import RefreshMessageMessage
 from messages import InvalidPermissionsMessage
 from messages.HostHandshakeMessage import  HostHandshakeMessage
 import platform
 
 from msg_codes import HOST_HOST_FETCH, HOST_FILE_PUSH, REMOVE_FILE, \
     STAT_FILE_REQUEST, LIST_FILES_REQUEST, CLIENT_FILE_PUT, READ_FILE_REQUEST, \
-    CLIENT_ADD_OWNER, CLIENT_ADD_CONTRIBUTOR
+    CLIENT_ADD_OWNER, CLIENT_ADD_CONTRIBUTOR, REFRESH_MESSAGE
 
 __author__ = 'Mike'
 
@@ -41,7 +42,8 @@ class Host:
         self._local_update_thread = None
         self._private_data = {} # cloud.my_id_from_remote -> PrivateData mapping
         # self._private_data = collections.MutableMapping()
-        self.network_signal = Event()
+        # self.network_signal = Event()
+        self.network_signal = Semaphore()
         self._io_lock = Lock()
         self.watchdog_worker = WatchdogWorker(self)
 
@@ -273,6 +275,9 @@ class Host:
                 handle_client_add_owner(self, connection, address, msg_obj)
             elif msg_type == CLIENT_ADD_CONTRIBUTOR:
                 handle_client_add_contributor(self, connection, address, msg_obj)
+            elif msg_type == REFRESH_MESSAGE:
+                connection.send_obj(RefreshMessageMessage())
+                pass  # for now, all we need to do is wake up on this message.
             else:
                 mylog('I don\'t know what to do with {},\n{}'.format(msg_obj, msg_obj.__dict__))
         except Exception, e:
@@ -329,5 +334,5 @@ class Host:
             os.path.basename(caller.filename)
             , os.path.basename(frameinfo.filename)
             , frameinfo.lineno))
-        self.network_signal.set()
+        self.network_signal.release()
 

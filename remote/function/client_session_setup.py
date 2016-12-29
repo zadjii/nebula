@@ -155,7 +155,8 @@ def get_cloud_host(connection, address, msg_obj):
     else:
         host_mapping = rd.data
         host = host_mapping.host
-        cloud = host_mapping.cloud
+        # cloud = host_mapping.cloud
+        cloud = db.session.query(Cloud).get(host_mapping.cloud_id)
         # tell client
         msg = ClientGetCloudHostResponseMessage(session_id, cloud.name, host.ipv6,
                                                 host.port, host.ws_port)

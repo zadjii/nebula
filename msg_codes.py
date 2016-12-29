@@ -67,6 +67,7 @@ USER_ID_RESPONSE = 48
 CLIENT_ADD_CONTRIBUTOR = 49
 ADD_CONTRIBUTOR = 50
 ADD_CONTRIBUTOR_SUCCESS = 51
+REFRESH_MESSAGE = 52
 
 
 def send_unprepared_host_error_and_close(socket):

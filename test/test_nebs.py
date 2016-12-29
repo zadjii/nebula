@@ -216,6 +216,11 @@ def test_client_mirror():
     log_success('successfully created Alli client')
 
     log_text('#### Create some test data ####')
+
+    log_text('#### client mirror the wedding cloud successfully ####')
+
+    mike.mirror('Mike-Griese', 'AfterglowWedding2017', wedding_0_root)
+
     wedding_test_text_0 = 'Hello Wedding World!'
     wedding_test_file_0 = 'hello.txt'
     handle = open(os.path.join(wedding_0_root, wedding_test_file_0), mode='wb')
@@ -223,9 +228,6 @@ def test_client_mirror():
     handle.close()
     log_text('#### Created test data in wedding_0_root ####')
 
-    log_text('#### client mirror the wedding cloud successfully ####')
-
-    mike.mirror('Mike-Griese', 'AfterglowWedding2017', wedding_0_root)
     rd = check_file_contents(wedding_0_root, wedding_test_file_0, wedding_test_text_0)
     if not rd.success:
         log_fail('Failed mirroring wedding 0')
