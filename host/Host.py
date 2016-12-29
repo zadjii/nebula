@@ -2,14 +2,16 @@ import collections
 import os
 import signal
 import sys
-from threading import Thread
+from inspect import getframeinfo, currentframe
+from threading import Thread, Event, Lock, Semaphore
 
 from common_util import mylog, ResultAndData
 from connections.RawConnection import RawConnection
 from host import get_db
 from host.NetworkThread import NetworkThread
 from host.PrivateData import PrivateData, NO_ACCESS, READ_ACCESS
-from host.function.local_updates import local_update_thread
+from host.WatchdogThread import WatchdogWorker
+from host.function.local_updates import local_update_thread, new_main_thread
 from host.function.network.client import list_files_handler, \
     handle_recv_file_from_client, handle_read_file_request, \
     handle_client_add_owner, handle_client_add_contributor
@@ -18,13 +20,14 @@ from host.function.network_updates import handle_fetch, handle_recv_file, \
 from host.models.Cloud import Cloud
 from host.util import set_mylog_name, mylog, get_ipv6_list, setup_remote_socket, \
     get_client_session, permissions_are_sufficient
+from messages.RefreshMessageMessage import RefreshMessageMessage
 from messages import InvalidPermissionsMessage
 from messages.HostHandshakeMessage import  HostHandshakeMessage
 import platform
 
 from msg_codes import HOST_HOST_FETCH, HOST_FILE_PUSH, REMOVE_FILE, \
     STAT_FILE_REQUEST, LIST_FILES_REQUEST, CLIENT_FILE_PUT, READ_FILE_REQUEST, \
-    CLIENT_ADD_OWNER, CLIENT_ADD_CONTRIBUTOR
+    CLIENT_ADD_OWNER, CLIENT_ADD_CONTRIBUTOR, REFRESH_MESSAGE
 
 __author__ = 'Mike'
 
@@ -39,6 +42,10 @@ class Host:
         self._local_update_thread = None
         self._private_data = {} # cloud.my_id_from_remote -> PrivateData mapping
         # self._private_data = collections.MutableMapping()
+        self.network_signal = Event()
+        # self.network_signal = Semaphore()
+        self._io_lock = Lock()
+        self.watchdog_worker = WatchdogWorker(self)
 
     def start(self, argv):
         set_mylog_name('nebs')
@@ -77,7 +84,8 @@ class Host:
 
         # local_update_thread(self)
         self._local_update_thread = Thread(
-            target=local_update_thread, args=[self]
+            target=new_main_thread, args=[self]
+            # target = local_update_thread, args = [self]
         )
         self._local_update_thread.start()
         self._local_update_thread.join()
@@ -87,8 +95,8 @@ class Host:
             # todo make sure connections from the old thread get dequeue'd
             self.active_network_obj.shutdown()
         mylog('Spawning new server thread on {}'.format(ipv6_address))
-        self.active_network_obj = NetworkThread(ipv6_address)
-        # mylog('')
+        self.active_network_obj = NetworkThread(ipv6_address, self)
+
         self.active_network_thread = Thread(
             target=self.active_network_obj.work_thread, args=[]
         )
@@ -267,6 +275,9 @@ class Host:
                 handle_client_add_owner(self, connection, address, msg_obj)
             elif msg_type == CLIENT_ADD_CONTRIBUTOR:
                 handle_client_add_contributor(self, connection, address, msg_obj)
+            elif msg_type == REFRESH_MESSAGE:
+                connection.send_obj(RefreshMessageMessage())
+                pass  # for now, all we need to do is wake up on this message.
             else:
                 mylog('I don\'t know what to do with {},\n{}'.format(msg_obj, msg_obj.__dict__))
         except Exception, e:
@@ -298,4 +309,31 @@ class Host:
         mylog('c access check {} {} {}'.format(client_sid, rel_path, rd.success), '30;{}'.format(bg))
         return rd
 
+    def acquire_lock(self):
+        self._io_lock.acquire()
+        frameinfo = getframeinfo(currentframe().f_back)
+        caller = getframeinfo(currentframe().f_back.f_back)
+        mylog('Locking - {}/{}:{}'.format(
+            os.path.basename(caller.filename)
+            , os.path.basename(frameinfo.filename)
+            , frameinfo.lineno))
+
+    def release_lock(self):
+        frameinfo = getframeinfo(currentframe().f_back)
+        caller = getframeinfo(currentframe().f_back.f_back)
+        mylog('Unlocking - {}/{}:{}'.format(
+            os.path.basename(caller.filename)
+            , os.path.basename(frameinfo.filename)
+            , frameinfo.lineno))
+        self._io_lock.release()
+
+    def signal(self):
+        frameinfo = getframeinfo(currentframe().f_back)
+        caller = getframeinfo(currentframe().f_back.f_back)
+        mylog('Signaling Host - {}/{}:{}'.format(
+            os.path.basename(caller.filename)
+            , os.path.basename(frameinfo.filename)
+            , frameinfo.lineno))
+        # self.network_signal.release()
+        self.network_signal.set()
 

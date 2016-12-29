@@ -125,6 +125,10 @@
 50  , ADD_CONTRIBUTOR   , host_id   , new_user_id, cloud_uname, cname
 # R->H->C
 51  , ADD_CONTRIBUTOR_SUCCESS   , new_user_id, cloud_uname, cname
+
+# M->H - This message is sent from a mirroring process to a host on the same machine (if one exists)
+#   so that the host can wake up and start hosting the new mirror as well, instead of waiting for the 30s timeout
+52  , REFRESH_MESSAGE
 ################################################################################
 #manually updated ones:
 ################################################################################

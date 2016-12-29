@@ -5,7 +5,7 @@ import getpass
 from sys import stdin
 import platform
 
-from common_util import ResultAndData, Error
+from common_util import ResultAndData, Error, set_mylog_name
 from connections.RawConnection import RawConnection
 
 from host import Cloud, REMOTE_PORT, HOST_PORT, HOST_WS_PORT
@@ -52,12 +52,12 @@ def ask_remote_for_id(host, port, db):
     check_response(ASSIGN_HOST_ID, resp_obj.type)
 
     my_id = resp_obj.id
-    print 'Remote says my id is', my_id
+    mylog('Remote says my id is {}'.format(my_id))
     # I have no idea wtf to do with this.
     key = resp_obj.key
-    print 'Remote says my key is', key
+    mylog('Remote says my key is {}'.format(key))
     cert = resp_obj.cert
-    print 'Remote says my cert is', cert
+    mylog('Remote says my cert is {}'.format(cert))
 
     sslSocket.close()
     return 0, my_id # returning a status code as well...
@@ -106,6 +106,7 @@ def finish_request_cloud(db, connection, cloud):
     else:
         handle_go_retrieve(resp_obj, cloud, db)
         rd = ResultAndData(True, None)
+        # attempt_wakeup()
     return rd
 
 
@@ -156,6 +157,24 @@ def handle_go_retrieve(response, cloud, db):
     mylog('Bottom of go_retrieve')
 
 
+def attempt_wakeup():
+    mylog('Attempting to alert any existing nebs')
+    try:
+        local_sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+        ips = get_ipv6_list()
+        ip = ips[0]
+        mylog('Local IP6 is {}'.format(ip))
+        local_sock.connect((ip, HOST_PORT, 0, 0))
+        mylog('connected to a nebs')
+        conn = RawConnection(local_sock)
+        msg = RefreshMessageMessage()
+        conn.send_obj(msg)
+        mylog('refreshed host')
+        conn.recv_obj()
+        conn.close()
+    except Exception, e:
+        mylog('Failed to alert any other hosts on this machine')
+
 def mirror_usage():
     print 'usage: neb mirror [--test][-r address][-p port]' + \
         '[-d root directory][cloudname]'
@@ -177,6 +196,7 @@ def mirror(argv):
      -- a string representing a nebula client session_id
      -- if not present, will prompt for a username and password.
     """
+    set_mylog_name('mirror')
     db = get_db()
     host = None
     port = REMOTE_PORT
@@ -268,6 +288,10 @@ def mirror(argv):
         db.session.commit()
 
         new_rem_sock.close()
+
+    if rd.success:
+        # try waking up any hosts on this machine that this mirror should be tracked by.
+        attempt_wakeup()
 
     # todo goto code that checks if a nebs.start process is running
 

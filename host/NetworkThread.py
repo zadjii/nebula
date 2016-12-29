@@ -14,7 +14,7 @@ from time import sleep
 
 
 class NetworkThread(object):
-    def __init__(self, ip_address, use_ipv6=True):
+    def __init__(self, ip_address, host, use_ipv6=True):
         self.shutdown_requested = False
         self.server_sock = None
         self._use_ipv6 = use_ipv6
@@ -35,6 +35,10 @@ class NetworkThread(object):
         self.ws_server_protocol_instance = None
         self.ws_internal_server_socket = None
         self.ws_internal_port = HOST_WS_PORT + 1
+
+        # This lock belongs to the Host that spawned us.
+        self._host = host
+
         # This V is done when the ws_work_thread is started,
         #   to keep in another thread
         # self.setup_web_socket(ipv6_address)
@@ -115,9 +119,12 @@ class NetworkThread(object):
 
         while not self.shutdown_requested:
             (connection, address) = self.server_sock.accept()
+            # self._host.acquire_lock()
             raw_conn = RawConnection(connection)
             mylog('Connected by {}'.format(address))
             self.connection_queue.append((raw_conn, address))
+            self._host.signal()
+            # self._host.release_lock()
 
         if self.server_sock is not None:
             self.server_sock.shutdown(socket.SHUT_RDWR)
@@ -158,12 +165,16 @@ class NetworkThread(object):
 
     def add_ws_conn(self, mbflsp):
         mylog('adding ws conn')
+
         # todo: Lock this such that only the MBFLSP that is currently connecting
         # cont    can actually accept the conn. (prevent out of order conns)
         (connection, address) = self.ws_internal_server_socket.accept()
+        # self._host.acquire_lock()
         mylog('accepted connection from MBFLSP')
         ws_conn = WebsocketConnection(connection, mbflsp)
         self.connection_queue.append((ws_conn, address))
+        self._host.signal()
+        # self._host.release_lock()
 
     def is_ipv6(self):
         return self._use_ipv6

@@ -197,6 +197,94 @@ def check_ipv6_changed(curr_ipv6):
         return True, new_addr
 
 
+def new_main_thread(host_obj):
+    db = get_db()
+    mylog('Beginning to watch for local modifications')
+    mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
+    num_clouds_mirrored = 0  # mirrored_clouds.count()
+
+    current_ipv6 = host_obj.active_ipv6()
+    host_obj.handshake_clouds(mirrored_clouds.all())
+
+    host_obj.acquire_lock()
+    host_obj.watchdog_worker.watch_all_clouds(mirrored_clouds.all())
+    # for mirror in mirrored_clouds.all():
+    #     host_obj.watchdog_worker.watch_path(mirror.root_directory)
+    host_obj.release_lock()
+    # for cloud in mirrored_clouds.all():
+    #     host_obj.send_remote_handshake(cloud)
+    last_handshake = datetime.utcnow()
+    db.session.close()
+    mylog('entering main loop')
+    while not host_obj.is_shutdown_requested():
+        # mylog('Top of Loop')
+        timed_out = host_obj.network_signal.wait(30)
+        # timed_out = host_obj.network_signal.acquire()
+        host_obj.network_signal.clear()
+        host_obj.acquire_lock()
+        # mylog('Signal Status = {}'.format(timed_out))
+        # if not timed_out:
+        host_obj.process_connections()
+        # mylog('Done processing connections')
+
+        db = get_db()
+        mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
+        all_mirrored_clouds = mirrored_clouds.all()
+        # check if out ip has changed since last update
+        ip_changed, new_ip = False, None
+        if host_obj.is_ipv6():
+            ip_changed, new_ip = check_ipv6_changed(current_ipv6)
+        mylog('Done checking IP change')
+        # if the ip is different, move our server over
+        if ip_changed:
+            host_obj.change_ip(new_ip, all_mirrored_clouds)
+            # todo: what if one of the remotes fails to handshake?
+            # should store the last handshake per remote
+            last_handshake = datetime.utcnow()
+            current_ipv6 = new_ip
+
+        # if the number of mirrors has changed...
+        if num_clouds_mirrored < mirrored_clouds.count():
+            # todo: if the number of mirrored clouds has changed, observe the new roots
+            # TODO: If a cloud is mirrored while we're waiting on the signal, then the
+            #       host process won't automatically wake up. We need an inter-process way
+            #       to signal that it's time for the thread to wake up again
+            mylog('number of clouds changed.')
+            host_obj.watchdog_worker.watch_all_clouds(all_mirrored_clouds)
+            mylog('checking for updates on {}'.format([cloud.my_id_from_remote for cloud in all_mirrored_clouds]))
+            num_clouds_mirrored = mirrored_clouds.count()
+            # if the number of clouds is different:
+            # - handshake all of them
+            # - Load the private data for any new ones into memory
+            for cloud in all_mirrored_clouds:
+                # load_private_data doesn't duplicate existing data
+                host_obj.load_private_data(cloud)
+                host_obj.send_remote_handshake(cloud)
+
+            last_handshake = datetime.utcnow()
+        # mylog('Done checking for changes to number of clouds')
+
+        # scan the tree for updates
+        # mylog('Checking for updates to files')
+        for cloud in all_mirrored_clouds:
+            check_local_modifications(host_obj, cloud, db)
+
+        # if more that 30s have passed since the last handshake, handshake
+        delta = datetime.utcnow() - last_handshake
+        if delta.seconds > 30:
+            host_obj.handshake_clouds(all_mirrored_clouds)
+            # for cloud in all_mirrored_clouds:
+            #     host_obj.send_remote_handshake(cloud)
+            last_handshake = datetime.utcnow()
+        db.session.close()
+        host_obj.release_lock()
+        # mylog('Bottom of loop')
+    mylog('Leaving main loop')
+
+
+
+
+
 def local_update_thread(host_obj):
     db = get_db()
     print 'Beginning to watch for local modifications'

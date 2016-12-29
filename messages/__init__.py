@@ -68,4 +68,5 @@ from messages.UserIdResponseMessage import UserIdResponseMessage
 from messages.ClientAddContributorMessage import ClientAddContributorMessage
 from messages.AddContributorMessage import AddContributorMessage
 from messages.AddContributorSuccessMessage import AddContributorSuccessMessage
+from messages.RefreshMessageMessage import RefreshMessageMessage
 

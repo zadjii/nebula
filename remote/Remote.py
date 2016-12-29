@@ -121,6 +121,33 @@ def do_client_get_clouds(db, session_id):
     return Success((owned_clouds, contributed_clouds))
 
 
+def do_add_user(db, username, password, email):
+    # type: (SimpleDB) -> ResultAndData
+    # type: (SimpleDB) -> ResultAndData(True, int)
+    # type: (SimpleDB) -> ResultAndData(False, BaseMessage )
+    if (username is None) or (password is None) or (email is None):
+        return Error(InvalidStateMessage('Must provide username, password and email'))
+
+    user = db.session.query(User).filter_by(username=username).first()
+    if user is not None:
+        return Error(InvalidStateMessage('Username already taken'))
+    user = db.session.query(User).filter_by(email=email).first()
+    if user is not None:
+        return Error(InvalidStateMessage('Email already taken'))
+
+    user = User()
+    user.username = username
+    user.password = password
+    user.email = email
+    user.created_on = datetime.utcnow()
+
+    db.session.add(user)
+    db.session.commit()
+
+    mylog('Added new user {}'.format(user.username))
+
+    return Success(user.id)
+
 def respond_to_get_clouds(connection, address, msg_obj):
     db = get_db()
     session_id = msg_obj.sid

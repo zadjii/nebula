@@ -71,6 +71,8 @@ _decoder_table = {
     , CLIENT_ADD_CONTRIBUTOR: ClientAddContributorMessage.deserialize # 49
     , ADD_CONTRIBUTOR: AddContributorMessage.deserialize # 50
     , ADD_CONTRIBUTOR_SUCCESS: AddContributorSuccessMessage.deserialize # 51
+    , REFRESH_MESSAGE: RefreshMessageMessage.deserialize # 52
+
 }
 
 

@@ -17,3 +17,4 @@ sqlparse==0.1.16
 wsgiref==0.1.2
 autobahn>=0.10.9
 trollius==2.1
+watchdog==0.8.3
