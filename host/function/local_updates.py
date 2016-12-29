@@ -217,15 +217,15 @@ def new_main_thread(host_obj):
     db.session.close()
     mylog('entering main loop')
     while not host_obj.is_shutdown_requested():
-        mylog('Top of Loop')
-        # timed_out = host_obj.network_signal.wait(30)
-        timed_out = host_obj.network_signal.acquire()
-        # host_obj.network_signal.clear()
+        # mylog('Top of Loop')
+        timed_out = host_obj.network_signal.wait(30)
+        # timed_out = host_obj.network_signal.acquire()
+        host_obj.network_signal.clear()
         host_obj.acquire_lock()
-        mylog('Signal Status = {}'.format(timed_out))
+        # mylog('Signal Status = {}'.format(timed_out))
         # if not timed_out:
         host_obj.process_connections()
-        mylog('Done processing connections')
+        # mylog('Done processing connections')
 
         db = get_db()
         mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
@@ -262,10 +262,10 @@ def new_main_thread(host_obj):
                 host_obj.send_remote_handshake(cloud)
 
             last_handshake = datetime.utcnow()
-        mylog('Done checking for changes to number of clouds')
+        # mylog('Done checking for changes to number of clouds')
 
         # scan the tree for updates
-        mylog('Checking for updates to files')
+        # mylog('Checking for updates to files')
         for cloud in all_mirrored_clouds:
             check_local_modifications(host_obj, cloud, db)
 
@@ -278,7 +278,7 @@ def new_main_thread(host_obj):
             last_handshake = datetime.utcnow()
         db.session.close()
         host_obj.release_lock()
-        mylog('Bottom of loop')
+        # mylog('Bottom of loop')
     mylog('Leaving main loop')
 
 

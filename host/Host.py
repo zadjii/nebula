@@ -42,8 +42,8 @@ class Host:
         self._local_update_thread = None
         self._private_data = {} # cloud.my_id_from_remote -> PrivateData mapping
         # self._private_data = collections.MutableMapping()
-        # self.network_signal = Event()
-        self.network_signal = Semaphore()
+        self.network_signal = Event()
+        # self.network_signal = Semaphore()
         self._io_lock = Lock()
         self.watchdog_worker = WatchdogWorker(self)
 
@@ -334,5 +334,6 @@ class Host:
             os.path.basename(caller.filename)
             , os.path.basename(frameinfo.filename)
             , frameinfo.lineno))
-        self.network_signal.release()
+        # self.network_signal.release()
+        self.network_signal.set()
 
