@@ -132,9 +132,11 @@ def basic_test():
     enable_vt_support()
     try:
         test_file_push_simple()
-        test_client_setup()
-        test_client_io()
-        test_client_mirror()
+        test_file_delete()
+        # test_client_setup()
+        # test_client_io()
+        test_client_io_big()  # This test is annoying.
+        # test_client_mirror()
         # test_client_mirror calls test_contributors
     finally:
         pass
@@ -175,7 +177,7 @@ def test_file_push_simple():
         fd.write('Line {}\n'.format(i))
     fd.close()
     # wait a sec
-    sleep(3)
+    sleep(2)
 
     # test it exists on neb 2
     file_exists = os.path.exists(neb_2_file)
@@ -183,6 +185,82 @@ def test_file_push_simple():
         log_success('File was copied to the second host')
     else:
         log_fail('File did not appear on second host')
+        return
+
+    os.remove(neb_1_file)
+    sleep(1)
+    if file_exists:
+        log_fail('File did not disappear on second host')
+        return
+    else:
+        log_success('File was deleted on the second host')
+
+
+
+def test_file_delete():
+    filename = "delete.txt"
+
+    neb_1_file = os.path.join(neb_1_path, filename)
+    neb_2_file = os.path.join(neb_2_path, filename)
+
+    # make a file on neb 0
+    fd = open(neb_1_file, mode='wb')
+    for i in range(0, 4 * 1024):
+        fd.write('Line {}\n'.format(i))
+    fd.close()
+    # wait a sec
+    sleep(2)
+
+    # test it exists on neb 2
+    file_exists = os.path.exists(neb_2_file)
+    if file_exists:
+        log_success('File was copied to the second host')
+    else:
+        log_fail('File did not appear on second host')
+        return
+
+    os.remove(neb_1_file)
+    sleep(1)
+    if file_exists:
+        log_fail('File did not disappear on second host')
+        return
+    else:
+        log_success('File was deleted on the second host')
+
+    log_text('Make a dir, with children, then delete dir')
+    dirname = 'delete-dir'
+    barname = 'bar.txt'
+    neb_1_dir = os.path.join(neb_1_path, dirname)
+    neb_2_dir = os.path.join(neb_2_path, dirname)
+    neb_1_bar = os.path.join(neb_1_dir, barname)
+    neb_2_bar = os.path.join(neb_2_dir, barname)
+    os.mkdir(neb_1_dir)
+    fd = open(neb_1_bar, mode='wb')
+    for i in range(0, 4 * 1024):
+        fd.write('Line {}\n'.format(i))
+    fd.close()
+
+    # wait a sec
+    sleep(2)
+    # test it exists on neb 2
+    file_exists = os.path.exists(neb_2_bar)
+    if file_exists:
+        log_success('File was copied to the second host')
+    else:
+        log_fail('File did not appear on second host')
+        return
+
+    shutil.rmtree(neb_1_dir)
+    # wait a sec
+    sleep(2)
+    # test it exists on neb 2
+    file_exists = os.path.exists(neb_2_bar)
+    if file_exists:
+        log_fail('File did not disappear on second host')
+        return
+    else:
+        log_success('File was deleted on the second host')
+
 
 
 def test_client_mirror():
@@ -293,7 +371,7 @@ def test_client_mirror():
         log_fail('failed to add_owner')
         return
 
-    hannah.mirror('Hannah-Bovee', 'Claires-Bridesmaids', bridesmaids_1_root)
+    hannah.mirror('Claire-Bovee', 'Claires-Bridesmaids', bridesmaids_1_root)
     sleep(1)
     rd = check_file_contents(bridesmaids_1_root, wedding_test_file_0, wedding_test_text_0)
     if not rd.success:
@@ -534,7 +612,7 @@ def get_client_host(sid, cloud_uname, cname):
         rem_sock = setup_remote_socket(REMOTE_HOST, REMOTE_PORT)
         rem_conn = RawConnection(rem_sock)
 
-        msg = ClientGetCloudHostRequestMessage(sid, cname)
+        msg = ClientGetCloudHostRequestMessage(sid, cloud_uname, cname)
         rem_conn.send_obj(msg)
         response = rem_conn.recv_obj()
         if not (response.type == CLIENT_GET_CLOUD_HOST_RESPONSE):
@@ -689,6 +767,56 @@ def test_client_io():
             log_fail('Neb 2 != client')
         neb_2_handle.close()
 
+
+def test_client_io_big():
+    log_text('### Client IO Test on a BIG File###', '7')
+
+    session_0 = None
+
+    # Create a valid session
+    rd = get_client_session('asdf', 'asdf')
+    if not rd.success:
+        log_fail('Failed to create session')
+        return
+    else:
+        log_success('Created good session')
+        session_0 = HostSession(rd.data.sid)
+
+    rd = session_0.get_host('asdf', 'qwer')
+    # rd = get_client_host(sid_0, 'asdf', 'qwer')
+    if not rd.success:
+        log_fail('Failed to get host for session')
+        return
+    else:
+        log_success('Got Host for session')
+        host_0_ip = rd.data.ip
+        host_0_port = rd.data.port
+
+    log_text('#### Test ls on some files ####', '7')
+    rd = session_0.ls('.')
+    log_fail(rd.data.serialize()) if not rd.success else log_success(rd.data.serialize())
+
+    for i in range(0, 20):
+        log_text('#### Create a file ####', '7')
+        filename = 'bar_{}.txt'.format(i)
+        real_path = os.path.join(neb_1_path, filename)
+        f = open(real_path, mode='wb')
+
+        write_data = '0123456789ABCDE\n' * 1024  # * (2 ** i)
+        for j in range(0, 2**i):
+            f.write(write_data)
+        sleep(1)
+
+        rd = session_0.read_file(filename)
+        if rd.success and rd.data == write_data:
+            log_success('Read big data for {}'.format(i))
+        else:
+            log_fail('Read Failed for big data #{}'.format(i))
+            # log_text('Expected:\n{}'.format(write_data))
+            # log_text('Received:\n{}'.format(rd.data))
+
+
+
 def retrieve_client_session(uname, password):
     rd = get_client_session(uname, password)
     if not rd.success:
@@ -723,7 +851,7 @@ class HostSession(object):
         return conn
 
     def ls(self, path):
-        msg = ListFilesRequestMessage(self.sid, self.cname, path)
+        msg = ListFilesRequestMessage(self.sid, self.cloud_uname, self.cname, path)
         response = create_sock_msg_get_response(
             self.ip
             , self.port
@@ -732,24 +860,24 @@ class HostSession(object):
         return ResultAndData(response.type == LIST_FILES_RESPONSE, response)
 
     def write(self, path, data):
-        msg = ClientFilePutMessage(self.sid, self.cname, path)
+        msg = ClientFilePutMessage(self.sid, self.cloud_uname, self.cname, path)
         conn = create_sock_and_send(self.ip, self.port, msg)
-        msg = ClientFileTransferMessage(self.sid, self.cname, path, len(data), False)
+        msg = ClientFileTransferMessage(self.sid, self.cloud_uname, self.cname, path, len(data), False)
         conn.send_obj(msg)
         conn.send_next_data(data)
-        conn.send_obj(ClientFileTransferMessage(self.sid, self.cname, None, None, None))
+        conn.send_obj(ClientFileTransferMessage(self.sid, self.cloud_uname, self.cname, None, None, None))
         return ResultAndData(True, 'Write doesnt check success LOL todo')
 
     def mkdir(self, path):
-        msg = ClientFilePutMessage(self.sid, self.cname, path)
+        msg = ClientFilePutMessage(self.sid, self.cloud_uname, self.cname, path)
         conn = create_sock_and_send(self.ip, self.port, msg)
-        msg = ClientFileTransferMessage(self.sid, self.cname, path, 0, True)
+        msg = ClientFileTransferMessage(self.sid, self.cloud_uname, self.cname, path, 0, True)
         conn.send_obj(msg)
-        conn.send_obj(ClientFileTransferMessage(self.sid, self.cname, None, None, None))
+        conn.send_obj(ClientFileTransferMessage(self.sid, self.cloud_uname, self.cname, None, None, None))
         return ResultAndData(True, 'Write doesnt check success LOL todo')
 
     def read_file(self, path):
-        msg = ReadFileRequestMessage(self.sid, self.cname, path)
+        msg = ReadFileRequestMessage(self.sid, self.cloud_uname, self.cname, path)
         conn = self.connect()
         conn.send_obj(msg)
         data_buffer = ''
@@ -790,11 +918,12 @@ class HostSession(object):
             return Error(resp)
 
     def mirror(self, uname, cname, local_root):
-        mirror_proc = Popen('python {} mirror -r {} -d {} -s {} {}'
+        mirror_proc = Popen('python {} mirror -r {} -d {} -s {} {}/{}'
                             .format('nebs.py'
                                     , 'localhost'
                                     , local_root
                                     , self.sid
+                                    , uname
                                     , cname))
         log_text('Created mirror process')
         mirror_proc.wait()

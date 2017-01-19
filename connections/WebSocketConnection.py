@@ -65,7 +65,12 @@ class WebsocketConnection(AbstractConnection):
         TODO: determine if the ws actually sent all of len()"""
         # data = data.encode('utf8')
         length = len(data)
+
+        # self._ws_server_protocol.beginMessage(isBinary=True)
+        # self._ws_server_protocol.beginMessageFrame(length)
+        # self._ws_server_protocol.sendMessageFrameData(data)
         self._ws_server_protocol.sendMessage(data, isBinary=True)
+        self._ws_server_protocol.sendPing()
         # mylog('bottom of ws send_next_data, "{}"[{}]'.format(data, length))
         # mylog('bottom of ws send_next_data')
         return length
@@ -99,10 +104,11 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
 
     def onMessage(self, payload, isBinary):
         if isBinary:
-            print("Binary message received: {0} bytes".format(len(payload)))
+            mylog("Binary message received: {0} bytes".format(len(payload)))
         else:
-            print("Text message received: {0}".format(payload.decode('utf8')))
+            mylog("Text message received: {0}".format(payload.decode('utf8')))
         self._internal_client_socket.send(payload)
+        MyBigFuckingLieServerProtocol.net_thread.signal_host()
 
         # echo back message verbatim
         # self.sendMessage(payload, isBinary)

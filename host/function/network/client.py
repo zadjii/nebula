@@ -123,7 +123,7 @@ def list_files_handler(host_obj, connection, address, msg_obj):
 def client_message_wrapper(host_obj, connection, address, msg_obj, callback):
     session_id = msg_obj.sid
     cloudname = msg_obj.cname
-    cloud_uname = None  # todo:15
+    cloud_uname = msg_obj.cloud_uname  # todo:15
     db = get_db()
 
     rd = validate_or_get_client_session(db, session_id, cloud_uname, cloudname)
@@ -192,7 +192,7 @@ def handle_client_add_owner(host_obj, connection, address, msg_obj):
 
 def do_client_add_owner(host_obj, connection, address, msg_obj, client):
     cloud = client.cloud
-    cloudname = cloud.name
+    cloudname = cloud.cname()
     session_id = client.uuid
     new_owner_id = msg_obj.new_user_id
     private_data = host_obj.get_private_data(cloud)
@@ -230,7 +230,7 @@ def do_client_add_owner(host_obj, connection, address, msg_obj, client):
         private_data.commit()
         mylog('Added user [{}] to the owners of {}'.format(new_owner_id, cloudname))
         # todo:15
-        response = AddOwnerSuccessMessage(session_id, new_owner_id, 'todo-uname', cloudname)
+        response = AddOwnerSuccessMessage(session_id, new_owner_id, cloud.uname(), cloudname)
         connection.send_obj(response)
 
 
@@ -276,8 +276,7 @@ def do_client_add_contributor(host_obj, connection, address, msg_obj, client):
     rd = cloud.get_remote_conn()
     if rd.success:
         remote_conn = rd.data
-        # todo:15
-        request = AddContributorMessage(cloud.my_id_from_remote, new_user_id, 'todo-uname', cloudname)
+        request = AddContributorMessage(cloud.my_id_from_remote, new_user_id, cloud.uname(), cloudname)
         # todo:24 too lazy to do now
         remote_conn.send_obj(request)
         response = remote_conn.recv_obj()
@@ -297,6 +296,5 @@ def do_client_add_contributor(host_obj, connection, address, msg_obj, client):
         mylog('Added permission {} for user [{}] to file {}:{}'.format(
             new_permissions, new_user_id, cloudname, fpath
         ))
-        # todo:15
-        response = AddContributorSuccessMessage(new_user_id, 'todo-uname', cloudname)
+        response = AddContributorSuccessMessage(new_user_id, cloud.uname(), cloudname)
         connection.send_obj(response)

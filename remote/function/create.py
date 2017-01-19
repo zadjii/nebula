@@ -1,11 +1,14 @@
 from datetime import datetime
 import getpass
 from werkzeug.security import check_password_hash
+
+from common_util import Error, Success
 from remote import User, Cloud, get_db
 # from remote import remote_db as db
 
 __author__ = 'zadjii'
 
+FOUR_GB = 4 * 1000 * 1000 * 1000
 
 def create(argv):
     """Creates a new cloud in the db to be tracked. Needs the credentials of the
@@ -32,10 +35,10 @@ def create(argv):
         return
     max_size = raw_input(
         'Enter a max size for the cloud in bytes' +
-        ' (leave blank to default to 4 MB(4000000)'
+        ' (leave blank to default to 4 GB(40000000000)'
     )
     if max_size is None or max_size is '':
-        max_size = 4000000
+        max_size = FOUR_GB
     else:
         max_size = int(max_size)
     create_cloud(owner_uname, owner_pass, cloud_name_in, max_size)
@@ -58,14 +61,49 @@ def create_cloud(username, password, cloudname, max_size):
         raise Exception(owner.name, 'already has a cloud named', cloudname)
 
     if max_size is None:
-        max_size = 4000000
+        max_size = FOUR_GB
     new_cloud = Cloud(
-        name=cloudname
+        creator=owner
+        , name=cloudname
         , created_on=datetime.utcnow()
         , last_update=datetime.utcnow()
         , max_size=max_size
     )
     db.session.add(new_cloud)
-    new_cloud.owners.append(owner)
+    # new_cloud.owners.append(owner)
     new_cloud.contributors.append(owner)
     db.session.commit()
+
+
+def do_create_cloud(db, creator, cloudname, max_size=FOUR_GB):
+    # type: (SimpleDB, User, str, int) -> ResultAndData
+    # type: (SimpleDB, User, str, int) -> ResultAndData(True, Cloud)
+    # type: (SimpleDB, User, str, int) -> ResultAndData(False, str)
+    """
+    This doesn't actually check any user credentials. We kinda just make a cloud for that user.
+
+    :param db:
+    :param creator:
+    :param cloudname:
+    :param max_size:
+    :return:
+    """
+    # todo:31 change the other functions here to use this function
+    if creator is None:
+        return Error('Cloud creator was None')
+    created_clouds = creator.created_clouds
+    duplicate_cloud = created_clouds.filter_by(name=cloudname).first()
+    if duplicate_cloud is not None:
+        return Error('Another cloud with the name {} already exists'.format(duplicate_cloud.full_name()))
+
+    new_cloud = Cloud(creator)
+    new_cloud.name = cloudname
+    new_cloud.max_size = max_size
+
+    db.session.add(new_cloud)
+    db.session.commit()
+    return Success(new_cloud)
+
+
+
+

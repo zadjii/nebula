@@ -22,7 +22,7 @@
 3   , REMOTE_HANDSHAKE      , int:id    , string:key    , string:cert
 4   , REM_HANDSHAKE_GO_FETCH #todo not done
 
-5   , REQUEST_CLOUD         , int:id    , string:cname  , string:uname  , string:passw
+5   , REQUEST_CLOUD         , int:id    , string:cloud_uname  , string:cname  , string:username  , string:passw
 # note: purposefully no wsport, this is for H->H only.
 # The owner_ids are used to set up the first mirror's PrivateData file.
 6   , GO_RETRIEVE_HERE      , int:id    , ip            , int:port      , blob:owner_ids
@@ -33,7 +33,7 @@
 
 # HHF is my_id asking other_id for the files at root and below on cloud (uname, cname)
 8   , HOST_HOST_FETCH       , int:my_id    , int:other_id    , string:cloud_uname, string:cname  , string:root
-9   , HOST_FILE_TRANSFER    , int:id    , string:cname  , string:fpath, int:fsize, bool:isdir
+9   , HOST_FILE_TRANSFER    , int:id    , string:cloud_uname, string:cname  , string:fpath, int:fsize, bool:isdir
 
 10  , MAKE_CLOUD_REQUEST #todo not done
 11  , MAKE_CLOUD_RESPONSE #todo not done
@@ -41,9 +41,9 @@
 12  , MAKE_USER_REQUEST #todo not done
 13  , MAKE_USER_RESPONSE #todo not done
 
-14  , MIRRORING_COMPLETE    , int:id    , string:cname
+14  , MIRRORING_COMPLETE    , int:id    , string:cloud_uname, string:cname
 
-15  , GET_HOSTS_REQUEST     , int:id    , string:cname
+15  , GET_HOSTS_REQUEST     , int:id    , string:cloud_uname, string:cname
 
 # 16 GHRp - Manual
 
@@ -54,16 +54,16 @@
 #todo:23
 17  , FILE_TRANSFER_SUCCESS , string:cloud_uname, string:cname, string:fpath
 
-18  , REMOVE_FILE           , int:id    , string:cname  , string:fpath
-19  , HOST_FILE_PUSH        , int:tid   , string:cname  , string:fpath # target id? I don't remember....
+18  , REMOVE_FILE           , int:id    , string:cloud_uname, string:cname  , string:fpath
+19  , HOST_FILE_PUSH        , int:tid   , string:cloud_uname, string:cname  , string:fpath # target id? I don't remember....
 
-20  , STAT_FILE_REQUEST     , sid       , string:cname  , string:fpath
+20  , STAT_FILE_REQUEST     , sid       , string:cloud_uname, string:cname  , string:fpath
 # 21 SFRp - Manual
 
-22  , LIST_FILES_REQUEST    , sid       , string:cname, string:fpath
+22  , LIST_FILES_REQUEST    , sid       , string:cloud_uname, string:cname, string:fpath
 # 23 LFRp - Manual
 
-24  , READ_FILE_REQUEST     , sid       , string:cname, string:fpath
+24  , READ_FILE_REQUEST     , sid       , string:cloud_uname, string:cname, string:fpath
 25  , READ_FILE_RESPONSE    , sid       , string:fpath, int:fsize #todo not done
 
 26  , CLIENT_SESSION_REQUEST    , string:uname  , string:passw
@@ -77,19 +77,19 @@
 #   Should be used in tandem whenever the client reads/writes from the host.
 27, CLIENT_SESSION_REFRESH  , sid
 
-29  , CLIENT_FILE_PUT           , sid, string:cname, string:fpath
-30  , CLIENT_FILE_TRANSFER      , sid, string:cname, string:fpath, int:fsize, bool:isdir
+29  , CLIENT_FILE_PUT           , sid, string:cloud_uname, string:cname, string:fpath
+30  , CLIENT_FILE_TRANSFER      , sid, string:cloud_uname, string:cname, string:fpath, int:fsize, bool:isdir
 
 31  , CLIENT_GET_CLOUDS_REQUEST     , sid
 
 # these two args get arrays of strings filled with the cnames for a user's clouds
 32  , CLIENT_GET_CLOUDS_RESPONSE    , sid, blob:owned, blob:contrib
 
-33  , CLIENT_GET_CLOUD_HOST_REQUEST      , sid, string:cname
-34  , CLIENT_GET_CLOUD_HOST_RESPONSE     , sid, string:cname, ip, int:port  , int:wsport
+33  , CLIENT_GET_CLOUD_HOST_REQUEST      , sid, string:cloud_uname, string:cname
+34  , CLIENT_GET_CLOUD_HOST_RESPONSE     , sid, string:cloud_uname, string:cname, ip, int:port  , int:wsport
 
 # These are only the hosts that have heartbeat recently
-35  , GET_ACTIVE_HOSTS_REQUEST     , int:id    , string:cname
+35  , GET_ACTIVE_HOSTS_REQUEST     , int:id    , string:cloud_uname, string:cname
 # 36 GAHRp - Manual
 
 # note: adding the uname to this message, even though it's not used for addressing clouds yet.

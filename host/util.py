@@ -63,10 +63,8 @@ def check_response(expected, recieved):
 
 
 def get_clouds_by_name(db, uname, cname):
-    # return [cloud for cloud in db.session.query(Cloud).filter_by(name=cname)
-    #         if cloud.owner_name() == uname]
-    # Hosts don't know about owner names yet, todo:15
-    return [cloud for cloud in db.session.query(Cloud).filter_by(name=cname)]
+    # return [cloud for cloud in db.session.query(Cloud).filter_by(name=cname)]
+    return [cloud for cloud in db.session.query(Cloud).filter_by(username=uname, name=cname)]
 
 
 def get_client_session(db, uuid, cloud_uname, cloud_cname):
@@ -76,7 +74,7 @@ def get_client_session(db, uuid, cloud_uname, cloud_cname):
         rd = Error('No matching session')
     else:
         for client in matching_clients:
-            if client.cloud.name == cloud_cname: # todo:15 use uname/cname
+            if client.cloud.uname() == cloud_uname and client.cloud.cname() == cloud_cname:
                 rd = ResultAndData(True, client)
                 break
         if not rd.success:
@@ -139,7 +137,7 @@ def validate_or_get_client_session(db, uuid, cloud_uname, cloud_cname):
     if not rd.success:
         rd = ResultAndData(False,
                            'Could not verify client session={}'.format(uuid))
-        print rd.data
+        mylog(rd.data)
     return rd
 
 

@@ -17,7 +17,8 @@ class Cloud(db.Base):
 
     id = Column(Integer, primary_key=True)
     my_id_from_remote = Column(Integer)
-    name = Column(String)
+    name = Column(String)  # cloudname
+    username = Column(String)  # uname
     created_on = Column(DateTime)
     mirrored_on = Column(DateTime)
 
@@ -36,6 +37,15 @@ class Cloud(db.Base):
     # cont have lots of sessions.
     clients = relationship('Client', backref='cloud', lazy='dynamic')
 
+    def full_name(self):
+        return '{}/{}'.format(self.uname(), self.cname())
+
+    def cname(self):
+        return self.name
+
+    def uname(self):
+        return self.username
+
     def get_remote_conn(self):
         from host.util import setup_remote_socket
 
@@ -53,7 +63,7 @@ class Cloud(db.Base):
         return full_path
 
     # we might end up needing the message
-    def create_or_update_node(self, full_path, file_transfer_msg, db):
+    def create_or_update_node(self, full_path, db):
         # msg = file_transfer_msg
         # file_isdir = msg['isdir']
         # file_size = msg['fsize']

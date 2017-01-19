@@ -15,7 +15,7 @@ def list_clouds(argv):
                                                     , 'port')
     for cloud in clouds:
 
-        print '[{}] {:5} {:16} {:24} {:16} {:8}'\
-            .format(cloud.id, cloud.my_id_from_remote, cloud.name
+        print '[{}] {:5} {}/{}\t\t{:24} {:16} {:8}'\
+            .format(cloud.id, cloud.my_id_from_remote, cloud.uname(), cloud.cname()
                     , cloud.root_directory
                     , cloud.remote_host, cloud.remote_port)

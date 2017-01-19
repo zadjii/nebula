@@ -226,7 +226,7 @@ class Host:
 
     def get_client_permissions(self, client_sid, cloud, relative_path):
         db = get_db()
-        rd = get_client_session(db, client_sid, None, cloud.name)  # todo:15 use un/cn
+        rd = get_client_session(db, client_sid, cloud.uname(), cloud.cname())
         # mylog('get_client_permissions [{}] {}'.format(0, rd))
         if rd.success:
             client = rd.data
@@ -313,27 +313,27 @@ class Host:
         self._io_lock.acquire()
         frameinfo = getframeinfo(currentframe().f_back)
         caller = getframeinfo(currentframe().f_back.f_back)
-        mylog('Locking - {}/{}:{}'.format(
-            os.path.basename(caller.filename)
-            , os.path.basename(frameinfo.filename)
-            , frameinfo.lineno))
+        # mylog('Locking - {}/{}:{}'.format(
+        #     os.path.basename(caller.filename)
+        #     , os.path.basename(frameinfo.filename)
+        #     , frameinfo.lineno))
 
     def release_lock(self):
         frameinfo = getframeinfo(currentframe().f_back)
         caller = getframeinfo(currentframe().f_back.f_back)
-        mylog('Unlocking - {}/{}:{}'.format(
-            os.path.basename(caller.filename)
-            , os.path.basename(frameinfo.filename)
-            , frameinfo.lineno))
+        # mylog('Unlocking - {}/{}:{}'.format(
+        #     os.path.basename(caller.filename)
+        #     , os.path.basename(frameinfo.filename)
+        #     , frameinfo.lineno))
         self._io_lock.release()
 
     def signal(self):
         frameinfo = getframeinfo(currentframe().f_back)
         caller = getframeinfo(currentframe().f_back.f_back)
-        mylog('Signaling Host - {}/{}:{}'.format(
-            os.path.basename(caller.filename)
-            , os.path.basename(frameinfo.filename)
-            , frameinfo.lineno))
+        # mylog('Signaling Host - {}/{}:{}'.format(
+        #     os.path.basename(caller.filename)
+        #     , os.path.basename(frameinfo.filename)
+        #     , frameinfo.lineno))
         # self.network_signal.release()
         self.network_signal.set()
 

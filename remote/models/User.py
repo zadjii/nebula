@@ -19,5 +19,7 @@ class User(_remote_db.Base):
 
     sessions = relationship('Session', backref='user', lazy='dynamic')
 
+    created_clouds = relationship('Cloud', backref='creator', lazy='dynamic')
+
     def check_password(self, provided_password):
         return check_password_hash(self.password, provided_password)

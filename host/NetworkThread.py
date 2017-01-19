@@ -173,8 +173,11 @@ class NetworkThread(object):
         mylog('accepted connection from MBFLSP')
         ws_conn = WebsocketConnection(connection, mbflsp)
         self.connection_queue.append((ws_conn, address))
-        self._host.signal()
+        self.signal_host()
         # self._host.release_lock()
+
+    def signal_host(self):
+        self._host.signal()
 
     def is_ipv6(self):
         return self._use_ipv6

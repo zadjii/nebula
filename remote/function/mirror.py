@@ -4,6 +4,7 @@ from messages import GoRetrieveHereMessage, HostVerifyHostFailureMessage, \
     AuthErrorMessage
 from msg_codes import send_generic_error_and_close
 from remote import get_db, Host, Cloud, Session
+from remote.models.User import User
 from remote.models.HostHostFetchMapping import HostHostFetchMapping
 from remote.util import get_cloud_by_name
 
@@ -37,8 +38,9 @@ def mirror_complete(connection, address, msg_obj):
 def host_request_cloud(connection, address, msg_obj):
     db = get_db()
     host_id = msg_obj.id
+    cloud_uname = msg_obj.cloud_uname
     cloudname = msg_obj.cname
-    username = msg_obj.uname
+    username = msg_obj.username
     password = msg_obj.passw
 
     # print('User provided {},{},{},{}'.format(
@@ -52,9 +54,18 @@ def host_request_cloud(connection, address, msg_obj):
         connection.close()
         return
 
-    match = db.session.query(Cloud).filter_by(name=cloudname).first()
+    creator = db.session.query(User).filter_by(username=cloud_uname).first()
+    if creator is None:
+        msg = 'There was no cloud matching name {}/{}'.format(cloud_uname, cloudname)
+        resp = InvalidStateMessage(msg)
+        connection.send_obj(resp)
+        connection.close()
+        return
+
+    # match = db.session.query(Cloud).filter_by(name=cloudname).first()
+    match = creator.created_clouds.filter_by(name=cloudname).first()
     if match is None:
-        msg = 'No cloud with name {}'.format(cloudname)
+        msg = 'No cloud with name {}/{}'.format(cloud_uname, cloudname)
         resp = MirrorFailureMessage(msg)
         connection.send_obj(resp)
         connection.close()
@@ -98,9 +109,18 @@ def client_mirror(connection, address, msg_obj):
     # todo: It'll be easier on the DB to find the user first, then filter their
     #   owned clouds to find the match
 
-    match = db.session.query(Cloud).filter_by(name=cloudname).first()
+    creator = db.session.query(User).filter_by(username=cloud_uname).first()
+    if creator is None:
+        msg = 'There was no cloud matching name {}/{}'.format(cloud_uname, cloudname)
+        resp = InvalidStateMessage(msg)
+        connection.send_obj(resp)
+        connection.close()
+        return
+
+    # match = db.session.query(Cloud).filter_by(name=cloudname).first()
+    match = creator.created_clouds.filter_by(name=cloudname).first()
     if match is None:
-        msg = 'No cloud with name {}'.format(cloudname)
+        msg = 'No cloud with name {}/{}'.format(cloud_uname, cloudname)
         resp = MirrorFailureMessage(msg)
         connection.send_obj(resp)
         connection.close()
@@ -157,7 +177,7 @@ def respond_to_mirror_request(db, connection, address, new_host, cloud):
         mylog('Created a host mapping [{}]->[{}] for {}'.format(
             rand_host.id
             , new_host.id
-            , (cloud.creator_name(), cloud.name)), '34;103')
+            , (cloud.uname(), cloud.cname())), '34;103')
         # see `host_verify_host`
     target_host_id = 0 if rand_host is None else rand_host.id
     owner_ids = [owner.id for owner in cloud.owners]
@@ -165,7 +185,7 @@ def respond_to_mirror_request(db, connection, address, new_host, cloud):
     msg = GoRetrieveHereMessage(target_host_id, ip, port, owner_ids)
     connection.send_obj(msg)
 
-    print 'nebr has reached the end of host_request_cloud'
+    mylog('nebr has reached the end of host_request_cloud')
 
 
 def host_verify_host(connection, address, msg_obj):

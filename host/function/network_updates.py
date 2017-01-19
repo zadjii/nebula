@@ -47,7 +47,7 @@ def handle_fetch(host_obj, connection, address, msg_obj):
     other_id = msg_obj.my_id
     local_id = msg_obj.other_id
     cloudname = msg_obj.cname
-    cloud_uname = None  # todo:15
+    cloud_uname = msg_obj.cloud_uname
     requested_root = msg_obj.root
 
     # Go to the remote, ask them if the fetching host is ok'd to be here.
@@ -62,7 +62,7 @@ def handle_fetch(host_obj, connection, address, msg_obj):
     their_ip = address[0]
     mylog('The connected host is via IP="{}"'.format(their_ip))
 
-    send_tree(other_id, matching_mirror, requested_root, connection)
+    send_tree(db, other_id, matching_mirror, requested_root, connection)
     mylog('Bottom of handle_fetch', '32')
 
 

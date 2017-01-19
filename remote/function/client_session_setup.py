@@ -99,7 +99,13 @@ def do_client_get_cloud_host(db, cloud_uname, cloudname, session_id):
         mylog(msg)
         return Error(InvalidStateMessage(msg))
 
-    cloud = db.session.query(Cloud).filter_by(name=cloudname).first()
+    creator = db.session.query(User).filter_by(username=cloud_uname).first()
+    if creator is None:
+        err = 'No cloud matching {}/{}'.format(cloud_uname, cloudname)
+        msg = InvalidStateMessage(err)
+        return Error(msg)
+    cloud = creator.created_clouds.filter_by(name=cloudname).first()
+    # cloud = db.session.query(Cloud).filter_by(username=cloud_uname, name=cloudname).first()
     if cloud is None:
         msg = 'ERR: cloud was none'
         mylog(msg)
@@ -122,9 +128,9 @@ def do_client_get_cloud_host(db, cloud_uname, cloudname, session_id):
         host = cloud.active_hosts()[0]  # todo:13 make this random
 
     if host is None:
-        msg = 'No Active host for {},{}'.format(cloud.creator_name(), cloud.name)
+        msg = 'No Active host for {},{}'.format(cloud.uname(), cloud.cname())
         mylog(msg)
-        return Error(NoActiveHostMessage(cloud.creator_name(), cloud.name))
+        return Error(NoActiveHostMessage(cloud.uname(), cloud.cname()))
 
     # todo:13 confirm that the host is alive, and can handle this response
 
@@ -147,9 +153,10 @@ def get_cloud_host(connection, address, msg_obj):
         return
     db = get_db()
     cloudname = msg_obj.cname
+    cloud_uname = msg_obj.cloud_uname
     session_id = msg_obj.sid
 
-    rd = do_client_get_cloud_host(db, 'todo:cloud_uname', cloudname, session_id)
+    rd = do_client_get_cloud_host(db, cloud_uname, cloudname, session_id)
     if not rd.success:
         connection.send_obj(rd.data)
     else:
@@ -158,7 +165,7 @@ def get_cloud_host(connection, address, msg_obj):
         # cloud = host_mapping.cloud
         cloud = db.session.query(Cloud).get(host_mapping.cloud_id)
         # tell client
-        msg = ClientGetCloudHostResponseMessage(session_id, cloud.name, host.ipv6,
+        msg = ClientGetCloudHostResponseMessage(session_id, cloud.uname(), cloud.cname(), host.ipv6,
                                                 host.port, host.ws_port)
         connection.send_obj(msg)
 

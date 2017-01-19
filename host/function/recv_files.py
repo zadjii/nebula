@@ -68,8 +68,11 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
     else:  # is normal file
         data_buffer = ''  # fixme i'm using a string to buffer this?? LOL
         total_read = 0
+        # todo:23
+        file_handle = open(full_path, mode='wb')
+        file_handle.seek(0, 0)  # seek to 0B relative to start
         while total_read < msg_file_size:
-            new_data = socket_conn.recv_next_data(min(1024, (msg_file_size - total_read)))
+            new_data = socket_conn.recv_next_data(min(1024 * 4, (msg_file_size - total_read)))
             nbytes = len(new_data)
             # print 'read ({},{})'.format(new_data, nbytes)
             if total_read is None or new_data is None:
@@ -77,25 +80,21 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
                 print 'I know I should have broke AND I JUST DIDN\'T ANYWAYS'
                 break
             total_read += nbytes
-            data_buffer += new_data
+            # data_buffer += new_data
+            file_handle.write(new_data)
             # print '<{}>read:{}B, total:{}B, expected total:{}B'.format(
             #     msg_rel_path, nbytes, total_read, msg_file_size
             # )
         exists = os.path.exists(full_path)
 
-        file_handle = None
+        # file_handle = None
         # try:
-        file_handle = open(full_path, mode='wb')
-        # except (OSError, IOError) as e:
-        # todo:23
-        #     mylog('FUCK')
-        file_handle.seek(0, 0)  # seek to 0B relative to start
 
-        file_handle.write(data_buffer)
+        # file_handle.write(data_buffer)
         file_handle.close()
         mylog('[{}] wrote the file to {}'.format(cloud.my_id_from_remote, full_path), '30;42')
 
-    updated_node = cloud.create_or_update_node(msg_rel_path, msg, db)
+    updated_node = cloud.create_or_update_node(msg_rel_path, db)
     if updated_node is not None:
         old_modified_on = updated_node.last_modified
         updated_node.last_modified = datetime.utcfromtimestamp(os.path.getmtime(full_path))

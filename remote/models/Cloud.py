@@ -53,7 +53,16 @@ class Cloud(db.Base):
     max_size = Column(Integer)  # Cloud size in bytes
     privacy = Column(Integer, default=PRIVATE_CLOUD)
 
+    creator_id = Column(ForeignKey('user.id'))
     # sessions = relationship('Session', backref='cloud', lazy='dynamic')
+
+    def __init__(self, creator):
+        self.creator_id = creator.id
+        self.owners.append(creator)
+        self.created_on = datetime.utcnow()
+        self.last_update = datetime.utcnow()
+        self.privacy = PRIVATE_CLOUD
+        self.max_size = -1
 
     def is_hidden(self):
         return self.privacy == HIDDEN_CLOUD
@@ -95,15 +104,25 @@ class Cloud(db.Base):
 
     def creator_name(self):
         # todo/fixme: this is temporary until I add uname properly to the DB
-        first_owner = self.owners.first()
-        if first_owner is not None:
-            return first_owner.username
-        return None
+        # first_owner = self.owners.first()
+        # if first_owner is not None:
+        #     return first_owner.username
+        # return None
+        return self.uname()
+
+    def uname(self):
+        return self.creator.username
+
+    def cname(self):
+        return self.name
+
+    def full_name(self):
+        return '{}/{}'.format(self.uname(), self.name)
 
     def to_dict(self):
         self_dict = {
-            'uname': self.creator_name()
-            , 'cname': self.name
+            'uname': self.uname()
+            , 'cname': self.cname()
             , 'created_on': self.created_on.isoformat() + 'Z"'
             , 'last_update': self.last_update.isoformat() + 'Z"'
             , 'max_size': self.max_size

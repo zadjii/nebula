@@ -8,7 +8,7 @@ __author__ = 'Mike'
 
 def start_nebs(host_dir, host_id, start_after_mirror):
     host_proc = Popen(
-        'python nebs.py mirror --test -r localhost -d {} qwer'.format(host_dir)
+        'python nebs.py mirror --test -r localhost -d {} asdf/qwer'.format(host_dir)
         , stdin=PIPE
         , shell=True)
     print 'nebs[{}] mirror pid: {}'.format(host_id, host_proc.pid)

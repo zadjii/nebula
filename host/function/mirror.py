@@ -77,7 +77,7 @@ def request_cloud(cloud, test_enabled, db):
         password = getpass.getpass()
 
     raw_conn = RawConnection(sslSocket)
-    msg = RequestCloudMessage(cloud.my_id_from_remote, cloud.name, username, password)
+    msg = RequestCloudMessage(cloud.my_id_from_remote, cloud.uname(), cloud.cname(), username, password)
     raw_conn.send_obj(msg)
 
     # resp_obj = raw_conn.recv_obj()
@@ -89,8 +89,7 @@ def client_request_cloud(cloud, session_id, db):
     sslSocket = setup_remote_socket(cloud.remote_host, cloud.remote_port)
     raw_conn = RawConnection(sslSocket)
 
-    # todo:15
-    msg = ClientMirrorMessage(session_id, cloud.my_id_from_remote, 'todo_cloud_uname', cloud.name)
+    msg = ClientMirrorMessage(session_id, cloud.my_id_from_remote, cloud.uname(), cloud.cname())
     raw_conn.send_obj(msg)
 
     return finish_request_cloud(db, raw_conn, cloud)
@@ -137,8 +136,8 @@ def handle_go_retrieve(response, cloud, db):
     # host_sock = setup_remote_socket(other_address, other_port)
     # todo:8 initialize our ssl context here
 
-    cloud_uname = None  # todo:15
-    cname = cloud.name
+    cloud_uname = cloud.uname()
+    cname = cloud.cname()
     my_id = cloud.my_id_from_remote
     msg = HostHostFetchMessage(my_id, other_id, cloud_uname, cname, '/')
     host_conn.send_obj(msg)
@@ -248,13 +247,24 @@ def mirror(argv):
     if host is None:
         raise Exception('Must specify a host to mirror from')
 
+    if cloudname.find('/') == -1:
+        raise Exception('Cloudname must be formatted as username/cloudname')
+
+    uname_cname = cloudname.split('/')
+    uname = uname_cname[0]
+    cname = uname_cname[1]
+
+    if len(uname) < 1 or len(cname) < 1:
+        raise Exception('Cloudname must be formatted as username/cloudname')
+
     abs_root = os.path.abspath(root)
 
     mylog('attempting to get cloud named "{}" from remote at [{}]:{} into root'
           ' directory <{}>'.format(cloudname, host, port, abs_root))
 
     # okay, so manually decipher the FQDN if they input one.
-    # fixme verify that directory is empty, don't do anything if it isn't
+    # todo:30 verify that directory is empty, don't do anything if it isn't
+    # also todo:25 ^
     status, my_id = ask_remote_for_id(host, port, db)
     if not status == 0:
         raise Exception('Exception while mirroring:' +
@@ -265,10 +275,11 @@ def mirror(argv):
     cloud.remote_host = host
     cloud.remote_port = port
     db.session.add(cloud)
-
     cloud.root_directory = abs_root
 
-    cloud.name = cloudname
+    cloud.name = cname
+    cloud.username = uname
+
     db.session.commit()
     rd = Error()
     if session_id is None:
@@ -281,7 +292,7 @@ def mirror(argv):
         # complete mirroring
         new_rem_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
         remote_conn = RawConnection(new_rem_sock)
-        msg = MirroringCompleteMessage(cloud.my_id_from_remote, cloud.name)
+        msg = MirroringCompleteMessage(cloud.my_id_from_remote, cloud.uname(), cloud.cname())
         remote_conn.send_obj(msg)
 
         cloud.completed_mirroring = True

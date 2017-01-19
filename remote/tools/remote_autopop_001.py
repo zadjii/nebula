@@ -42,7 +42,7 @@ def repop():
 
     db.session.commit()
 
-    wedding = Cloud()
+    wedding = Cloud(mikegr)
     db.session.add(wedding)
     wedding.name = 'AfterglowWedding2017'
     wedding.created_on = datetime.utcnow()
@@ -57,23 +57,23 @@ def repop():
     # wedding.contributors.append(sueg)
     # wedding.contributors.append(daddio)
 
-    bridesmaids = Cloud()
+    bridesmaids = Cloud(clairabel)
     db.session.add(bridesmaids)
     bridesmaids.name = 'Claires-Bridesmaids'
     bridesmaids.created_on = datetime.utcnow()
     bridesmaids.last_update = datetime.utcnow()
     bridesmaids.max_size = FOUR_GB
-    bridesmaids.owners.append(clairabel)
+    # bridesmaids.owners.append(clairabel)
     # wedding.contributors.append(hoon)
     # bridesmaids.owners.append(alli)
 
-    bachelorette = Cloud()
+    bachelorette = Cloud(hoon)
     db.session.add(bachelorette)
     bachelorette.name = 'Claires_Bachelorette_Party'
     bachelorette.created_on = datetime.utcnow()
     bachelorette.last_update = datetime.utcnow()
     bachelorette.max_size = FOUR_GB
-    bachelorette.owners.append(hoon)
+    # bachelorette.owners.append(hoon)
     bachelorette.owners.append(alli)
 
     db.session.commit()

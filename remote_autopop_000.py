@@ -41,23 +41,23 @@ def repop():
 
     remote_db.session.commit()
 
-    qwer = Cloud()
+    qwer = Cloud(asdf)
     remote_db.session.add(qwer)
     qwer.name = 'qwer'
     qwer.created_on = datetime.utcnow()
     qwer.last_update = datetime.utcnow()
-    qwer.owners.append(asdf)
+    # qwer.owners.append(asdf)
     qwer.owners.append(admin)
     qwer.contributors.append(mike)
     qwer.max_size = 4000000
 
-    zxcv = Cloud()
+    zxcv = Cloud(admin)
     remote_db.session.add(zxcv)
     zxcv.name = 'zxcv'
     zxcv.created_on = datetime.utcnow()
     zxcv.last_update = datetime.utcnow()
     zxcv.contributors.append(asdf)
-    zxcv.owners.append(admin)
+    # zxcv.owners.append(admin)
     zxcv.owners.append(mike)
     zxcv.max_size = 4 * 1000 * 1000 * 1000  # 4GB
 

@@ -5,7 +5,7 @@ from stat import S_ISDIR
 import time
 from connections.RawConnection import RawConnection
 from host import FileNode, get_db, Cloud, HOST_PORT
-from host.function.send_files import send_file_to_other, complete_sending_files
+from host.function.send_files import send_file_to_other, complete_sending_files, send_file_to_local
 from host.util import check_response, setup_remote_socket, mylog, get_ipv6_list
 from msg_codes import *
 from messages import *
@@ -13,13 +13,13 @@ from messages import *
 __author__ = 'Mike'
 
 
-def send_updates(cloud, updates):
+def send_updates(db, cloud, updates):
     mylog('[{}] has updates {}'.format(cloud.my_id_from_remote, updates))
     # connect to remote
     ssl_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
     raw_connection = RawConnection(ssl_sock)
     # get hosts list
-    msg = GetActiveHostsRequestMessage(cloud.my_id_from_remote, cloud.name)
+    msg = GetActiveHostsRequestMessage(cloud.my_id_from_remote, cloud.uname(), cloud.cname())
     raw_connection.send_obj(msg)
     response = raw_connection.recv_obj()
     check_response(GET_ACTIVE_HOSTS_RESPONSE, response.type)
@@ -28,33 +28,40 @@ def send_updates(cloud, updates):
     for host in hosts:
         if host['id'] == cloud.my_id_from_remote:
             continue
-        update_peer(cloud, host, updates)
+        update_peer(db, cloud, host, updates)
         updated_peers += 1
     mylog('[{}] updated {} peers'.format(cloud.my_id_from_remote, updated_peers))
 
 
-def update_peer(cloud, host, updates):
-    host_id = host['id']
+def update_peer(db, cloud, host, updates):
+    host_id = host['id']  # id of host to recv files
     host_ip = host['ip']
     host_port = host['port']
     host_sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
     host_sock.connect((host_ip, host_port, 0, 0))
     raw_connection = RawConnection(host_sock)
-    msg = HostFilePushMessage(host_id, cloud.name, 'i-dont-give-a-fuck')
+    msg = HostFilePushMessage(host_id, cloud.uname(), cloud.cname(), 'i-dont-give-a-fuck')  # the full path apparently doesn't matter
     raw_connection.send_obj(msg)
+
+    matching_local_mirror = db.session.query(Cloud).filter_by(my_id_from_remote=host_id).first()
+    local_peer = matching_local_mirror is not None
 
     for update in updates:
         file_path = update[1]
         relative_pathname = os.path.relpath(file_path, cloud.root_directory)
         if update[0] == FILE_CREATE or update[0] == FILE_UPDATE:
-            send_file_to_other(
-                host_id
-                , cloud
-                , os.path.join(cloud.root_directory, relative_pathname)
-                , raw_connection
-                , recurse=False)
+            if local_peer:
+                send_file_to_local(db, cloud, matching_local_mirror, relative_pathname)
+            else:
+                send_file_to_other(
+                    host_id
+                    , cloud
+                    , os.path.join(cloud.root_directory, relative_pathname)
+                    , raw_connection
+                    , recurse=False)
+
         elif update[0] == FILE_DELETE:
-            msg = RemoveFileMessage(host_id, cloud.name, relative_pathname)
+            msg = RemoveFileMessage(host_id, cloud.uname(), cloud.cname(), relative_pathname)
             raw_connection.send_obj(msg)
         else:
             print 'Welp this shouldn\'t happen'
@@ -132,6 +139,36 @@ def local_file_update(host_obj, directory_path, dir_node, filename, filenode, db
     return updates
 
 
+def local_file_delete(host_obj, directory_path, dir_node, filename, filenode, db):
+    # type: (Host, str, FileNode, str, FileNode, SimpleDB) -> [(int, str)]
+    #   where (int, str): (FILE_DELETE, full_path)
+    file_pathname = os.path.join(directory_path, filename)
+    # we don't need to recurse for the subdirs of this name
+    # we do need to recurse on subnodes
+
+    # This is safe even on the root filenode (Which is a Cloud object)
+    # because the Cloud has children, and because we're not deleting
+    # the node it's called on.
+    recursive_child_delete(db, filenode)
+
+    # fortunately, filenode isn't ever the root of the cloud, so delete it too.
+    db.session.delete(filenode)
+
+
+def recursive_child_delete(db, filenode):
+    # type: (SimpleDB, FileNode) -> ResultAndData
+    # DON'T delete the node it's called on.
+    children_to_delete = filenode.children.all()
+    i = 0
+    to_delete = len(children_to_delete)
+    while i < to_delete:
+        child = children_to_delete[i]
+        children_to_delete.extend(child.children.all())
+        i += 1
+        to_delete = len(children_to_delete)
+    for child in children_to_delete:
+        db.session.delete(child)
+
 FILE_CREATE = 0
 FILE_UPDATE = 1
 FILE_DELETE = 2
@@ -160,6 +197,8 @@ def recursive_local_modifications_check(host_obj, directory_path, dir_node, db):
         elif files[i] > nodes[j].name:  # redundant if clause, there for clarity
             # todo handle file deletes, moves.
             # updates.append((FILE_DELETE, nodes[j])) -> this is a problemo
+            delete_updates = local_file_delete(host_obj, directory_path, dir_node, files[i], db)
+            updates.extend(delete_updates)
             j += 1
     while i < num_files:  # create the rest of the files
         # print 'finishing', (num_files-i), 'files'
@@ -178,7 +217,7 @@ def check_local_modifications(host_obj, cloud, db):
     root = cloud.root_directory
     updates = recursive_local_modifications_check(host_obj, root, cloud, db)
     if len(updates) > 0:
-        send_updates(cloud, updates)
+        send_updates(db, cloud, updates)
 
 
 def check_ipv6_changed(curr_ipv6):
@@ -234,7 +273,7 @@ def new_main_thread(host_obj):
         ip_changed, new_ip = False, None
         if host_obj.is_ipv6():
             ip_changed, new_ip = check_ipv6_changed(current_ipv6)
-        mylog('Done checking IP change')
+        # mylog('Done checking IP change')
         # if the ip is different, move our server over
         if ip_changed:
             host_obj.change_ip(new_ip, all_mirrored_clouds)

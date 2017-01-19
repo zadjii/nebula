@@ -4,6 +4,7 @@ from datetime import datetime
 from threading import Thread
 
 from OpenSSL import SSL
+from werkzeug.security import generate_password_hash
 
 from common_util import send_error_and_close, Success, Error, enable_vt_support
 from connections.RawConnection import RawConnection
@@ -137,7 +138,7 @@ def do_add_user(db, username, password, email):
 
     user = User()
     user.username = username
-    user.password = password
+    user.password = generate_password_hash(password)
     user.email = email
     user.created_on = datetime.utcnow()
 
