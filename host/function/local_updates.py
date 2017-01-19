@@ -359,6 +359,7 @@ def local_update_thread(host_obj):
 
         # if the number of mirrors has changed...
         if num_clouds_mirrored < mirrored_clouds.count():
+            all_mirrored_clouds = mirrored_clouds.all()
             mylog('checking for updates on {}'.format([cloud.my_id_from_remote for cloud in all_mirrored_clouds]))
             num_clouds_mirrored = mirrored_clouds.count()
             # if the number of clouds is different:

@@ -98,7 +98,7 @@ def do_client_read_file(host_obj, connection, address, msg_obj, client):
             l = sent_len
             total_len += sent_len
             num_transfers += 1
-            if (num_transfers % 128 == 0) and num_transfers > 1:
+            if (num_transfers % 127 == 1) and num_transfers >= 1:
                 mylog('sent {} blobs of <{}> ({}/{}B total)'
                       .format(num_transfers, filepath, total_len,
                               req_file_size))

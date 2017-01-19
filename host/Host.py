@@ -313,27 +313,27 @@ class Host:
         self._io_lock.acquire()
         frameinfo = getframeinfo(currentframe().f_back)
         caller = getframeinfo(currentframe().f_back.f_back)
-        # mylog('Locking - {}/{}:{}'.format(
-        #     os.path.basename(caller.filename)
-        #     , os.path.basename(frameinfo.filename)
-        #     , frameinfo.lineno))
+        mylog('Locking - {}/{}:{}'.format(
+            os.path.basename(caller.filename)
+            , os.path.basename(frameinfo.filename)
+            , frameinfo.lineno))
 
     def release_lock(self):
         frameinfo = getframeinfo(currentframe().f_back)
         caller = getframeinfo(currentframe().f_back.f_back)
-        # mylog('Unlocking - {}/{}:{}'.format(
-        #     os.path.basename(caller.filename)
-        #     , os.path.basename(frameinfo.filename)
-        #     , frameinfo.lineno))
+        mylog('Unlocking - {}/{}:{}'.format(
+            os.path.basename(caller.filename)
+            , os.path.basename(frameinfo.filename)
+            , frameinfo.lineno))
         self._io_lock.release()
 
     def signal(self):
         frameinfo = getframeinfo(currentframe().f_back)
         caller = getframeinfo(currentframe().f_back.f_back)
-        # mylog('Signaling Host - {}/{}:{}'.format(
-        #     os.path.basename(caller.filename)
-        #     , os.path.basename(frameinfo.filename)
-        #     , frameinfo.lineno))
+        mylog('Signaling Host - {}/{}:{}'.format(
+            os.path.basename(caller.filename)
+            , os.path.basename(frameinfo.filename)
+            , frameinfo.lineno))
         # self.network_signal.release()
         self.network_signal.set()
 
