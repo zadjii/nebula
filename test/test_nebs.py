@@ -168,8 +168,11 @@ def basic_test():
 def test_file_push_simple():
     filename = "foo.txt"
 
+    # neb_1_file = os.path.join(neb_1_path, 'dir')
+    # neb_2_file = os.path.join(neb_2_path, 'dir')
+
     neb_1_file = os.path.join(neb_1_path, filename)
-    neb_2_file = os.path.join(neb_2_path, filename)
+    neb_2_file = os.path.join(neb_1_path, filename)
 
     # make a file on neb 0
     fd = open(neb_1_file, mode='wb')
@@ -221,6 +224,7 @@ def test_file_delete():
 
     os.remove(neb_1_file)
     sleep(1)
+    file_exists = os.path.exists(neb_2_file)
     if file_exists:
         log_fail('File did not disappear on second host')
         return
@@ -241,7 +245,7 @@ def test_file_delete():
     fd.close()
 
     # wait a sec
-    sleep(2)
+    sleep(1)
     # test it exists on neb 2
     file_exists = os.path.exists(neb_2_bar)
     if file_exists:
@@ -252,7 +256,7 @@ def test_file_delete():
 
     shutil.rmtree(neb_1_dir)
     # wait a sec
-    sleep(2)
+    sleep(1)
     # test it exists on neb 2
     file_exists = os.path.exists(neb_2_bar)
     if file_exists:

@@ -157,3 +157,84 @@ def setup_remote_socket(host, port):
 
 def permissions_are_sufficient(permissions, requested):
     return (permissions & requested) == requested
+
+
+def get_breadth_first_children(root):
+    # type: (FileNode) -> [(str, FileNode)]
+    children = [('.', root)]
+    num_children = 1
+    i = 0
+    while i < num_children:
+        parent = children[i][1]
+        parent_full_path = children[i][0]
+        new_children = parent.children
+        for child in new_children.all():
+            children.append((os.path.join(parent_full_path, child.name), child))
+        i += 1
+        num_children += new_children.count()
+    children.pop(0)  # remove the root
+    return children
+
+
+def remove_all_parents(children, index):
+    # type: ([(str, FileNode)], int) -> [(str, FileNode)]
+    """
+    Children must be a reverse BFS of nodes for this to work.
+    :param children:
+    :param index:
+    :return:
+    """
+    child_path, child = children[index]
+    path_elems = os.path.normpath(child_path).split(os.path.sep)
+    subset = children[index:]
+    last_parent_index = index
+    for i in range(0, len(path_elems)):
+        elem = path_elems[i]
+        found_parent = False
+        for j in range(last_parent_index, len(children)):
+            family_path, family_node = children[j]
+            if family_node.name == elem:
+                last_parent_index = j
+                children.pop(last_parent_index)
+                found_parent = True
+                break
+        # If the parent wasn't found, then the parent isn't a Node at all
+        # That means we've iterated on all parents in this list
+        # OR the parent was already taken out of this list. Which is good enough.
+        if not found_parent:
+            break
+
+    return children
+
+
+def find_deletable_children(root, full_path, timestamp):
+    # type: (FileNode, str, datetime) -> [(str, FileNode)]
+    # find all children of this node, BFS
+    # reverse the order (bottom up)
+    # for node in children:
+    #   if node.mtime < timestamp
+    #       remove all of it's parents from the list
+    #       remove it from the list
+    #   else
+    #       leave in the list
+    # remove all nodes still in the list
+    children = get_breadth_first_children(root)
+    children = children[::-1]  # my favorite python operator
+    deleteables = []
+    i = 0
+    done = i >= len(children)
+    while not done:
+        # mylog('find_deletable_children {}/{}'.format(i, len(children)))
+        # print('find_deletable_children {}/{}'.format(i, len(children)))
+        child_path, node = children[i]
+        child_mtime = node.last_modified
+        if child_mtime > timestamp:
+            children = remove_all_parents(children, i)
+            children.pop(i)
+            # leave i where it is, the next node is at that index now.
+        else:
+            i += 1
+        done = i >= len(children)
+
+    return children
+

@@ -15,7 +15,7 @@ from host.function.local_updates import local_update_thread, new_main_thread
 from host.function.network.client import list_files_handler, \
     handle_recv_file_from_client, handle_read_file_request, \
     handle_client_add_owner, handle_client_add_contributor
-from host.function.network_updates import handle_fetch, handle_recv_file, \
+from host.function.network_updates import handle_fetch, handle_file_change, \
     handle_remove_file
 from host.models.Cloud import Cloud
 from host.util import set_mylog_name, mylog, get_ipv6_list, setup_remote_socket, \
@@ -168,7 +168,7 @@ class Host:
         num_conns = len(self.active_network_obj.connection_queue)
         while num_conns > 0:
             (conn, addr) = self.active_network_obj.connection_queue.pop(0)
-        # for (conn, addr) in self.active_network_obj.connection_queue[:]:
+            # for (conn, addr) in self.active_network_obj.connection_queue[:]:
             self.filter_func(conn, addr)
             num_conns -= 1
             mylog('processed {} from {}'.format(conn.__class__, addr))
@@ -206,9 +206,10 @@ class Host:
         if cloud.completed_mirroring:
             self._private_data[cloud.my_id_from_remote] = PrivateData(cloud, None)
 
-    def is_private_data_file(self, path, cloud=None):
+    def is_private_data_file(self, full_path, cloud=None):
         """
-
+        Returns true if the file at full_path is the .nebs for the given mirror.
+        If cloud=None, then it searches all mirrors on this host.
         :param path: The FULL path. Not the cloud-relative one.
         :param cloud:
         :return:
@@ -217,12 +218,12 @@ class Host:
             # todo: this is pretty untested. Write some tests that make sure
             db = get_db()
             for cloud2 in db.session.query(Cloud).all():
-                if cloud2.root_directory == os.path.commonprefix(cloud2.root_directory, path):
+                if cloud2.root_directory == os.path.commonprefix([cloud2.root_directory, full_path]):
                     cloud = cloud2
                     break
         if cloud is None:
             return False
-        return os.path.join(cloud.root_directory, '.nebs') == path
+        return os.path.join(cloud.root_directory, '.nebs') == full_path
 
     def get_client_permissions(self, client_sid, cloud, relative_path):
         db = get_db()
@@ -258,9 +259,8 @@ class Host:
             if msg_type == HOST_HOST_FETCH:
                 handle_fetch(self, connection, address, msg_obj)
             elif msg_type == HOST_FILE_PUSH:
-                handle_recv_file(self, connection, address, msg_obj)
-            elif msg_type == REMOVE_FILE:
-                handle_remove_file(self, connection, address, msg_obj)
+                # This is for HOST_FILE_TRANSFER, REMOVE_FILE. They follow HFP
+                handle_file_change(self, connection, address, msg_obj)
             # ----------------------- C->H Messages ----------------------- #
             elif msg_type == STAT_FILE_REQUEST:
                 # todo:2 REALLY? This still isnt here? I guess list files does it...
@@ -311,29 +311,29 @@ class Host:
 
     def acquire_lock(self):
         self._io_lock.acquire()
-        frameinfo = getframeinfo(currentframe().f_back)
-        caller = getframeinfo(currentframe().f_back.f_back)
-        mylog('Locking - {}/{}:{}'.format(
-            os.path.basename(caller.filename)
-            , os.path.basename(frameinfo.filename)
-            , frameinfo.lineno))
+        # frameinfo = getframeinfo(currentframe().f_back)
+        # caller = getframeinfo(currentframe().f_back.f_back)
+        # mylog('Locking - {}/{}:{}'.format(
+        #     os.path.basename(caller.filename)
+        #     , os.path.basename(frameinfo.filename)
+        #     , frameinfo.lineno))
 
     def release_lock(self):
-        frameinfo = getframeinfo(currentframe().f_back)
-        caller = getframeinfo(currentframe().f_back.f_back)
-        mylog('Unlocking - {}/{}:{}'.format(
-            os.path.basename(caller.filename)
-            , os.path.basename(frameinfo.filename)
-            , frameinfo.lineno))
         self._io_lock.release()
+        # frameinfo = getframeinfo(currentframe().f_back)
+        # caller = getframeinfo(currentframe().f_back.f_back)
+        # mylog('Unlocking - {}/{}:{}'.format(
+        #     os.path.basename(caller.filename)
+        #     , os.path.basename(frameinfo.filename)
+        #     , frameinfo.lineno))
 
     def signal(self):
-        frameinfo = getframeinfo(currentframe().f_back)
-        caller = getframeinfo(currentframe().f_back.f_back)
-        mylog('Signaling Host - {}/{}:{}'.format(
-            os.path.basename(caller.filename)
-            , os.path.basename(frameinfo.filename)
-            , frameinfo.lineno))
-        # self.network_signal.release()
         self.network_signal.set()
+        # frameinfo = getframeinfo(currentframe().f_back)
+        # caller = getframeinfo(currentframe().f_back.f_back)
+        # mylog('Signaling Host - {}/{}:{}'.format(
+        #     os.path.basename(caller.filename)
+        #     , os.path.basename(frameinfo.filename)
+        #     , frameinfo.lineno))
+        # self.network_signal.release()
 

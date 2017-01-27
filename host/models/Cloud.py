@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 
-from common_util import ResultAndData
+from common_util import ResultAndData, mylog
 from connections.RawConnection import RawConnection
 from host import _host_db as db
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table, Boolean
@@ -14,7 +14,10 @@ __author__ = 'Mike'
 
 class Cloud(db.Base):
     __tablename__ = 'cloud'
-
+    """
+    This should more accurately be called a Mirror, this represents one
+        mirror of a cloud on a host.
+    """
     id = Column(Integer, primary_key=True)
     my_id_from_remote = Column(Integer)
     name = Column(String)  # cloudname
@@ -72,6 +75,7 @@ class Cloud(db.Base):
         curr_parent_node = None
         # curr_path = '.'
         dirs = os.path.normpath(full_path).split(os.sep)
+        mylog('create or update dirs={}'.format(dirs))
         # print 'create/update for all of {}'.format(dirs)
         while len(dirs) > 0:
             # find the node in children if it exists, else make it
@@ -84,24 +88,51 @@ class Cloud(db.Base):
                 child.name = dirs[0]
                 child.created_on = datetime.utcnow()
                 child.last_modified = child.created_on
-                child.cloud = self
+                # child.cloud = self
                 db.session.add(child)
                 if curr_parent_node is not None:
                     curr_parent_node.children.append(child)
+                    mylog('[{}] {} attached to node {}'.format(self.my_id_from_remote, child.name, curr_parent_node.name))
                 else:
                     self.children.append(child)
+                    mylog('[{}] {} attached to mirror'.format(self.my_id_from_remote, child.name,))
                 db.session.commit()
-                # print '\tcreated node for <{}>({}), parent:<{}>'\
-                #     .format(
-                #         child.name
-                #         , child.created_on
-                #         , curr_parent_node.name if curr_parent_node is not None else 'None'
-                #     )
+                mylog('\tcreated node for <{}>, parent:<{}>'\
+                    .format(
+                        child.name
+                        , curr_parent_node.name if curr_parent_node is not None else 'None'
+                    )
+                )
             curr_parent_node = child
             curr_children = child.children
             dirs.pop(0)
         #at this point, the curr_parent_node is the node that is the file we created
         return curr_parent_node
+
+    def get_child_node(self, relative_path):
+        # type: (str) -> Any(Cloud, FileNode)
+        target_path_elems = os.path.normpath(relative_path).split(os.sep)
+        if target_path_elems[0] == '.':
+            target_path_elems.pop(0)
+
+        curr_child = self
+        while len(target_path_elems) > 0:
+            curr_file = target_path_elems[0]
+            child = curr_child.children.filter_by(name=curr_file).first()
+            curr_child = child
+            target_path_elems.pop(0)
+            if child is not None:
+                # This is a match to the current path elem. Continue on it's children.
+                pass
+            else:
+                break
+
+        # curr_child is either self, or a FileNode
+        return curr_child
+
+    def is_root(self):
+        return True
+
 
 
 

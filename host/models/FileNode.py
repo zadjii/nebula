@@ -19,4 +19,7 @@ class FileNode(db.Base):
                             , backref=backref('parent', remote_side=[id])
                             , lazy='dynamic')
 
+    def is_root(self):
+        return False
+
 

@@ -5,15 +5,16 @@ from stat import S_ISDIR
 import time
 from connections.RawConnection import RawConnection
 from host import FileNode, get_db, Cloud, HOST_PORT
+from host.function.network_updates import handle_remove_file
 from host.function.send_files import send_file_to_other, complete_sending_files, send_file_to_local
-from host.util import check_response, setup_remote_socket, mylog, get_ipv6_list
+from host.util import check_response, setup_remote_socket, mylog, get_ipv6_list, find_deletable_children
 from msg_codes import *
 from messages import *
 
 __author__ = 'Mike'
 
 
-def send_updates(db, cloud, updates):
+def send_updates(host_obj, db, cloud, updates):
     mylog('[{}] has updates {}'.format(cloud.my_id_from_remote, updates))
     # connect to remote
     ssl_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
@@ -28,18 +29,25 @@ def send_updates(db, cloud, updates):
     for host in hosts:
         if host['id'] == cloud.my_id_from_remote:
             continue
-        update_peer(db, cloud, host, updates)
+        update_peer(host_obj, db, cloud, host, updates)
         updated_peers += 1
     mylog('[{}] updated {} peers'.format(cloud.my_id_from_remote, updated_peers))
 
 
-def update_peer(db, cloud, host, updates):
+def update_peer(host_obj, db, cloud, host, updates):
     host_id = host['id']  # id of host to recv files
     host_ip = host['ip']
     host_port = host['port']
     host_sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
     host_sock.connect((host_ip, host_port, 0, 0))
     raw_connection = RawConnection(host_sock)
+
+    # fixme: Change it to one FILE_PUSH per update.
+    # fixme: First check if the peer is local or not,
+    #   then either send_updates_other or send_updates_local
+    #   send_updates_other will open the connection and do the FilePush, HFT/RF
+    #   send_updates_local will just make sure the state is the same on the local machine, EZ
+
     msg = HostFilePushMessage(host_id, cloud.uname(), cloud.cname(), 'i-dont-give-a-fuck')  # the full path apparently doesn't matter
     raw_connection.send_obj(msg)
 
@@ -62,7 +70,13 @@ def update_peer(db, cloud, host, updates):
 
         elif update[0] == FILE_DELETE:
             msg = RemoveFileMessage(host_id, cloud.uname(), cloud.cname(), relative_pathname)
-            raw_connection.send_obj(msg)
+            if local_peer:
+                handle_remove_file(host_obj, msg, matching_local_mirror, raw_connection, db)
+                mylog('LOCALLY deleted', '32')
+                # I echo the above fixme, this is stupid
+            else:
+                raw_connection.send_obj(msg)
+                mylog('Sent a delete', '32')
         else:
             print 'Welp this shouldn\'t happen'
     complete_sending_files(host_id, cloud, None, raw_connection)
@@ -81,10 +95,12 @@ def local_file_create(host_obj, directory_path, dir_node, filename, db):
     filenode.name = filename
     filenode.created_on = datetime.utcfromtimestamp( file_created )
     filenode.last_modified = datetime.utcfromtimestamp( file_modified )
-    try:
-        filenode.cloud = dir_node.cloud
-    except AttributeError:
-        filenode.cloud = dir_node
+    # if dir_node.is_root():
+    #     filenode.cloud = dir_node
+    # try:
+    #     filenode.cloud = dir_node.cloud
+    # except AttributeError:
+    #     filenode.cloud = dir_node
     dir_node.children.append(filenode)
     db.session.commit()
 
@@ -142,22 +158,73 @@ def local_file_update(host_obj, directory_path, dir_node, filename, filenode, db
 def local_file_delete(host_obj, directory_path, dir_node, filename, filenode, db):
     # type: (Host, str, FileNode, str, FileNode, SimpleDB) -> [(int, str)]
     #   where (int, str): (FILE_DELETE, full_path)
-    file_pathname = os.path.join(directory_path, filename)
+    # file_pathname = os.path.join(directory_path, filename)
+    file_pathname = os.path.join(directory_path, filenode.name)
+    # note: filenode is always a filenode. If at all, the dir_node might
+    #       be the root (Cloud) node
     # we don't need to recurse for the subdirs of this name
     # we do need to recurse on subnodes
+    mirror = filenode.cloud
+    mylog('[{}] Found a deleted file {}'.format(mirror.my_id_from_remote, file_pathname), '33')
+    private_data = host_obj.get_private_data(mirror)
+    if private_data is None:
+        # this is a problem
+        err = 'The host doesn\'t have a private data file, that\'s not great'
+        mylog(err)
 
+    # if the deleted file was the .nebs, then that's a problem.
+    #   regenerate it, and do nothing else.
+    if file_pathname == host_obj.is_private_data_file(file_pathname):
+        err = 'Hey you there. Don\'t delete the .nebs!'
+        mylog(err, '31')
+        private_data.commit()
+        return
+    timestamp = datetime.utcnow()
+    deletables = find_deletable_children(filenode, file_pathname, timestamp)
+    # deletables should be in reverse BFS order, so as they are deleted they
+    #   should have no children
+    for full_child_path, node in deletables:
+        db.session.delete(node)
     # This is safe even on the root filenode (Which is a Cloud object)
     # because the Cloud has children, and because we're not deleting
     # the node it's called on.
-    recursive_child_delete(db, filenode)
+    # recursive_child_delete(db, filenode)
 
     # fortunately, filenode isn't ever the root of the cloud, so delete it too.
     db.session.delete(filenode)
+
+    # The .nebs also needs to be updated.
+    #   The same subset as in recursive child delete needs to be removed from that file.
+    #   **It's the deleter's responsibility to also update the .nebs.**
+    relative_deletables = [os.path.relpath(child[0], mirror.root_directory) for child in deletables]
+
+    result = private_data.delete_paths(relative_deletables)
+    private_data.commit()
+    db.session.commit()
+    updates = [(FILE_DELETE, file_pathname)]
+
+    # if result:
+    #     updates.append((FILE_UPDATE, private_data.))
+    # note: actually, this might update all on it's own on the next update.
+    #       Maybe not the best idea, probably should just update it's nodes'
+    #       mtime and send it as an update oo, but this is good enough for now.
+
+    # Fortunately, the only change is this one.
+    # If it's a palin file, then there's nothing to recurse on.
+    # If its a dir, there is no longer anything to recurse on. Deleting this is sufficient.
+    # fixme also send the .nebs as a FILE_UPDATE
+    return updates
 
 
 def recursive_child_delete(db, filenode):
     # type: (SimpleDB, FileNode) -> ResultAndData
     # DON'T delete the node it's called on.
+    # todo: This needs to be updated to do the right delete action.
+    # cont: gather all the nodes in top down, then traverse backwards
+    # cont: if any are children of the given node, and they have a newer
+    # timestamp then the update, leave that node and direct parents, but not other relatives.
+    # (by removing direct parents from the list)
+    # This will delete all children of filenode except the ones that have since been updated.
     children_to_delete = filenode.children.all()
     i = 0
     to_delete = len(children_to_delete)
@@ -178,13 +245,22 @@ def recursive_local_modifications_check(host_obj, directory_path, dir_node, db):
     files = sorted(os.listdir(directory_path), key=lambda filename: filename, reverse=False)
     nodes = dir_node.children.all()
     nodes = sorted(nodes, key=lambda node: node.name, reverse=False)
-
+    is_root = dir_node.is_root()
+    mirror = None
+    if is_root:
+        mirror = dir_node
+    else:
+        mirror = dir_node.cloud
+    mirror_id = mirror.my_id_from_remote
     i = j = 0
     num_files = len(files)
     num_nodes = len(nodes) if nodes is not None else 0
     original_total_nodes = db.session.query(FileNode).count()
     updates = []
+    mylog('[{}] curr children: <{}>, ({})'.format(mirror_id, files, [node.name for node in nodes]))
+    mylog('[{}] curr children parents: <{}>, ({})'.format(mirror_id, files, [node.parent.name if node.parent is not None else 'None' for node in nodes]))
     while (i < num_files) and (j < num_nodes):
+        mylog('[{}]Iterating on <{}>, ({})'.format(mirror_id, files[i], nodes[j].name))
         if files[i] == nodes[j].name:
             update_updates = local_file_update(host_obj, directory_path, dir_node, files[i], nodes[j], db)
             updates.extend(update_updates)
@@ -197,7 +273,7 @@ def recursive_local_modifications_check(host_obj, directory_path, dir_node, db):
         elif files[i] > nodes[j].name:  # redundant if clause, there for clarity
             # todo handle file deletes, moves.
             # updates.append((FILE_DELETE, nodes[j])) -> this is a problemo
-            delete_updates = local_file_delete(host_obj, directory_path, dir_node, files[i], db)
+            delete_updates = local_file_delete(host_obj, directory_path, dir_node, files[i], nodes[j], db)
             updates.extend(delete_updates)
             j += 1
     while i < num_files:  # create the rest of the files
@@ -217,7 +293,7 @@ def check_local_modifications(host_obj, cloud, db):
     root = cloud.root_directory
     updates = recursive_local_modifications_check(host_obj, root, cloud, db)
     if len(updates) > 0:
-        send_updates(db, cloud, updates)
+        send_updates(host_obj, db, cloud, updates)
 
 
 def check_ipv6_changed(curr_ipv6):
@@ -306,6 +382,10 @@ def new_main_thread(host_obj):
         # scan the tree for updates
         # mylog('Checking for updates to files')
         for cloud in all_mirrored_clouds:
+            # fixme: Make sure that the root of the cloud still exists.
+            # cont if not, then the entire mirror was deleted. It should be removed
+            #   from the DB, and, we should make sure to tell the remote that the mirror
+            #   is inactive/should stop being tracked
             check_local_modifications(host_obj, cloud, db)
 
         # if more that 30s have passed since the last handshake, handshake
@@ -360,7 +440,9 @@ def local_update_thread(host_obj):
         # if the number of mirrors has changed...
         if num_clouds_mirrored < mirrored_clouds.count():
             all_mirrored_clouds = mirrored_clouds.all()
-            mylog('checking for updates on {}'.format([cloud.my_id_from_remote for cloud in all_mirrored_clouds]))
+            mylog('checking for updates on {}'.format(
+                [cloud.my_id_from_remote for cloud in all_mirrored_clouds]
+            ))
             num_clouds_mirrored = mirrored_clouds.count()
             # if the number of clouds is different:
             # - handshake all of them

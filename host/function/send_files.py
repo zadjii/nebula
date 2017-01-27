@@ -63,7 +63,7 @@ def send_file_to_local(db, src_mirror, tgt_mirror, relative_pathname):
         if updated_node is not None:
             old_modified_on = updated_node.last_modified
             updated_node.last_modified = datetime.utcfromtimestamp(os.path.getmtime(full_tgt_path))
-            # mylog('update mtime {}=>{}'.format(old_modified_on, updated_node.last_modified))
+            mylog('update mtime {}=>{}'.format(old_modified_on, updated_node.last_modified))
             db.session.commit()
         else:
             mylog('ERROR: Failed to create a FileNode for the new file {}'.format(full_tgt_path))

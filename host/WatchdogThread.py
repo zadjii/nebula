@@ -24,7 +24,7 @@ class HostEventHandler(FileSystemEventHandler):
         what = 'directory' if event.is_directory else 'file'
         # logging.info("Moved %s: from %s to %s", what, event.src_path,
         #              event.dest_path)
-        mylog('$$$$$$$ MOVED $$$$$$$$$$ {} $$$$$$$$$$$$$$$$$$$$'.format(event.src_path))
+        mylog('$$$$$$$ MOVED $$$$$$$$$$ {} $$$$$$$$$$$$$$$$$$$$'.format(event.src_path), '7')
 
     def on_created(self, event):
         super(HostEventHandler, self).on_created(event)
@@ -32,7 +32,7 @@ class HostEventHandler(FileSystemEventHandler):
 
         what = 'directory' if event.is_directory else 'file'
         # logging.info("Created %s: %s", what, event.src_path)
-        mylog('$$$$$$$ Created $$$$$$$$$$ {} $$$$$$$$$$$$$$$$$$$$'.format(event.src_path))
+        mylog('$$$$$$$ Created $$$$$$$$$$ {} $$$$$$$$$$$$$$$$$$$$'.format(event.src_path), '7')
 
     def on_deleted(self, event):
         super(HostEventHandler, self).on_deleted(event)
@@ -40,7 +40,7 @@ class HostEventHandler(FileSystemEventHandler):
 
         what = 'directory' if event.is_directory else 'file'
         # logging.info("Deleted %s: %s", what, event.src_path)
-        mylog('$$$$$$$ Deleted $$$$$$$$$$ {} $$$$$$$$$$$$$$$$$$$$'.format(event.src_path))
+        mylog('$$$$$$$ Deleted $$$$$$$$$$ {} $$$$$$$$$$$$$$$$$$$$'.format(event.src_path), '7')
 
     def on_modified(self, event):
         super(HostEventHandler, self).on_modified(event)
@@ -48,7 +48,7 @@ class HostEventHandler(FileSystemEventHandler):
 
         what = 'directory' if event.is_directory else 'file'
         # logging.info("Modified %s: %s", what, event.src_path)
-        mylog('$$$$$$$ Modified $$$$$$$$$$ {} $$$$$$$$$$$$$$$$$$$$'.format(event.src_path))
+        mylog('$$$$$$$ Modified $$$$$$$$$$ {} $$$$$$$$$$$$$$$$$$$$'.format(event.src_path), '7')
 
 
 class WatchdogWorker(object):

@@ -4,6 +4,7 @@ import socket
 import getpass
 from sys import stdin
 import platform
+from time import sleep
 
 from common_util import ResultAndData, Error, set_mylog_name
 from connections.RawConnection import RawConnection
@@ -301,6 +302,7 @@ def mirror(argv):
         new_rem_sock.close()
 
     if rd.success:
+        sleep(1)
         # try waking up any hosts on this machine that this mirror should be tracked by.
         attempt_wakeup()
 

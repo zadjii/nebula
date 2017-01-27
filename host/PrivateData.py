@@ -294,6 +294,14 @@ class PrivateData(object):
 
         return perms
 
+    def delete_paths(self, paths):
+        result = False
+        for path in paths:
+            if path in self._files.keys():
+                result = True
+                self._files.pop(path)
+        return result
+
     def commit(self):
         """
         Writes out the PrivateData to the .nebs backing.
