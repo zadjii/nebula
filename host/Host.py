@@ -7,7 +7,6 @@ from threading import Thread, Event, Lock, Semaphore
 
 from common_util import mylog, ResultAndData
 from connections.RawConnection import RawConnection
-from host import get_db
 from host.NetworkThread import NetworkThread
 from host.PrivateData import PrivateData, NO_ACCESS, READ_ACCESS
 from host.WatchdogThread import WatchdogWorker
@@ -33,7 +32,7 @@ __author__ = 'Mike'
 
 
 class Host:
-    def __init__(self):
+    def __init__(self, nebs_instance):
         self.active_network_obj = None
         self.active_network_thread = None
         self.active_ws_thread = None
@@ -46,13 +45,14 @@ class Host:
         # self.network_signal = Semaphore()
         self._io_lock = Lock()
         self.watchdog_worker = WatchdogWorker(self)
+        self._nebs_instance = nebs_instance
 
     def start(self, argv):
         set_mylog_name('nebs')
         # todo process start() args here
 
         # read in all the .nebs
-        db = get_db()
+        db = self.get_db()
         for cloud in db.session.query(Cloud).all():
             self.load_private_data(cloud)
 
@@ -216,7 +216,7 @@ class Host:
         """
         if cloud is None:
             # todo: this is pretty untested. Write some tests that make sure
-            db = get_db()
+            db = self.get_db()
             for cloud2 in db.session.query(Cloud).all():
                 if cloud2.root_directory == os.path.commonprefix([cloud2.root_directory, full_path]):
                     cloud = cloud2
@@ -226,7 +226,7 @@ class Host:
         return os.path.join(cloud.root_directory, '.nebs') == full_path
 
     def get_client_permissions(self, client_sid, cloud, relative_path):
-        db = get_db()
+        db = self.get_db()
         rd = get_client_session(db, client_sid, cloud.uname(), cloud.cname())
         # mylog('get_client_permissions [{}] {}'.format(0, rd))
         if rd.success:
@@ -238,6 +238,9 @@ class Host:
             else:
                 mylog('There has no private data for {}'.format(cloud.name), '31')
         return NO_ACCESS
+
+    def get_db(self):
+        return self._nebs_instance.get_db()
 
     def filter_func(self, connection, address):
         try:

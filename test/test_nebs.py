@@ -133,10 +133,10 @@ def basic_test():
     try:
         test_file_push_simple()
         test_file_delete()
-        # test_client_setup()
-        # test_client_io()
+        test_client_setup()
+        test_client_io()
         # test_client_io_big()  # This test is annoying.
-        # test_client_mirror()
+        test_client_mirror()
         # test_client_mirror calls test_contributors
     finally:
         pass

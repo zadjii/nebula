@@ -12,8 +12,9 @@ from host.models.IncomingHostEntry import IncomingHostEntry
 
 
 def repop():
-    host_db = host.get_db()
+    # host_db = host.get_db()
     # does nothing
+    #fixme rewrite to use an instance DB
     print 'Host DB populated'
 
 if __name__ == '__main__':

@@ -8,11 +8,11 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table, Boo
 from sqlalchemy.orm import relationship, backref
 from FileNode import FileNode
 from IncomingHostEntry import IncomingHostEntry
-
+from models import nebs_base as base
 __author__ = 'Mike'
 
 
-class Cloud(db.Base):
+class Cloud(base):
     __tablename__ = 'cloud'
     """
     This should more accurately be called a Mirror, this represents one
@@ -67,15 +67,11 @@ class Cloud(db.Base):
 
     # we might end up needing the message
     def create_or_update_node(self, full_path, db):
-        # msg = file_transfer_msg
-        # file_isdir = msg['isdir']
-        # file_size = msg['fsize']
-        # rel_path = msg['fpath']
         curr_children = self.children
         curr_parent_node = None
         # curr_path = '.'
         dirs = os.path.normpath(full_path).split(os.sep)
-        mylog('create or update dirs={}'.format(dirs))
+        # mylog('create or update dirs={}'.format(dirs))
         # print 'create/update for all of {}'.format(dirs)
         while len(dirs) > 0:
             # find the node in children if it exists, else make it
@@ -92,21 +88,21 @@ class Cloud(db.Base):
                 db.session.add(child)
                 if curr_parent_node is not None:
                     curr_parent_node.children.append(child)
-                    mylog('[{}] {} attached to node {}'.format(self.my_id_from_remote, child.name, curr_parent_node.name))
+                    # mylog('[{}] {} attached to node {}'.format(self.my_id_from_remote, child.name, curr_parent_node.name))
                 else:
                     self.children.append(child)
-                    mylog('[{}] {} attached to mirror'.format(self.my_id_from_remote, child.name,))
+                    # mylog('[{}] {} attached to mirror'.format(self.my_id_from_remote, child.name,))
                 db.session.commit()
-                mylog('\tcreated node for <{}>, parent:<{}>'\
-                    .format(
-                        child.name
-                        , curr_parent_node.name if curr_parent_node is not None else 'None'
-                    )
-                )
+                # mylog('\tcreated node for <{}>, parent:<{}>'\
+                #     .format(
+                #         child.name
+                #         , curr_parent_node.name if curr_parent_node is not None else 'None'
+                #     )
+                # )
             curr_parent_node = child
             curr_children = child.children
             dirs.pop(0)
-        #at this point, the curr_parent_node is the node that is the file we created
+        # at this point, the curr_parent_node is the node that is the file we created
         return curr_parent_node
 
     def get_child_node(self, relative_path):

@@ -1,6 +1,7 @@
 import sys
 
 from common_util import enable_vt_support
+from host.NebsInstance import NebsInstance
 from host.Host import Host
 from host.function.dbg_nodes import dbg_nodes
 from host.function.list_clouds import list_clouds
@@ -8,8 +9,8 @@ from host.function.mirror import mirror
 from host.function.tree import tree, db_tree
 
 
-def start(argv):
-    host_controller = Host()
+def start(instance, argv):
+    host_controller = Host(instance)
     host_controller.start(argv=argv)
 
 
@@ -46,11 +47,14 @@ def nebs_main(argv):
         usage(argv)
         sys.exit(0)
 
+    working_dir, argv = NebsInstance.get_working_dir(argv)
+    nebs_instance = NebsInstance(working_dir)
+
     command = argv[1]
 
     selected = commands.get(command, usage)
     enable_vt_support()
-    result = selected(argv[2:])
+    result = selected(nebs_instance, argv[2:])
     result = 0 if result is None else result
     sys.exit(result)
 

@@ -4,7 +4,6 @@ import time
 from stat import S_ISDIR
 
 from common_util import mylog, send_error_and_close, Success, Error
-from host import get_db, Cloud
 from host.PrivateData import READ_ACCESS, SHARE_ACCESS
 from host.function.recv_files import recv_file_tree
 from host.util import check_response, validate_or_get_client_session, \
@@ -19,7 +18,7 @@ def handle_recv_file_from_client(host_obj, connection, address, msg_obj):
 
 
 def do_recv_file_from_client(host_obj, connection, address, msg_obj, client):
-    db = get_db()
+    db = host_obj.get_db()
     cloud = client.cloud
     cloudname = cloud.name
     # todo: maybe add a quick response to tell the client the transfer is okay.
@@ -38,7 +37,7 @@ def handle_read_file_request(host_obj, connection, address, msg_obj):
 
 
 def do_client_read_file(host_obj, connection, address, msg_obj, client):
-    db = get_db()
+    db = host_obj.get_db()
     cloud = client.cloud
 
     cloudname = cloud.name
@@ -124,7 +123,7 @@ def client_message_wrapper(host_obj, connection, address, msg_obj, callback):
     session_id = msg_obj.sid
     cloudname = msg_obj.cname
     cloud_uname = msg_obj.cloud_uname  # todo:15
-    db = get_db()
+    db = host_obj.get_db()
 
     rd = validate_or_get_client_session(db, session_id, cloud_uname, cloudname)
     if not rd.success:

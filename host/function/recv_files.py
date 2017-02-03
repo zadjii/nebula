@@ -2,7 +2,6 @@ from datetime import datetime
 import os
 
 from common_util import ResultAndData
-from host import get_db, FileNode
 from host.PrivateData import WRITE_ACCESS
 from host.util import mylog
 # from msg_codes import recv_msg

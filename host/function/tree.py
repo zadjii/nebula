@@ -1,7 +1,6 @@
 import os
 from stat import S_ISDIR, S_ISREG
 from host import Cloud
-from host import get_db
 
 __author__ = 'Mike'
 
@@ -16,8 +15,8 @@ def tree_usage():
     print ''
 
 
-def db_tree(argv):
-    db = get_db()
+def db_tree(instance, argv):
+    db = instance.get_db()
     if len(argv) < 1:
         db_tree_usage()
         return
@@ -61,8 +60,8 @@ def db_tree(argv):
             walk_db_recursive(top_level_node, 1, print_filename)
 
 
-def tree(argv):
-    db = get_db()
+def tree(instance, argv):
+    db = instance.get_db()
     if len(argv) < 1:
         tree_usage()
         return
@@ -101,7 +100,7 @@ def tree(argv):
         walktree(root_dir, 1, print_filename)
 
 
-def walktree(top,depth, callback):
+def walktree(top, depth, callback):
     """recursively descend the directory tree rooted at top,
        calling the callback function for each regular file"""
 

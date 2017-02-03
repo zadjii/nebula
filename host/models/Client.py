@@ -2,11 +2,11 @@ from datetime import datetime
 from host import _host_db as db
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table, BigInteger
 from sqlalchemy.orm import relationship, backref
-
+from models import nebs_base as base
 __author__ = 'Mike'
 
 
-class Client(db.Base):
+class Client(base):
     """
     This Client represents a host's view of a connecting client.
     Whenever a client message comes in, we'll first see if we have seen that

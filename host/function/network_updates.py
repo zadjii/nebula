@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 from common_util import ResultAndData, send_error_and_close, Error, Success
-from host import get_db, Cloud
+from host import Cloud
 # from host.function.network.ls_handler import list_files_handler
 from host.function.recv_files import recv_file_tree
 from host.function.send_files import send_tree
@@ -45,7 +45,7 @@ def verify_host(db, cloud_uname, cname, local_id, other_id):
 
 
 def handle_fetch(host_obj, connection, address, msg_obj):
-    db = get_db()
+    db = host_obj.get_db()
     # the id's are swapped because they are named from the origin host's POV.
     other_id = msg_obj.my_id
     local_id = msg_obj.other_id
@@ -73,7 +73,7 @@ def handle_file_change(host_obj, connection, address, msg_obj):
     # This is called on HOST_FILE_PUSH, indicating that the next message
     # says what we're doing.
     # See .../host/function/local_updates.py@update_peer() for the other end.
-    db = get_db()
+    db = host_obj.get_db()
     my_id = msg_obj.tid
     cloudname = msg_obj.cname
     cloud_uname = msg_obj.cloud_uname
@@ -161,13 +161,13 @@ def do_remove_file(host_obj, mirror, relative_path, db):
             os.rmdir(full_child_path)
         else:
             os.remove(full_child_path)
-        mylog('Deleted node, file for {}'.format(full_child_path), '34')
+        # mylog('Deleted node, file for {}'.format(full_child_path), '34')
     db.session.delete(file_node)
     if os.path.isdir(full_path):
         os.rmdir(full_path)
     else:
         os.remove(full_path)
-    mylog('Deleted node, file for {}'.format(full_path), '35')
+    # mylog('Deleted node, file for {}'.format(full_path), '35')
     db.session.commit()
     rd = Success(deletables)
 

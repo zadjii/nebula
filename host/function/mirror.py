@@ -10,7 +10,6 @@ from common_util import ResultAndData, Error, set_mylog_name
 from connections.RawConnection import RawConnection
 
 from host import Cloud, REMOTE_PORT, HOST_PORT, HOST_WS_PORT
-from host import get_db
 from host.PrivateData import PrivateData
 from host.function.recv_files import recv_file_tree
 from host.util import check_response, setup_remote_socket, mylog, get_ipv6_list
@@ -181,7 +180,7 @@ def mirror_usage():
     print ''
 
 
-def mirror(argv):
+def mirror(instance, argv):
     """
     Things we need for this:
      - [-r address]
@@ -197,7 +196,7 @@ def mirror(argv):
      -- if not present, will prompt for a username and password.
     """
     set_mylog_name('mirror')
-    db = get_db()
+    db = instance.get_db()
     host = None
     port = REMOTE_PORT
     cloudname = None
