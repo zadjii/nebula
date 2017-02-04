@@ -1,5 +1,6 @@
 import sys
 
+from common.Instance import Instance
 from common_util import enable_vt_support
 from host.NebsInstance import NebsInstance
 from host.Host import Host
@@ -47,7 +48,7 @@ def nebs_main(argv):
         usage(argv)
         sys.exit(0)
 
-    working_dir, argv = NebsInstance.get_working_dir(argv)
+    working_dir, argv = Instance.get_working_dir(argv)
     nebs_instance = NebsInstance(working_dir)
 
     command = argv[1]

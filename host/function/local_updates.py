@@ -4,7 +4,7 @@ import socket
 from stat import S_ISDIR
 import time
 from connections.RawConnection import RawConnection
-from host import FileNode, Cloud, HOST_PORT
+from host import FileNode, Cloud
 from host.function.network_updates import handle_remove_file
 from host.function.send_files import send_file_to_other, complete_sending_files, send_file_to_local
 from host.util import check_response, setup_remote_socket, mylog, get_ipv6_list, find_deletable_children

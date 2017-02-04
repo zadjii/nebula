@@ -39,7 +39,7 @@ class Host:
         self.network_queue = []  # all the queued connections to handle.
         self._shutdown_requested = False
         self._local_update_thread = None
-        self._private_data = {} # cloud.my_id_from_remote -> PrivateData mapping
+        self._private_data = {}  # cloud.my_id_from_remote -> PrivateData mapping
         # self._private_data = collections.MutableMapping()
         self.network_signal = Event()
         # self.network_signal = Semaphore()
@@ -210,7 +210,7 @@ class Host:
         """
         Returns true if the file at full_path is the .nebs for the given mirror.
         If cloud=None, then it searches all mirrors on this host.
-        :param path: The FULL path. Not the cloud-relative one.
+        :param full_path: The FULL path. Not the cloud-relative one.
         :param cloud:
         :return:
         """
@@ -340,3 +340,5 @@ class Host:
         #     , frameinfo.lineno))
         # self.network_signal.release()
 
+    def get_instance(self):
+        return self._nebs_instance

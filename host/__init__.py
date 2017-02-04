@@ -14,9 +14,9 @@ from database.SimpleDB import SimpleDB
 #   The models all get imported with declarative_base()
 #   NOTE: no
 #   I think they all need to be declared on the same base instance.
-
-_host_db = SimpleDB(DATABASE_URI, models.nebs_base)
-_host_db.engine.echo = False
+#
+# _host_db = SimpleDB(DATABASE_URI, models.nebs_base)
+# _host_db.engine.echo = False
 
 from models.Cloud import Cloud
 from models.FileNode import FileNode
@@ -46,8 +46,8 @@ from models.Client import Client
 
 REMOTE_HOST = 'localhost'
 REMOTE_PORT = 12345
-HOST_HOST = ''
-HOST_PORT = 23456
-HOST_WS_HOST = '127.0.0.1'
-HOST_WS_PORT = 34567
+# HOST_HOST = ''
+# HOST_PORT = 23456
+# HOST_WS_HOST = '127.0.0.1'
+# HOST_WS_PORT = 34567
 
