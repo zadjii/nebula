@@ -4,7 +4,7 @@ from remote_config import DATABASE_URI, MIGRATE_REPO
 from database.SimpleDB import SimpleDB
 
 _remote_db = SimpleDB(DATABASE_URI)
-_remote_db.engine.echo = False
+# _remote_db.engine.echo = False
 # note: He unfortunately needs to stay around,
 #  so we can set up ORM metadata.
 

@@ -1,13 +1,13 @@
 from datetime import datetime, timedelta
 
-from remote import _remote_db as db
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table, BigInteger
 from sqlalchemy.orm import relationship, backref
+from remote.models import nebr_base as base
 
 __author__ = 'Mike'
 
 
-class ClientCloudHostMapping(db.Base):
+class ClientCloudHostMapping(base):
     __tablename__ = 'clientcloudhostmapping'
     id = Column(Integer, primary_key=True)
     session_id = Column(ForeignKey('session.id'))

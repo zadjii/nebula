@@ -3,7 +3,6 @@ from host import models
 __author__ = 'zadjii'
 
 from host_config import DATABASE_URI, MIGRATE_REPO
-from database.SimpleDB import SimpleDB
 
 # fixme I believe I should remove the DATABASE_URI here.
 #   We'll still use this instance to import all the models, etc, but then we

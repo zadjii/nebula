@@ -34,7 +34,7 @@ command_descriptions = {
 }
 
 
-def usage(argv):
+def usage(instance, argv):
     print 'usage: nebs <command>'
     print ''
     print 'The available commands are:'
@@ -45,7 +45,7 @@ def usage(argv):
 def nebs_main(argv):
     # if there weren't any args, print the usage and return
     if len(argv) < 2:
-        usage(argv)
+        usage(None, argv)
         sys.exit(0)
 
     working_dir, argv = Instance.get_working_dir(argv)

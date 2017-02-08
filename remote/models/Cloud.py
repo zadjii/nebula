@@ -1,9 +1,9 @@
 import json
 from datetime import datetime
 
-from remote import _remote_db as db
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table
 from sqlalchemy.orm import relationship, backref
+from remote.models import nebr_base as base
 
 
 __author__ = 'Mike'
@@ -11,13 +11,13 @@ __author__ = 'Mike'
 
 cloud_owners = Table(
     'cloud_owners'
-    , db.Base.metadata
+    , base.metadata
     , Column('cloud_id', Integer, ForeignKey('cloud.id'))
     , Column('user_id', Integer, ForeignKey('user.id'))
     )
 cloud_contributors = Table(
     'cloud_contributors'
-    , db.Base.metadata
+    , base.metadata
     , Column('cloud_id', Integer, ForeignKey('cloud.id'))
     , Column('user_id', Integer, ForeignKey('user.id'))
     )
@@ -30,7 +30,7 @@ PUBLIC_CLOUD = 2  # anyone (host can still reject RDWR)
 # cont make a public link, then the cloud needs to be public, etc.
 
 
-class Cloud(db.Base):
+class Cloud(base):
     __tablename__ = 'cloud'
 
     id = Column(Integer, primary_key=True)

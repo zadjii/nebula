@@ -4,15 +4,15 @@ import socket
 from datetime import datetime
 
 from connections.RawConnection import RawConnection
-from remote import _remote_db as db
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table,\
     Boolean
 from sqlalchemy.orm import relationship, backref
+from remote.models import nebr_base as base
 
 __author__ = 'Mike'
 
 
-class Host(db.Base):
+class Host(base):
     __tablename__ = 'host'
 
     id = Column(Integer, primary_key=True)

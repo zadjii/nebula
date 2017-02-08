@@ -1,12 +1,11 @@
 from common_util import mylog
 from messages import ClientGetCloudHostsResponseMessage
 from msg_codes import send_generic_error_and_close
-from remote import get_db
 from remote.util import get_user_from_session
 
 
-def respond_to_client_get_cloud_hosts(connection, address, msg_obj):
-    db = get_db()
+def respond_to_client_get_cloud_hosts(remote_obj, connection, address, msg_obj):
+    db = remote_obj.get_db()
     session_id = msg_obj.sid
     rd = get_user_from_session(db, session_id)
     if not rd.success:

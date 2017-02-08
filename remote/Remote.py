@@ -1,5 +1,4 @@
 import socket
-import sys
 from datetime import datetime
 from threading import Thread
 
@@ -7,19 +6,17 @@ from OpenSSL import SSL
 from werkzeug.security import generate_password_hash
 
 from common_util import send_error_and_close, Success, Error, enable_vt_support
-from connections.RawConnection import RawConnection
 from common_util import set_mylog_name, mylog
+from connections.RawConnection import RawConnection
 from messages import *
 from msg_codes import *
-from remote import User, Cloud, Host, get_db
+from remote import User, Host
 from remote.function.client import respond_to_client_get_cloud_hosts
 from remote.function.client_session_setup import setup_client_session,\
     get_cloud_host, host_verify_client
-from remote.function.create import create
 from remote.function.get_hosts import get_hosts_response
 from remote.function.mirror import mirror_complete, host_request_cloud, \
     client_mirror, host_verify_host
-from remote.function.new_user import new_user
 from remote.util import get_user_from_session, validate_session_id, \
     get_cloud_by_name
 
@@ -36,49 +33,8 @@ CERT_FILE = 'remote/cert'
 ###############################################################################
 
 
-def filter_func(connection, address):
-    msg_obj = connection.recv_obj()
-    msg_type = msg_obj.type
-    # print 'The message is', msg_obj
-    if msg_type == NEW_HOST:
-        new_host_handler(connection, address, msg_obj)
-    elif msg_type == HOST_HANDSHAKE:
-        host_handshake(connection, address, msg_obj)
-    elif msg_type == REQUEST_CLOUD:
-        host_request_cloud(connection, address, msg_obj)
-    elif msg_type == MIRRORING_COMPLETE:
-        mirror_complete(connection, address, msg_obj)
-    elif msg_type == GET_HOSTS_REQUEST:
-        get_hosts_response(connection, address, msg_obj)
-    elif msg_type == GET_ACTIVE_HOSTS_REQUEST:
-        get_hosts_response(connection, address, msg_obj)
-    elif msg_type == CLIENT_SESSION_REQUEST:
-        setup_client_session(connection, address, msg_obj)
-    elif msg_type == CLIENT_GET_CLOUDS_REQUEST:
-        respond_to_get_clouds(connection, address, msg_obj)
-    elif msg_type == CLIENT_GET_CLOUD_HOST_REQUEST:
-        get_cloud_host(connection, address, msg_obj)
-    elif msg_type == CLIENT_GET_CLOUD_HOSTS_REQUEST:
-        respond_to_client_get_cloud_hosts(connection, address, msg_obj)
-    elif msg_type == CLIENT_MIRROR:
-        client_mirror(connection, address, msg_obj)
-    elif msg_type == HOST_VERIFY_CLIENT_REQUEST:
-        host_verify_client(connection, address, msg_obj)
-    elif msg_type == HOST_VERIFY_HOST_REQUEST:
-        host_verify_host(connection, address, msg_obj)
-    elif msg_type == CLIENT_ADD_OWNER:
-        client_add_owner(connection, address, msg_obj)
-    elif msg_type == ADD_CONTRIBUTOR:
-        host_add_contributor(connection, address, msg_obj)
-    elif msg_type == CLIENT_SESSION_REFRESH:
-        client_session_refresh(connection, address, msg_obj)
-    else:
-        print 'I don\'t know what to do with', msg_obj
-    connection.close()
-
-
-def host_handshake(connection, address, msg_obj):
-    db = get_db()
+def host_handshake(remote_obj, connection, address, msg_obj):
+    db = remote_obj.get_db()
     ipv6 = msg_obj.ipv6
     host = db.session.query(Host).get(msg_obj.id)
     if host is not None:
@@ -91,8 +47,8 @@ def host_handshake(connection, address, msg_obj):
         db.session.commit()
 
 
-def client_session_refresh(connection, address, msg_obj):
-    db = get_db()
+def client_session_refresh(remote_obj, connection, address, msg_obj):
+    db = remote_obj.get_db()
     session_id = msg_obj.sid
     # refreshes the session
     rd = validate_session_id(db, session_id)
@@ -149,8 +105,8 @@ def do_add_user(db, username, password, email):
 
     return Success(user.id)
 
-def respond_to_get_clouds(connection, address, msg_obj):
-    db = get_db()
+def respond_to_get_clouds(remote_obj, connection, address, msg_obj):
+    db = remote_obj.get_db()
     session_id = msg_obj.sid
     rd = do_client_get_clouds(db, session_id)
     if rd.success:
@@ -167,8 +123,8 @@ def respond_to_get_clouds(connection, address, msg_obj):
 
 
 
-def new_host_handler(connection, address, msg_obj):
-    db = get_db()
+def new_host_handler(remote_obj, connection, address, msg_obj):
+    db = remote_obj.get_db()
     print 'Handling new host'
     host = Host()
     host.ipv4 = address[0]
@@ -181,15 +137,16 @@ def new_host_handler(connection, address, msg_obj):
     connection.send_obj(msg)
 
 
-def client_add_owner(connection, address, msg_obj):
-    # type: (AbstractConnection, object, ClientAddOwnerMessage) -> None
+def client_add_owner(remote_obj, connection, address, msg_obj):
+    # type: (Remote, AbstractConnection, object, ClientAddOwnerMessage) -> None
+
     if not msg_obj.type == CLIENT_ADD_OWNER:
         msg = 'Somehow tried to client_add_owner without CLIENT_ADD_OWNER'
         err = InvalidStateMessage(msg)
         send_error_and_close(err, connection)
         return
 
-    db = get_db()
+    db = remote_obj.get_db()
     session_id = msg_obj.sid
     cloudname = msg_obj.cname
     cloud_uname = msg_obj.cloud_uname
@@ -230,15 +187,15 @@ def client_add_owner(connection, address, msg_obj):
     connection.close()
 
 
-def host_add_contributor(connection, address, msg_obj):
-    # type: (AbstractConnection, object, AddContributorMessage) -> None
+def host_add_contributor(remote_obj, connection, address, msg_obj):
+    # type: (Remote, AbstractConnection, object, AddContributorMessage) -> None
     if not msg_obj.type == ADD_CONTRIBUTOR:
         msg = 'Somehow tried to host_add_contributor without ADD_CONTRIBUTOR'
         err = InvalidStateMessage(msg)
         send_error_and_close(err, connection)
         return
     mylog('host_add_contributor')
-    db = get_db()
+    db = remote_obj.get_db()
     host_id = msg_obj.host_id
     cloudname = msg_obj.cname
     cloud_uname = msg_obj.cloud_uname
@@ -271,96 +228,90 @@ def host_add_contributor(connection, address, msg_obj):
     connection.close()
 
 
-def start(argv):
-    set_mylog_name('nebr')
-    enable_vt_support()
-    context = SSL.Context(SSL.SSLv23_METHOD)
-    context.use_privatekey_file(KEY_FILE)
-    context.use_certificate_file(CERT_FILE)
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-    s = SSL.Connection(context, s)
-    address = (HOST, PORT) # ipv4
-    # address = (HOST, PORT, 0, 0) # ipv6
-    s.bind(address)
-    mylog('Listening on {}'.format(address))
+class Remote(object):
+    def __init__(self, nebr_instance):
+        # type: (NebrInstance) -> Remote
+        self.nebr_instance = nebr_instance
 
-    s.listen(5)
-    while True:
-        (connection, address) = s.accept()
-        raw_connection = RawConnection(connection)
-        mylog('Connected by {}'.format(address))
-        # This is kinda really dumb.
-        # I guess the thread just catches any exceptions and prevents the main
-        #   from crashing> otherwise it has no purpose
-        # spawn a new thread to handle this connection
-        thread = Thread(target=filter_func, args=[raw_connection, address])
-        thread.start()
-        thread.join()
-        # echo_func(connection, address)
-        # todo: possible that we might want to thread.join here.
-        # cont  Make it so that each req gets handled before blindly continuing
+    def get_db(self):
+        # type: () -> SimpleDB
+        """
+        Note: that Remote::get_db returns a new instance of SimpleDB, because
+          the remote spawns a new child thread for each connection.
+        In the long run, this isn't a great idea. especially because remote
+          interactions should be short lived in general...
 
+        :return:
+        """
+        return self.nebr_instance.make_db()
 
-def list_users(argv):
-    db = get_db()
-    # users = User.query.all()
-    users = db.session.query(User).all()
-    print 'There are ', len(users), 'users.'
-    print '[{}] {:16} {:16}'.format('id', 'name', 'email')
-    for user in users:
-        print '[{}] {:16} {:16}'.format(user.id, user.name, user.email)
+    def start(self, argv):
+        set_mylog_name('nebr')
+        enable_vt_support()
+        context = SSL.Context(SSL.SSLv23_METHOD)
+        context.use_privatekey_file(KEY_FILE)
+        context.use_certificate_file(CERT_FILE)
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+        s = SSL.Connection(context, s)
+        address = (HOST, PORT)  # ipv4
+        # address = (HOST, PORT, 0, 0) # ipv6
+        s.bind(address)
+        mylog('Listening on {}'.format(address))
 
+        s.listen(5)
+        while True:
+            (connection, address) = s.accept()
+            raw_connection = RawConnection(connection)
+            mylog('Connected by {}'.format(address))
+            # This is kinda really dumb.
+            # I guess the thread just catches any exceptions and prevents the main
+            #   from crashing, otherwise it has no purpose.
+            # spawn a new thread to handle this connection
+            thread = Thread(target=self.filter_func, args=[raw_connection, address])
+            thread.start()
+            thread.join()
+            # echo_func(connection, address)
+            # todo: possible that we might want to thread.join here.
+            # cont  Make it so that each req gets handled before blindly continuing
 
-def list_clouds(argv):
-    db = get_db()
-    # clouds = Cloud.query.all()
-    clouds = db.session.query(Cloud).all()
-    print 'There are ', len(clouds), 'clouds.'
-    print '[{}] {:16} {:16} {:16}'.format('id', 'name', 'max_size', 'owners')
-    for cloud in clouds:
-        owners = ''
-        for owner in cloud.owners:
-            owners = owners + owner.name + ' '
-        print '[{}] {:16} {:16} {}'\
-            .format(cloud.id, cloud.name, cloud.max_size, owners)
+    def filter_func(self, connection, address):
+        msg_obj = connection.recv_obj()
+        msg_type = msg_obj.type
+        # print 'The message is', msg_obj
+        if msg_type == NEW_HOST:
+            new_host_handler(self, connection, address, msg_obj)
+        elif msg_type == HOST_HANDSHAKE:
+            host_handshake(self, connection, address, msg_obj)
+        elif msg_type == REQUEST_CLOUD:
+            host_request_cloud(self, connection, address, msg_obj)
+        elif msg_type == MIRRORING_COMPLETE:
+            mirror_complete(self, connection, address, msg_obj)
+        elif msg_type == GET_HOSTS_REQUEST:
+            get_hosts_response(self, connection, address, msg_obj)
+        elif msg_type == GET_ACTIVE_HOSTS_REQUEST:
+            get_hosts_response(self, connection, address, msg_obj)
+        elif msg_type == CLIENT_SESSION_REQUEST:
+            setup_client_session(self, connection, address, msg_obj)
+        elif msg_type == CLIENT_GET_CLOUDS_REQUEST:
+            respond_to_get_clouds(self, connection, address, msg_obj)
+        elif msg_type == CLIENT_GET_CLOUD_HOST_REQUEST:
+            get_cloud_host(self, connection, address, msg_obj)
+        elif msg_type == CLIENT_GET_CLOUD_HOSTS_REQUEST:
+            respond_to_client_get_cloud_hosts(self, connection, address, msg_obj)
+        elif msg_type == CLIENT_MIRROR:
+            client_mirror(self, connection, address, msg_obj)
+        elif msg_type == HOST_VERIFY_CLIENT_REQUEST:
+            host_verify_client(self, connection, address, msg_obj)
+        elif msg_type == HOST_VERIFY_HOST_REQUEST:
+            host_verify_host(self, connection, address, msg_obj)
+        elif msg_type == CLIENT_ADD_OWNER:
+            client_add_owner(self, connection, address, msg_obj)
+        elif msg_type == ADD_CONTRIBUTOR:
+            host_add_contributor(self, connection, address, msg_obj)
+        elif msg_type == CLIENT_SESSION_REFRESH:
+            client_session_refresh(self, connection, address, msg_obj)
+        else:
+            print 'I don\'t know what to do with', msg_obj
+        connection.close()
 
-
-commands = {
-    'new-user': new_user
-    , 'start': start
-    , 'create': create
-    , 'list-users': list_users
-    , 'list-clouds': list_clouds
-}
-command_descriptions = {
-    'new-user': '\tadd a new user to the database'
-    , 'start': '\t\tstart the remote server'
-    , 'create': '\t\tcreate a new cloud to track'
-    , 'list-users': '\tlist all current users'
-    , 'list-clouds': '\tlist all current clouds'
-}
-
-
-def usage(argv):
-    print 'usage: nebr <command>'
-    print ''
-    print 'The available commands are:'
-    for command in command_descriptions.keys():
-        print '\t', command, command_descriptions[command]
-
-
-def nebr_main(argv):
-    if len(argv) < 2:
-        usage(argv)
-        sys.exit(0)
-
-    command = argv[1]
-
-    selected = commands.get(command, usage)
-    selected(argv[2:])
-    sys.exit(0)
-
-
-if __name__ == '__main__':
-    nebr_main(sys.argv)

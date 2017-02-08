@@ -47,6 +47,25 @@ def start_nebs_and_nebr(root='test_out'):
     return host_proc_0, host_proc_1, remote_proc
 
 
+def start_nebs_and_nebr_instance(working_dir='test'):
+    remote_proc = Popen('python nebr.py start')
+    # remote_proc = Popen('python -w {} nebr.py start'.format(working_dir))
+
+    # remote_proc = call('python nebr.py start')
+    sleep(1)
+    print '----- remote pid: {}'.format(remote_proc.pid)
+    sleep(1)
+    host_proc_0 = start_nebs(os.path.join(root, 'tmp0'), 1, True)
+    print '----- \x1b[45m__ first host created __\x1b[0m'
+    print '----- Waitin` for Host 0 to finish setup.'
+    sleep(2)
+    print '----- We want to see a Mirroring Complete (14) before this.'
+    print '----- (and make sure it\'s from host [1]'
+    host_proc_1 = start_nebs(os.path.join(root, 'tmp1'), 2, False)
+    print '\x1b[44m__ second host finished __\x1b[0m'
+    return host_proc_0, host_proc_1, remote_proc
+
+
 def teardown_children(children):
     for child in children:
         if child is not None:

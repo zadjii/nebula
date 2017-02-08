@@ -1,6 +1,5 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
 from migrate.versioning import api
 import os
 __author__ = 'Mike'
@@ -12,9 +11,7 @@ class SimpleDB(object):
         self.engine = engine = create_engine(database_uri, echo=True)
         Session = sessionmaker(bind=engine)  # create a configured "Session" class
         self.session = Session()  # create a Session
-        # self.Base = declarative_base()
         self.Base = base
-        # Base.metadata.create_all(engine, checkfirst=True)
 
     def create_all(self):
         self.Base.metadata.create_all(self.engine, checkfirst=True)

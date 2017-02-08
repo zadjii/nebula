@@ -1,13 +1,11 @@
-from remote import _remote_db
-
-__author__ = 'Mike'
 from werkzeug.security import check_password_hash
 from sqlalchemy import Column, Integer, String, DateTime
 # from .. import remote_db
 from sqlalchemy.orm import relationship, backref
+from remote.models import nebr_base as base
+__author__ = 'Mike'
 
-
-class User(_remote_db.Base):
+class User(base):
     __tablename__ = 'user'
 
     id = Column(Integer, primary_key=True)

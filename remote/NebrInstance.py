@@ -3,12 +3,11 @@ import os
 from StringIO import StringIO
 
 from common.Instance import Instance, get_from_conf
-from host import models
+from remote import models
 from common.SimpleDB import SimpleDB
 
 
-class NebsInstance(Instance):
-
+class NebrInstance(Instance):
     def __init__(self, working_dir=None):
         """
         Creates a instance of nebs.
@@ -17,16 +16,16 @@ class NebsInstance(Instance):
                             Used to store configuration, nebs.db, etc.
                             Can be relative, will be stored as absolute
         """
-        super(NebsInstance, self).__init__(working_dir)
+        super(NebrInstance, self).__init__(working_dir)
 
-        self.host_host = ''
-        self.host_port = 23456
-        self.host_ws_host = '127.0.0.1'
-        self.host_ws_port = 34567
+        # self.host_host = ''
+        # self.host_port = 23456
+        # self.host_ws_host = '127.0.0.1'
+        # self.host_ws_port = 34567
 
-        self._db_name = 'host.db'
-        self._db_models = models.nebs_base
-        self._conf_file_name = 'nebs.conf'
+        self._db_name = 'remote.db'
+        self._db_models = models.nebr_base
+        self._conf_file_name = 'nebr.conf'
 
         self.init_dir()
 

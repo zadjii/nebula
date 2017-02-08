@@ -3,14 +3,14 @@ from uuid import uuid4
 
 from common_util import Error
 from common_util import ResultAndData
-from remote import _remote_db as db
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table, BigInteger
 from sqlalchemy.orm import relationship, backref
 from remote.models.ClientCloudHostMapping import ClientCloudHostMapping
+from remote.models import nebr_base as base
 __author__ = 'Mike'
 
 
-class Session(db.Base):
+class Session(base):
     __tablename__ = 'session'
 
     id = Column(Integer, primary_key=True)
