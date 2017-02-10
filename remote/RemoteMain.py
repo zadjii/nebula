@@ -2,14 +2,14 @@ import sys
 
 from common.Instance import Instance
 from remote.NebrInstance import NebrInstance
-from remote.Remote import Remote
+from remote.RemoteController import RemoteController
 from remote.function.query_db import list_users, list_clouds
 from remote.function.create import create
 from remote.function.new_user import new_user
 
 
 def start(instance, argv):
-    remote_controller = Remote(instance)
+    remote_controller = RemoteController(instance)
     remote_controller.start(argv=argv)
 
 commands = {
@@ -41,7 +41,7 @@ def nebr_main(argv):
         usage(None, argv)
         sys.exit(0)
 
-    working_dir, argv = Instance.get_working_dir(argv)
+    working_dir, argv = Instance.get_working_dir(argv, True)
     nebr_instance = NebrInstance(working_dir)
 
     command = argv[1]

@@ -16,6 +16,8 @@ class NebrInstance(Instance):
                             Used to store configuration, nebs.db, etc.
                             Can be relative, will be stored as absolute
         """
+        if working_dir is None:
+            working_dir = './instances/remote/default'
         super(NebrInstance, self).__init__(working_dir)
 
         # self.host_host = ''

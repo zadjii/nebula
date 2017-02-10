@@ -3,7 +3,7 @@ import sys
 from common.Instance import Instance
 from common_util import enable_vt_support
 from host.NebsInstance import NebsInstance
-from host.Host import Host
+from host.HostController import HostController
 from host.function.dbg_nodes import dbg_nodes
 from host.function.list_clouds import list_clouds
 from host.function.mirror import mirror
@@ -11,7 +11,7 @@ from host.function.tree import tree, db_tree
 
 
 def start(instance, argv):
-    host_controller = Host(instance)
+    host_controller = HostController(instance)
     host_controller.start(argv=argv)
 
 
@@ -40,6 +40,10 @@ def usage(instance, argv):
     print 'The available commands are:'
     for command in command_descriptions.keys():
         print '\t', command, command_descriptions[command]
+    print ''
+    print 'Use [-w, --working-dir <path>] to specify a working dir for the instance,'
+    print ' or [-i, --instance <name>] to provide the instance name'
+    print '                            (same as `-w ./instances/host/<name>`)'
 
 
 def nebs_main(argv):

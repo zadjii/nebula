@@ -313,7 +313,10 @@ def check_ipv6_changed(curr_ipv6):
 
 
 def new_main_thread(host_obj):
-    db = host_obj.get_db()
+    # type: (HostController) -> object
+
+    db = host_obj.get_instance().make_db_session()
+
     mylog('Beginning to watch for local modifications')
     mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
     num_clouds_mirrored = 0  # mirrored_clouds.count()
@@ -330,6 +333,9 @@ def new_main_thread(host_obj):
     #     host_obj.send_remote_handshake(cloud)
     last_handshake = datetime.utcnow()
     db.session.close()
+
+    db = host_obj.get_instance().make_db_session()
+
     mylog('entering main loop')
     while not host_obj.is_shutdown_requested():
         # mylog('Top of Loop')
@@ -342,7 +348,7 @@ def new_main_thread(host_obj):
         host_obj.process_connections()
         # mylog('Done processing connections')
 
-        db = host_obj.get_db()
+        # db = host_obj.get_db()
         mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
         all_mirrored_clouds = mirrored_clouds.all()
         # check if out ip has changed since last update

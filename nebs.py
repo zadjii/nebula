@@ -2,7 +2,7 @@ import host.main
 
 __author__ = 'zadjii'
 
-from host import Host
+from host import HostController
 import sys
 
 if __name__ == '__main__':

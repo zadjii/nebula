@@ -138,7 +138,7 @@ def new_host_handler(remote_obj, connection, address, msg_obj):
 
 
 def client_add_owner(remote_obj, connection, address, msg_obj):
-    # type: (Remote, AbstractConnection, object, ClientAddOwnerMessage) -> None
+    # type: (RemoteController, AbstractConnection, object, ClientAddOwnerMessage) -> None
 
     if not msg_obj.type == CLIENT_ADD_OWNER:
         msg = 'Somehow tried to client_add_owner without CLIENT_ADD_OWNER'
@@ -188,7 +188,7 @@ def client_add_owner(remote_obj, connection, address, msg_obj):
 
 
 def host_add_contributor(remote_obj, connection, address, msg_obj):
-    # type: (Remote, AbstractConnection, object, AddContributorMessage) -> None
+    # type: (RemoteController, AbstractConnection, object, AddContributorMessage) -> None
     if not msg_obj.type == ADD_CONTRIBUTOR:
         msg = 'Somehow tried to host_add_contributor without ADD_CONTRIBUTOR'
         err = InvalidStateMessage(msg)
@@ -228,9 +228,9 @@ def host_add_contributor(remote_obj, connection, address, msg_obj):
     connection.close()
 
 
-class Remote(object):
+class RemoteController(object):
     def __init__(self, nebr_instance):
-        # type: (NebrInstance) -> Remote
+        # type: (NebrInstance) -> RemoteController
         self.nebr_instance = nebr_instance
 
     def get_db(self):

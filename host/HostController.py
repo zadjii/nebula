@@ -31,7 +31,7 @@ from msg_codes import HOST_HOST_FETCH, HOST_FILE_PUSH, REMOVE_FILE, \
 __author__ = 'Mike'
 
 
-class Host:
+class HostController:
     def __init__(self, nebs_instance):
         self.active_network_obj = None
         self.active_network_thread = None

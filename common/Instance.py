@@ -13,7 +13,7 @@ def get_from_conf(config, key, default):
 class Instance(object):
 
     @staticmethod
-    def get_working_dir(argv):
+    def get_working_dir(argv, is_remote=False):
         # type: ([str]) -> (str, [str])
         """
         If there's a [-w <path>] or [--working-dir <path>] in argv,
@@ -21,13 +21,21 @@ class Instance(object):
         Else it returns None
 
         :param argv:
+        :param is_remote: If the instance is a remote instance or a host instance
         :return: (path, [argv] - [-w, path]) or (None, argv)
         """
         remaining_argv = []
         working_dir = None
+        instance_type = 'remote' if is_remote else 'host'
         for index, arg in enumerate(argv):
-            if arg == '-w' and index < (len(argv) - 1):
+            if index >= (len(argv) - 1):
+                break
+            if (arg == '-w') or (arg == '--working-dir'):
                 working_dir = argv[index+1]
+                remaining_argv.extend(argv[index+2:])
+                break
+            if (arg == '-i') or (arg == '--instance'):
+                working_dir = os.path.join('./instances/{}/'.format(instance_type), argv[index+1])
                 remaining_argv.extend(argv[index+2:])
                 break
             else:
@@ -88,7 +96,9 @@ class Instance(object):
         return self._db
 
     def make_db_session(self):
-        return SimpleDB(self._db_uri(), self._db_models)
+        db = SimpleDB(self._db_uri(), self._db_models)
+        db.engine.echo = False
+        return db
 
     def _db_path(self):
         return os.path.join(self._working_dir, self._db_name)
