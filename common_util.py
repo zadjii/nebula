@@ -1,5 +1,10 @@
 import os
+from os import path
 from datetime import datetime
+###############################################################################
+NEBULA_ROOT = path.abspath(path.dirname(__file__))
+INSTANCES_ROOT = path.abspath(path.join(NEBULA_ROOT, './instances'))
+
 
 ###############################################################################
 from collections import namedtuple

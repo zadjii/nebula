@@ -4,6 +4,7 @@ from common.Instance import Instance
 from common_util import enable_vt_support
 from host.NebsInstance import NebsInstance
 from host.HostController import HostController
+from host.function.dbg_mirrors import dbg_mirrors
 from host.function.dbg_nodes import dbg_nodes
 from host.function.list_clouds import list_clouds
 from host.function.mirror import mirror
@@ -22,6 +23,7 @@ commands = {
     , 'tree': tree
     , 'db-tree': db_tree
     , 'dbg-nodes': dbg_nodes
+    , 'dbg-mirrors': dbg_mirrors
 }
 
 command_descriptions = {
@@ -30,6 +32,7 @@ command_descriptions = {
     , 'list-clouds': '\tlist all current clouds'
     , 'tree': '\t\tdisplays the file structure of a cloud on this host.'
     , 'db-tree': '\tdisplays the db structure of a cloud on this host.'
+    , 'dbg-mirrors': '\tdebug information on the mirrors present on this instance'
     , 'export-nebs': '\tWrites out the .nebs of matching clouds as json'
 }
 
@@ -52,7 +55,7 @@ def nebs_main(argv):
         usage(None, argv)
         sys.exit(0)
 
-    working_dir, argv = Instance.get_working_dir(argv)
+    working_dir, argv = Instance.get_working_dir(argv, is_remote=False)
     nebs_instance = NebsInstance(working_dir)
 
     command = argv[1]

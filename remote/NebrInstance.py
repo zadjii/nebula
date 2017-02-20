@@ -3,6 +3,7 @@ import os
 from StringIO import StringIO
 
 from common.Instance import Instance, get_from_conf
+from common_util import NEBULA_ROOT
 from remote import models
 from common.SimpleDB import SimpleDB
 
@@ -20,8 +21,10 @@ class NebrInstance(Instance):
             working_dir = './instances/remote/default'
         super(NebrInstance, self).__init__(working_dir)
 
-        # self.host_host = ''
-        # self.host_port = 23456
+        # todo: This is a bit of a hack. Each instance should probably
+        #   auto-generate a key/cert, but for now just use the default ones
+        self.key_file = os.path.join(NEBULA_ROOT, './remote/key')
+        self.cert_file = os.path.join(NEBULA_ROOT, './remote/cert')
         # self.host_ws_host = '127.0.0.1'
         # self.host_ws_port = 34567
 
@@ -41,8 +44,15 @@ class NebrInstance(Instance):
             stream = StringIO("[root]\n" + stream.read())
             config.readfp(stream)
 
-            self.host_port = get_from_conf(config, 'PORT', self.host_port)
-            self.host_ws_port = get_from_conf(config, 'WS_PORT', self.host_ws_port)
+            self.key_file = get_from_conf(config, 'KEY', self.key_file)
+            self.cert_file = get_from_conf(config, 'CERT', self.cert_file)
+
+    def get_key_file(self):
+        return self.key_file
+
+    def get_cert_file(self):
+        return self.cert_file
+
 
 
 

@@ -184,6 +184,7 @@ def mirror_usage():
 
 
 def mirror(instance, argv):
+    # mylog(argv)
     """
     Things we need for this:
      - [-r address]

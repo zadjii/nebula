@@ -12,22 +12,27 @@ from msg_codes import *
 
 __author__ = 'Mike'
 
+
 def verify_host(db, cloud_uname, cname, local_id, other_id):
     """
     Returns either (False, error_string) or (True, matching_mirror)
     """
     rd = ResultAndData(False, None)
+    mylog('verify_host 0')
     # I'm naming this a mirror because that's what it is.
     # The other host was told to come look for a particular mirror here.
     # if that mirror isn't here, (but another mirror of that cloud is), don't
     # process this request.
     mirror = db.session.query(Cloud).filter_by(my_id_from_remote=local_id).first()
+    mylog('verify_host 1')
     if mirror is None:
         err = 'That mirror isn\'t on this host.'
         rd = ResultAndData(False, err)
+        mylog('verify_host 2')
     else:
         rd = mirror.get_remote_conn()
         if rd.success:
+            mylog('verify_host 3')
             rem_conn = rd.data
             msg = HostVerifyHostRequestMessage(local_id, other_id, cloud_uname, cname)
             try:
@@ -41,11 +46,14 @@ def verify_host(db, cloud_uname, cname, local_id, other_id):
                     rd = ResultAndData(False, 'Unknown error while attempting to verify host')
             except Exception, e:
                 rd = ResultAndData(False, e)
+    mylog('verify_host 4')
     return rd
 
 
 def handle_fetch(host_obj, connection, address, msg_obj):
-    db = host_obj.get_db()
+    mylog('handle_fetch 0')
+    db = host_obj.get_instance().make_db_session ()
+    mylog('handle_fetch 1')
     # the id's are swapped because they are named from the origin host's POV.
     other_id = msg_obj.my_id
     local_id = msg_obj.other_id
@@ -59,6 +67,7 @@ def handle_fetch(host_obj, connection, address, msg_obj):
         err = HostVerifyHostFailureMessage(rd.data)
         send_error_and_close(err, connection)
         return
+    mylog('handle_fetch 2')
 
     matching_mirror = rd.data
 
@@ -67,6 +76,7 @@ def handle_fetch(host_obj, connection, address, msg_obj):
 
     send_tree(db, other_id, matching_mirror, requested_root, connection)
     mylog('Bottom of handle_fetch', '32')
+    mylog('handle_fetch 3')
 
 
 def handle_file_change(host_obj, connection, address, msg_obj):

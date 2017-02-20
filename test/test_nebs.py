@@ -1,22 +1,21 @@
 import os
 import shutil
 import socket
-from subprocess import Popen, PIPE
-from time import sleep
 from inspect import currentframe, getframeinfo
+from time import sleep
 
-import signal
-
-from common_util import ResultAndData, enable_vt_support, Success, Error
+from common_util import ResultAndData, enable_vt_support
 from connections.RawConnection import RawConnection
 from host import REMOTE_HOST, REMOTE_PORT
 from host.PrivateData import RDWR_ACCESS, READ_ACCESS, SHARE_ACCESS
 from host.util import setup_remote_socket
 from messages import *
 from msg_codes import *
-from test.util import teardown_children, start_nebs_and_nebr
-from test.all_dbs_repop import repop_dbs
+from remote.NebrInstance import NebrInstance
 from remote.tools.remote_autopop_001 import repop as wedding_repop
+from test.all_dbs_repop import repop_dbs
+from test.util import teardown_children, start_nebs_and_nebr, retrieve_client_session, HostSession, check_file_contents, \
+    log_warn, log_text, log_success, log_fail, get_client_session
 
 remote = None
 host_0 = None
@@ -36,39 +35,6 @@ bridesmaids_1_root = os.path.join(test_root, 'bridesmaids_1')
 bachelorette_0_root = os.path.join(test_root, 'bachelorette_0')
 bachelorette_1_root = os.path.join(test_root, 'bachelorette_1')
 
-num_successes = 0
-num_fails = 0
-fail_messages = []
-
-# DONT USE DIRECTLY
-def _log_message(text, fmt):
-    frameinfo = getframeinfo(currentframe().f_back.f_back)
-    output = '[{}:{}]\x1b[{}m{}\x1b[0m'.format(
-        os.path.basename(frameinfo.filename)
-        , frameinfo.lineno
-        , fmt
-        , text)
-    print(output)
-    return output
-
-
-def log_success(text):
-    _log_message(text, '32')
-    global num_successes
-    num_successes += 1
-
-def log_fail(text):
-    output = _log_message(text, '31')
-    global num_fails, fail_messages
-    num_fails += 1
-    fail_messages.append(output)
-
-def log_warn(text):
-    _log_message(text, '33')
-
-def log_text(text, fmt='0'):
-    _log_message(text, fmt)
-
 # def log_rd(rd, reverse=False):
 #     if not reverse:
 #         log_fail(rd.data) if not rd.success else log_success(rd.data)
@@ -83,7 +49,7 @@ def close_env():
 
 def setup_env():
     repop_dbs()
-    wedding_repop()
+    wedding_repop(NebrInstance(None))
     # Todo: replace repoping with test-driven population
     # reset_dbs()
 
@@ -587,58 +553,7 @@ def test_contributors():
 
 
 
-def check_file_contents(root, path, data):
-    try:
-        handle = open(os.path.join(root, path))
-        contents = handle.read()
-        handle.close()
-        return ResultAndData(data == contents, 'Checking {} file contents'.format(path))
-    except Exception, e:
-        return Error(e)
 
-
-def get_client_session(uname, password):
-    try:
-        rem_sock = setup_remote_socket(REMOTE_HOST, REMOTE_PORT)
-        rem_conn = RawConnection(rem_sock)
-        request = ClientSessionRequestMessage(uname, password)
-        rem_conn.send_obj(request)
-        response = rem_conn.recv_obj()
-        if not (response.type == CLIENT_SESSION_RESPONSE):
-            raise Exception('remote did not respond with success')
-        return ResultAndData(True, response)
-    except Exception, e:
-        return ResultAndData(False, e)
-
-
-def get_client_host(sid, cloud_uname, cname):
-    try:
-        rem_sock = setup_remote_socket(REMOTE_HOST, REMOTE_PORT)
-        rem_conn = RawConnection(rem_sock)
-
-        msg = ClientGetCloudHostRequestMessage(sid, cloud_uname, cname)
-        rem_conn.send_obj(msg)
-        response = rem_conn.recv_obj()
-        if not (response.type == CLIENT_GET_CLOUD_HOST_RESPONSE):
-            raise Exception('remote did not respond with success CGCR')
-        return ResultAndData(True, response)
-    except Exception, e:
-        return ResultAndData(False, e)
-
-
-def create_sock_msg_get_response(ip, port, msg):
-    conn = create_sock_and_send(ip, port, msg)
-    response = conn.recv_obj()
-    conn.close()
-    return response
-
-
-def create_sock_and_send(ip, port, msg):
-    host_sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-    host_sock.connect((ip, port, 0, 0))
-    conn = RawConnection(host_sock)
-    conn.send_obj(msg)
-    return conn
 
 def test_client_setup():
     log_text('### Client Setup Test ###', '7')
@@ -825,117 +740,4 @@ def test_client_io_big():
             # log_text('Received:\n{}'.format(rd.data))
 
 
-
-def retrieve_client_session(uname, password):
-    rd = get_client_session(uname, password)
-    if not rd.success:
-        log_fail('Failed to create session')
-    else:
-        log_success('Created good session')
-        rd = Success(HostSession(rd.data.sid))
-    return rd
-
-
-class HostSession(object):
-    def __init__(self, sid):
-        self.sid = sid
-        self.cloud_uname = None
-        self.cname = None
-        self.ip = None
-        self.port = None
-
-    def get_host(self, cloud_uname, cname):
-        self.cloud_uname = cloud_uname
-        self.cname = cname
-        rd = get_client_host(self.sid, self.cloud_uname, self.cname)
-        if rd.success:
-            self.ip = rd.data.ip
-            self.port = rd.data.port
-        return rd
-
-    def connect(self):
-        host_sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-        host_sock.connect((self.ip, self.port, 0, 0))
-        conn = RawConnection(host_sock)
-        return conn
-
-    def ls(self, path):
-        msg = ListFilesRequestMessage(self.sid, self.cloud_uname, self.cname, path)
-        response = create_sock_msg_get_response(
-            self.ip
-            , self.port
-            , msg
-        )
-        return ResultAndData(response.type == LIST_FILES_RESPONSE, response)
-
-    def write(self, path, data):
-        msg = ClientFilePutMessage(self.sid, self.cloud_uname, self.cname, path)
-        conn = create_sock_and_send(self.ip, self.port, msg)
-        msg = ClientFileTransferMessage(self.sid, self.cloud_uname, self.cname, path, len(data), False)
-        conn.send_obj(msg)
-        conn.send_next_data(data)
-        conn.send_obj(ClientFileTransferMessage(self.sid, self.cloud_uname, self.cname, None, None, None))
-        return ResultAndData(True, 'Write doesnt check success LOL todo')
-
-    def mkdir(self, path):
-        msg = ClientFilePutMessage(self.sid, self.cloud_uname, self.cname, path)
-        conn = create_sock_and_send(self.ip, self.port, msg)
-        msg = ClientFileTransferMessage(self.sid, self.cloud_uname, self.cname, path, 0, True)
-        conn.send_obj(msg)
-        conn.send_obj(ClientFileTransferMessage(self.sid, self.cloud_uname, self.cname, None, None, None))
-        return ResultAndData(True, 'Write doesnt check success LOL todo')
-
-    def read_file(self, path):
-        msg = ReadFileRequestMessage(self.sid, self.cloud_uname, self.cname, path)
-        conn = self.connect()
-        conn.send_obj(msg)
-        data_buffer = ''
-        resp = conn.recv_obj()
-        if resp.type == READ_FILE_RESPONSE:
-            fsize = resp.fsize
-            recieved = 0
-            while recieved < fsize:
-                data = conn.recv_next_data(fsize)
-                # log_text('Read "{}"'.format(data))
-                if len(data) == 0:
-                    break
-                recieved += len(data)
-                data_buffer += data
-            return Success(data_buffer)
-        else:
-            return Error(resp)
-
-    def add_owner(self, new_owner_id):
-        msg = ClientAddOwnerMessage(self.sid, new_owner_id, self.cloud_uname, self.cname)
-        conn = self.connect()
-        conn.send_obj(msg)
-        resp = conn.recv_obj()
-        if resp.type == ADD_OWNER_SUCCESS:
-            return Success()
-        else:
-            return Error(resp)
-
-    def share(self, new_owner_id, path, permissions):
-        msg = ClientAddContributorMessage(self.sid, new_owner_id,
-                                          self.cloud_uname, self.cname,
-                                          path, permissions)
-        conn = self.connect()
-        conn.send_obj(msg)
-        resp = conn.recv_obj()
-        if resp.type == ADD_CONTRIBUTOR_SUCCESS:
-            return Success()
-        else:
-            return Error(resp)
-
-    def mirror(self, uname, cname, local_root):
-        mirror_proc = Popen('python {} mirror -r {} -d {} -s {} {}/{}'
-                            .format('nebs.py'
-                                    , 'localhost'
-                                    , local_root
-                                    , self.sid
-                                    , uname
-                                    , cname))
-        log_text('Created mirror process')
-        mirror_proc.wait()
-        log_text('mirror process joined')
 

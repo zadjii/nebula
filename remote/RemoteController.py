@@ -11,6 +11,7 @@ from connections.RawConnection import RawConnection
 from messages import *
 from msg_codes import *
 from remote import User, Host
+from remote.NebrInstance import NebrInstance
 from remote.function.client import respond_to_client_get_cloud_hosts
 from remote.function.client_session_setup import setup_client_session,\
     get_cloud_host, host_verify_client
@@ -243,14 +244,16 @@ class RemoteController(object):
 
         :return:
         """
-        return self.nebr_instance.make_db()
+        return self.nebr_instance.make_db_session()
 
     def start(self, argv):
         set_mylog_name('nebr')
         enable_vt_support()
         context = SSL.Context(SSL.SSLv23_METHOD)
-        context.use_privatekey_file(KEY_FILE)
-        context.use_certificate_file(CERT_FILE)
+        mylog(self.nebr_instance.get_key_file())
+        mylog(self.nebr_instance.get_cert_file())
+        context.use_privatekey_file(self.nebr_instance.get_key_file())
+        context.use_certificate_file(self.nebr_instance.get_cert_file())
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         s = SSL.Connection(context, s)
@@ -268,9 +271,13 @@ class RemoteController(object):
             # I guess the thread just catches any exceptions and prevents the main
             #   from crashing, otherwise it has no purpose.
             # spawn a new thread to handle this connection
-            thread = Thread(target=self.filter_func, args=[raw_connection, address])
-            thread.start()
-            thread.join()
+
+            # thread = Thread(target=self.filter_func, args=[raw_connection, address])
+            # thread.start()
+            # thread.join()
+
+            self.filter_func(raw_connection, address)
+
             # echo_func(connection, address)
             # todo: possible that we might want to thread.join here.
             # cont  Make it so that each req gets handled before blindly continuing
