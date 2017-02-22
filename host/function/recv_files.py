@@ -94,12 +94,18 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
         file_handle.close()
         mylog('[{}] wrote the file to {}'.format(cloud.my_id_from_remote, full_path), '30;42')
 
-    updated_node = cloud.create_or_update_node(msg_rel_path, db)
-    if updated_node is not None:
-        old_modified_on = updated_node.last_modified
-        updated_node.last_modified = datetime.utcfromtimestamp(os.path.getmtime(full_path))
-        # mylog('update mtime {}=>{}'.format(old_modified_on, updated_node.last_modified))
-        db.session.commit()
+    # if it wasn't a client file transfer, update our node.
+    #   We don't want to see that it was updated and send updates to the other hosts.
+    # else (this came from a client):
+    #   We DO want to tell other mirrors about this change, so don't change the DB>
+    #   The local thread will find the change and alert the other mirrors.
+    if not is_client:
+        updated_node = cloud.create_or_update_node(msg_rel_path, db)
+        if updated_node is not None:
+            old_modified_on = updated_node.last_modified
+            updated_node.last_modified = datetime.utcfromtimestamp(os.path.getmtime(full_path))
+            # mylog('update mtime {}=>{}'.format(old_modified_on, updated_node.last_modified))
+            db.session.commit()
 
     # new_num_nodes = db.session.query(FileNode).count()
     # mylog('RFT:total file nodes:{}'.format(new_num_nodes))
