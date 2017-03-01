@@ -1,6 +1,5 @@
 import socket
 from datetime import datetime
-from threading import Thread
 
 from OpenSSL import SSL
 from werkzeug.security import generate_password_hash
@@ -44,6 +43,9 @@ def host_handshake(remote_obj, connection, address, msg_obj):
         host.ipv6 = ipv6
         host.port = msg_obj.port
         host.ws_port = msg_obj.wsport
+        host.remaining_size = msg_obj.remaining_space
+        host.curr_size = msg_obj.used_space
+        host.hostname = msg_obj.hostname
         host.last_handshake = datetime.utcnow()
         db.session.commit()
 
@@ -106,6 +108,7 @@ def do_add_user(db, username, password, email):
 
     return Success(user.id)
 
+
 def respond_to_get_clouds(remote_obj, connection, address, msg_obj):
     db = remote_obj.get_db()
     session_id = msg_obj.sid
@@ -123,10 +126,9 @@ def respond_to_get_clouds(remote_obj, connection, address, msg_obj):
         connection.send_obj(rd.data)
 
 
-
 def new_host_handler(remote_obj, connection, address, msg_obj):
     db = remote_obj.get_db()
-    print 'Handling new host'
+    mylog('Handling new host')
     host = Host()
     host.ipv4 = address[0]
     host.ipv6 = msg_obj.ipv6

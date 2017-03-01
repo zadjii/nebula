@@ -3,6 +3,9 @@ from datetime import datetime
 
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table
 from sqlalchemy.orm import relationship, backref
+
+from common_util import INFINITE_SIZE
+from remote.models.Host import Host
 from remote.models import nebr_base as base
 
 
@@ -50,7 +53,7 @@ class Cloud(base):
         )
     hosts = relationship('Host', backref='cloud', lazy='dynamic')
     last_update = Column(DateTime)
-    max_size = Column(Integer)  # Cloud size in bytes
+    max_size = Column(Integer, default=INFINITE_SIZE)  # Cloud size in bytes
     privacy = Column(Integer, default=PRIVATE_CLOUD)
 
     creator_id = Column(ForeignKey('user.id'))
@@ -119,6 +122,15 @@ class Cloud(base):
     def full_name(self):
         return '{}/{}'.format(self.uname(), self.name)
 
+    def available_space(self):
+        """
+        Returns the minimum of the space available on this cloud.
+        :return:
+        """
+        min_host = self.hosts.order_by(Host.remaining_size).first()
+        min = min_host.remaining_size if min_host is not None else self.max_size
+        return min
+
     def to_dict(self):
         self_dict = {
             'uname': self.uname()
@@ -126,6 +138,7 @@ class Cloud(base):
             , 'created_on': self.created_on.isoformat() + 'Z"'
             , 'last_update': self.last_update.isoformat() + 'Z"'
             , 'max_size': self.max_size
+            , 'available_space': self.available_space()
             , 'privacy': self.privacy
         }
         return self_dict

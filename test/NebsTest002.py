@@ -17,7 +17,7 @@ from test.util import start_nebs_and_nebr, start_nebr_and_nebs_instance, teardow
 
 remote_proc = None
 host_proc = None
-test_root = 'foo'
+test_root = 'sunio'  # this is the instance name.
 nebr_instance = None
 nebs_instance = None
 nebs_working_dir = None

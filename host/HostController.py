@@ -151,14 +151,12 @@ class HostController:
         # )
         remote_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
         remote_conn = RawConnection(remote_sock)
-        msg = HostHandshakeMessage(
-            cloud.my_id_from_remote,
-            self.active_network_obj.ipv6_address,
-            self.active_network_obj.port,
-            self.active_network_obj.ws_port,
-            0,  # todo update number/timestamp? it's in my notes
-            platform.uname()[1]  # hostname
+        msg = cloud.generate_handshake(
+            self.active_network_obj.ipv6_address
+            , self.active_network_obj.port
+            , self.active_network_obj.ws_port
         )
+
         remote_conn.send_obj(msg)
         # todo
         # response = remote_conn.recv_obj()

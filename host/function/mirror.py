@@ -119,6 +119,11 @@ def handle_go_retrieve(response, cloud, db):
     other_address = response.ip
     other_port = response.port
     other_id = response.id
+    max_size = response.max_size
+
+    cloud.max_size = max_size
+    db.session.commit()
+
     if other_address == '0' and other_port == 0:
         mylog('No other hosts in cloud')
         # note: falling out of this function takes us to the code that

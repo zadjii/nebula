@@ -23,10 +23,19 @@ def get_user_from_session(db, session_id):
 
 
 def get_cloud_by_name(db, uname, cname):
+    # type: (SimpleDB, str, str) -> Cloud
     # return [cloud for cloud in db.session.query(Cloud).filter_by(name=cname)
     #         if cloud.owner_name() == uname]
     # Hosts don't know about owner names yet, todo:15
-    return db.session.query(Cloud).filter_by(name=cname).first()
+    # return db.session.query(Cloud).filter_by(name=cname).first()
+    clouds = [cloud
+              for cloud in db.session.query(Cloud).filter_by(name=cname).all()
+              if cloud.uname() == uname]
+    if len(clouds) > 1:
+        mylog('get_cloud_by_name error '
+              '- There should be AT MOST one result'
+              '\n\t Found {}'.format([cloud.full_name() for cloud in clouds]))
+    return None if len(clouds) < 1 else clouds[0]
 
 
 def validate_session_id(db, session_id):

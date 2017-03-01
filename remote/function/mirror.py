@@ -163,7 +163,8 @@ def respond_to_mirror_request(db, connection, address, new_host, cloud):
         port = rand_host.port
 
         # Here we have to do what we did with HostClientVerify.
-        # The remote now makes an entry saying that the requester is going to
+        # The remote now makes an entry s
+        # aying that the requester is going to
         # rand_host. When the rand_host gets the HostHostFetch, then they'll ask
         # the remote if that host was told to fetch from rand_host.
         # we'll look up the entry, and return success/fail.
@@ -182,7 +183,7 @@ def respond_to_mirror_request(db, connection, address, new_host, cloud):
     target_host_id = 0 if rand_host is None else rand_host.id
     owner_ids = [owner.id for owner in cloud.owners]
     # GoRetrieveHere kinda acts as the MirrorSuccess message I guess...
-    msg = GoRetrieveHereMessage(target_host_id, ip, port, owner_ids)
+    msg = GoRetrieveHereMessage(target_host_id, ip, port, owner_ids, cloud.max_size)
     connection.send_obj(msg)
 
     mylog('nebr has reached the end of host_request_cloud')

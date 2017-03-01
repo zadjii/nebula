@@ -42,6 +42,7 @@ class Host(base):
         return False
 
     def send_msg(self, msg):
+        raise Exception('If you find yourself doing this then that\'s the remote pushing to a host, which is NOT OKAY ')
         # print 'rand host is ({},{})'.format(ip, port)
         # context = SSL.Context(SSL.SSLv23_METHOD)
         # context.use_privatekey_file(KEY_FILE)
@@ -63,7 +64,7 @@ class Host(base):
             'curr_size': self.curr_size
             , 'ip': self.ipv6
             , 'port': self.port
-            , 'wsport': self.wsport
+            , 'ws_port': self.ws_port
             , 'hostname': self.hostname
             , 'remaining_size': self.remaining_size
         }

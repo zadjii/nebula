@@ -1,12 +1,15 @@
 import os
+import platform
 from datetime import datetime
 
-from common_util import ResultAndData, mylog
+from common_util import ResultAndData, mylog, get_free_space_bytes, INFINITE_SIZE
 from connections.RawConnection import RawConnection
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table, Boolean
 from sqlalchemy.orm import relationship, backref
 from FileNode import FileNode
 from host.models import nebs_base as base
+from messages import HostHandshakeMessage
+
 __author__ = 'Mike'
 
 
@@ -126,6 +129,33 @@ class Cloud(base):
 
     def is_root(self):
         return True
+
+    def get_used_size(self):
+        total_size = 0
+        for dirpath, dirnames, filenames in os.walk(self.root_directory):
+            for f in filenames:
+                fp = os.path.join(dirpath, f)
+                total_size += os.path.getsize(fp)
+        return total_size
+
+    def generate_handshake(self, ip, port, ws_port):
+        used_space = self.get_used_size()
+        if self.max_size == INFINITE_SIZE:
+            remaining_space = get_free_space_bytes('/')
+        else:
+            remaining_space = self.max_size - used_space
+        # mylog(platform.uname())
+        msg = HostHandshakeMessage(
+            self.my_id_from_remote,
+            ip,
+            port,
+            ws_port,
+            0,  # todo update number/timestamp? it's in my notes
+            platform.uname()[1],  # hostname
+            used_space,
+            remaining_space
+        )
+        return msg
 
 
 
