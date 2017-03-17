@@ -31,6 +31,7 @@ class NebrInstance(Instance):
         self._db_name = 'remote.db'
         self._db_models = models.nebr_base
         self._conf_file_name = 'nebr.conf'
+        self._pid_name = 'nebr'
 
         self.init_dir()
 

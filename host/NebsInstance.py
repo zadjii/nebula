@@ -29,6 +29,7 @@ class NebsInstance(Instance):
         self._db_name = 'host.db'
         self._db_models = models.nebs_base
         self._conf_file_name = 'nebs.conf'
+        self._pid_name = 'nebs'
 
         self.init_dir()
 

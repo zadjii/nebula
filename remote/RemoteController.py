@@ -1,3 +1,4 @@
+import atexit
 import socket
 from datetime import datetime
 
@@ -27,8 +28,8 @@ __author__ = 'Mike'
 HOST = ''                 # Symbolic name meaning all available interfaces
 PORT = 12345              # Arbitrary non-privileged port
 
-KEY_FILE = 'remote/key'
-CERT_FILE = 'remote/cert'
+# KEY_FILE = 'remote/key'
+# CERT_FILE = 'remote/cert'
 # todo this is jank AF
 ###############################################################################
 
@@ -251,7 +252,20 @@ class RemoteController(object):
     def start(self, argv):
         set_mylog_name('nebr')
         enable_vt_support()
-        context = SSL.Context(SSL.SSLv23_METHOD)
+        # address = (HOST, PORT, 0, 0) # ipv6
+        # register the shutdown callback
+        atexit.register(self.shutdown)
+
+        force_kill = '--force' in argv
+        if force_kill:
+            mylog('Forcing shutdown of previous instance')
+        rd = self.nebr_instance.start(force_kill)
+        if rd.success:
+            self.network_updates()
+
+    def network_updates(self):
+        # context = SSL.Context(SSL.SSLv23_METHOD)
+        context = SSL.Context(SSL.TLSv1_2_METHOD)
         mylog(self.nebr_instance.get_key_file())
         mylog(self.nebr_instance.get_cert_file())
         context.use_privatekey_file(self.nebr_instance.get_key_file())
@@ -260,7 +274,6 @@ class RemoteController(object):
         # s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         s = SSL.Connection(context, s)
         address = (HOST, PORT)  # ipv4
-        # address = (HOST, PORT, 0, 0) # ipv6
         s.bind(address)
         mylog('Listening on {}'.format(address))
 
@@ -283,6 +296,7 @@ class RemoteController(object):
             # echo_func(connection, address)
             # todo: possible that we might want to thread.join here.
             # cont  Make it so that each req gets handled before blindly continuing
+
 
     def filter_func(self, connection, address):
         msg_obj = connection.recv_obj()
@@ -323,4 +337,8 @@ class RemoteController(object):
         else:
             print 'I don\'t know what to do with', msg_obj
         connection.close()
+
+    def shutdown(self):
+        if self.nebr_instance is not None:
+            self.nebr_instance.shutdown()
 

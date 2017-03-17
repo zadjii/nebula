@@ -1,11 +1,17 @@
 import ConfigParser
 import os
+
 import threading
 from StringIO import StringIO
 
 import thread
 
+import subprocess
+
+import signal
+
 from common.SimpleDB import SimpleDB
+from common_util import ResultAndData, Error, Success
 
 
 def get_from_conf(config, key, default):
@@ -65,6 +71,7 @@ class Instance(object):
         self._db_models = None
         self._conf_file_name = None
         self._db_map = {}
+        self._pid_name = None
 
     def init_dir(self):
         """
@@ -117,3 +124,36 @@ class Instance(object):
 
     def get_config_file_path(self):
         return os.path.join(self._working_dir, self._conf_file_name)
+
+    def _get_pid_file_path(self):
+        pid_file = os.path.join(self._working_dir, '{}.pid'.format(self._pid_name))
+        return pid_file
+
+    def start(self, force=False):
+        # type: (bool) -> ResultAndData
+        pid_file = self._get_pid_file_path()
+        rd = Error()
+        if os.path.exists(pid_file):
+            if force:
+                with open(pid_file) as handle:
+                    pid = handle.read()
+                    os.kill(int(pid), signal.SIGTERM)
+            else:
+                return Error('Process already exists')
+        handle = open(pid_file, mode='wb')
+        pid = os.getpid()
+        handle.write(str(pid))
+        handle.close()
+        return Success(pid)
+
+    def shutdown(self):
+        pid_file = self._get_pid_file_path()
+        if os.path.exists(pid_file):
+            os.remove(pid_file)
+        pass
+
+        
+
+
+
+

@@ -1,3 +1,4 @@
+import atexit
 import collections
 import os
 import signal
@@ -33,6 +34,7 @@ __author__ = 'Mike'
 
 class HostController:
     def __init__(self, nebs_instance):
+        # type: (NebsInstance) -> HostController
         self.active_network_obj = None
         self.active_network_thread = None
         self.active_ws_thread = None
@@ -48,6 +50,7 @@ class HostController:
         self._nebs_instance = nebs_instance
 
     def start(self, argv):
+        # type: ([str]) -> None
         set_mylog_name('nebs')
         # todo process start() args here
 
@@ -61,21 +64,29 @@ class HostController:
         # what if we complete mirroring while we're running?
         #   regardless if it has a .nebs (existing) or not (new/1st mirror)
 
-        ipv6_addresses = get_ipv6_list()
-        if len(ipv6_addresses) < 1:
-            mylog('Could\'nt acquire an IPv6 address')
-        else:
-            self.spawn_net_thread(ipv6_addresses[0])
-            # local_update thread will handle the first handshake/host setup
+        # register the shutdown callback
+        atexit.register(self.shutdown)
 
-        try:
-            self.do_local_updates()
-        finally:
-            self.shutdown()
+        force_kill = '--force' in argv
+        if force_kill:
+            mylog('Forcing shutdown of previous instance')
+        rd = self._nebs_instance.start(force_kill)
+        if rd.success:
+            ipv6_addresses = get_ipv6_list()
+            if len(ipv6_addresses) < 1:
+                mylog('Couldn\'t acquire an IPv6 address')
+            else:
+                self.spawn_net_thread(ipv6_addresses[0])
+                # local_update thread will handle the first handshake/host setup
 
-        mylog('Both the local update checking thread and the network thread'
-              ' have exited.')
-        sys.exit()
+            try:
+                self.do_local_updates()
+            finally:
+                self.shutdown()
+
+            mylog('Both the local update checking thread and the network thread'
+                  ' have exited.')
+            sys.exit()
 
     def do_local_updates(self):
         # signal.signal(signal.CTRL_C_EVENT, self.shutdown())
@@ -117,11 +128,16 @@ class HostController:
         return self._shutdown_requested
 
     def shutdown(self):
+        mylog('Calling HostController.shutdown()')
         self._shutdown_requested = True
         if self.active_network_obj is not None:
             self.active_network_obj.shutdown()
+
         if self._local_update_thread is not None:
             self._local_update_thread.join()
+
+        if self._nebs_instance is not None:
+            self._nebs_instance.shutdown()
 
     def change_ip(self, new_ip, clouds):
         if new_ip is None:
