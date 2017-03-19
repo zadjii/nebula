@@ -4,15 +4,15 @@ import socket
 from datetime import datetime
 
 from connections.RawConnection import RawConnection
-from remote import _remote_db as db
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table,\
     Boolean
 from sqlalchemy.orm import relationship, backref
+from remote.models import nebr_base as base
 
 __author__ = 'Mike'
 
 
-class Host(db.Base):
+class Host(base):
     __tablename__ = 'host'
 
     id = Column(Integer, primary_key=True)
@@ -42,6 +42,7 @@ class Host(db.Base):
         return False
 
     def send_msg(self, msg):
+        raise Exception('If you find yourself doing this then that\'s the remote pushing to a host, which is NOT OKAY ')
         # print 'rand host is ({},{})'.format(ip, port)
         # context = SSL.Context(SSL.SSLv23_METHOD)
         # context.use_privatekey_file(KEY_FILE)
@@ -63,7 +64,7 @@ class Host(db.Base):
             'curr_size': self.curr_size
             , 'ip': self.ipv6
             , 'port': self.port
-            , 'wsport': self.wsport
+            , 'ws_port': self.ws_port
             , 'hostname': self.hostname
             , 'remaining_size': self.remaining_size
         }

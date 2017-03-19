@@ -4,7 +4,6 @@ from threading import Thread
 import sys
 
 from connections.AbstractConnection import AbstractConnection
-from host import HOST_WS_PORT, HOST_PORT
 # from messages import decode_msg_size
 from host.util import mylog, get_ipv6_list
 from messages.util import get_msg_size, decode_msg_size

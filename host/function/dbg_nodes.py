@@ -1,10 +1,10 @@
-from host import get_db, FileNode
+from host import FileNode
 
 __author__ = 'zadjii'
 
 
-def dbg_nodes(argv):
-    db = get_db()
+def dbg_nodes(instance, argv):
+    db = instance.get_db()
     nodes = db.session.query(FileNode).all()
     for node in nodes:
         print(

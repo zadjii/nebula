@@ -1,3 +1,4 @@
+import atexit
 import collections
 import os
 import signal
@@ -7,7 +8,6 @@ from threading import Thread, Event, Lock, Semaphore
 
 from common_util import mylog, ResultAndData
 from connections.RawConnection import RawConnection
-from host import get_db
 from host.NetworkThread import NetworkThread
 from host.PrivateData import PrivateData, NO_ACCESS, READ_ACCESS
 from host.WatchdogThread import WatchdogWorker
@@ -32,27 +32,30 @@ from msg_codes import HOST_HOST_FETCH, HOST_FILE_PUSH, REMOVE_FILE, \
 __author__ = 'Mike'
 
 
-class Host:
-    def __init__(self):
+class HostController:
+    def __init__(self, nebs_instance):
+        # type: (NebsInstance) -> HostController
         self.active_network_obj = None
         self.active_network_thread = None
         self.active_ws_thread = None
         self.network_queue = []  # all the queued connections to handle.
         self._shutdown_requested = False
         self._local_update_thread = None
-        self._private_data = {} # cloud.my_id_from_remote -> PrivateData mapping
+        self._private_data = {}  # cloud.my_id_from_remote -> PrivateData mapping
         # self._private_data = collections.MutableMapping()
         self.network_signal = Event()
         # self.network_signal = Semaphore()
         self._io_lock = Lock()
         self.watchdog_worker = WatchdogWorker(self)
+        self._nebs_instance = nebs_instance
 
     def start(self, argv):
+        # type: ([str]) -> None
         set_mylog_name('nebs')
         # todo process start() args here
 
         # read in all the .nebs
-        db = get_db()
+        db = self.get_db()
         for cloud in db.session.query(Cloud).all():
             self.load_private_data(cloud)
 
@@ -61,21 +64,29 @@ class Host:
         # what if we complete mirroring while we're running?
         #   regardless if it has a .nebs (existing) or not (new/1st mirror)
 
-        ipv6_addresses = get_ipv6_list()
-        if len(ipv6_addresses) < 1:
-            mylog('Could\'nt acquire an IPv6 address')
-        else:
-            self.spawn_net_thread(ipv6_addresses[0])
-            # local_update thread will handle the first handshake/host setup
+        # register the shutdown callback
+        atexit.register(self.shutdown)
 
-        try:
-            self.do_local_updates()
-        finally:
-            self.shutdown()
+        force_kill = '--force' in argv
+        if force_kill:
+            mylog('Forcing shutdown of previous instance')
+        rd = self._nebs_instance.start(force_kill)
+        if rd.success:
+            ipv6_addresses = get_ipv6_list()
+            if len(ipv6_addresses) < 1:
+                mylog('Couldn\'t acquire an IPv6 address')
+            else:
+                self.spawn_net_thread(ipv6_addresses[0])
+                # local_update thread will handle the first handshake/host setup
 
-        mylog('Both the local update checking thread and the network thread'
-              ' have exited.')
-        sys.exit()
+            try:
+                self.do_local_updates()
+            finally:
+                self.shutdown()
+
+            mylog('Both the local update checking thread and the network thread'
+                  ' have exited.')
+            sys.exit()
 
     def do_local_updates(self):
         # signal.signal(signal.CTRL_C_EVENT, self.shutdown())
@@ -117,11 +128,16 @@ class Host:
         return self._shutdown_requested
 
     def shutdown(self):
+        mylog('Calling HostController.shutdown()')
         self._shutdown_requested = True
         if self.active_network_obj is not None:
             self.active_network_obj.shutdown()
+
         if self._local_update_thread is not None:
             self._local_update_thread.join()
+
+        if self._nebs_instance is not None:
+            self._nebs_instance.shutdown()
 
     def change_ip(self, new_ip, clouds):
         if new_ip is None:
@@ -151,14 +167,12 @@ class Host:
         # )
         remote_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
         remote_conn = RawConnection(remote_sock)
-        msg = HostHandshakeMessage(
-            cloud.my_id_from_remote,
-            self.active_network_obj.ipv6_address,
-            self.active_network_obj.port,
-            self.active_network_obj.ws_port,
-            0,  # todo update number/timestamp? it's in my notes
-            platform.uname()[1]  # hostname
+        msg = cloud.generate_handshake(
+            self.active_network_obj.ipv6_address
+            , self.active_network_obj.port
+            , self.active_network_obj.ws_port
         )
+
         remote_conn.send_obj(msg)
         # todo
         # response = remote_conn.recv_obj()
@@ -210,13 +224,13 @@ class Host:
         """
         Returns true if the file at full_path is the .nebs for the given mirror.
         If cloud=None, then it searches all mirrors on this host.
-        :param path: The FULL path. Not the cloud-relative one.
+        :param full_path: The FULL path. Not the cloud-relative one.
         :param cloud:
         :return:
         """
         if cloud is None:
             # todo: this is pretty untested. Write some tests that make sure
-            db = get_db()
+            db = self.get_db()
             for cloud2 in db.session.query(Cloud).all():
                 if cloud2.root_directory == os.path.commonprefix([cloud2.root_directory, full_path]):
                     cloud = cloud2
@@ -226,7 +240,7 @@ class Host:
         return os.path.join(cloud.root_directory, '.nebs') == full_path
 
     def get_client_permissions(self, client_sid, cloud, relative_path):
-        db = get_db()
+        db = self.get_db()
         rd = get_client_session(db, client_sid, cloud.uname(), cloud.cname())
         # mylog('get_client_permissions [{}] {}'.format(0, rd))
         if rd.success:
@@ -238,6 +252,9 @@ class Host:
             else:
                 mylog('There has no private data for {}'.format(cloud.name), '31')
         return NO_ACCESS
+
+    def get_db(self):
+        return self._nebs_instance.get_db()
 
     def filter_func(self, connection, address):
         try:
@@ -337,3 +354,5 @@ class Host:
         #     , frameinfo.lineno))
         # self.network_signal.release()
 
+    def get_instance(self):
+        return self._nebs_instance

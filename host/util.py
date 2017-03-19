@@ -64,7 +64,8 @@ def check_response(expected, recieved):
 
 def get_clouds_by_name(db, uname, cname):
     # return [cloud for cloud in db.session.query(Cloud).filter_by(name=cname)]
-    return [cloud for cloud in db.session.query(Cloud).filter_by(username=uname, name=cname)]
+    # return [cloud for cloud in db.session.query(Cloud).filter_by(username=uname, name=cname)]
+    return db.session.query(Cloud).filter_by(username=uname, name=cname).all()
 
 
 def get_client_session(db, uuid, cloud_uname, cloud_cname):

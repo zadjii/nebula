@@ -1,13 +1,13 @@
 from datetime import datetime, timedelta
 
-from remote import _remote_db as db
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table, BigInteger
 from sqlalchemy.orm import relationship, backref
+from remote.models import nebr_base as base
 
 __author__ = 'Mike'
 
 
-class HostHostFetchMapping(db.Base):
+class HostHostFetchMapping(base):
     __tablename__ = 'hosthostfetchmapping'
     id = Column(Integer, primary_key=True)
     new_host_id = Column(ForeignKey('host.id'))

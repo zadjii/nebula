@@ -1,10 +1,10 @@
 __author__ = 'Mike'
 
-from remote_config import DATABASE_URI, MIGRATE_REPO
-from database.SimpleDB import SimpleDB
-
-_remote_db = SimpleDB(DATABASE_URI)
-_remote_db.engine.echo = False
+# from remote_config import DATABASE_URI, MIGRATE_REPO
+# from database.SimpleDB import SimpleDB
+#
+# _remote_db = SimpleDB(DATABASE_URI)
+# _remote_db.engine.echo = False
 # note: He unfortunately needs to stay around,
 #  so we can set up ORM metadata.
 
@@ -24,7 +24,3 @@ from models.HostHostFetchMapping import HostHostFetchMapping
 # todo: if it wasn't, then make both of them.
 # remote_db.create_all_and_repo(MIGRATE_REPO, DATABASE_URI)
 
-def get_db():
-    db = SimpleDB(DATABASE_URI)
-    db.engine.echo = False
-    return db

@@ -1,7 +1,6 @@
 import socket
 from connections.RawConnection import RawConnection
 from util import mylog
-from host import HOST_PORT, HOST_WS_PORT
 from connections.WebSocketConnection import MyBigFuckingLieServerProtocol, \
     WebsocketConnection
 import txaio
@@ -25,8 +24,9 @@ class NetworkThread(object):
         else:
             self.ipv4_address = ip_address
 
-        self.port = HOST_PORT
-        self.ws_port = HOST_WS_PORT
+        self.port = host.get_instance().host_port
+        self.ws_port = host.get_instance().host_ws_port
+
         self.setup_socket(ip_address, self._use_ipv6)
         self.connection_queue = []
 
@@ -34,7 +34,7 @@ class NetworkThread(object):
         self.ws_coro = None
         self.ws_server_protocol_instance = None
         self.ws_internal_server_socket = None
-        self.ws_internal_port = HOST_WS_PORT + 1
+        self.ws_internal_port = self.ws_port + 1
 
         # This lock belongs to the Host that spawned us.
         self._host = host
@@ -56,7 +56,7 @@ class NetworkThread(object):
                     succeeded = True
                     break
                 except socket.error, e:
-                    failure_count+=1
+                    failure_count += 1
                     mylog('Failed {} time(s) to bind to {}'.format(
                         failure_count, (ip_address, self.port)), '34')
                     mylog(e)

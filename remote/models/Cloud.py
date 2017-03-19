@@ -1,9 +1,12 @@
 import json
 from datetime import datetime
 
-from remote import _remote_db as db
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table
 from sqlalchemy.orm import relationship, backref
+
+from common_util import INFINITE_SIZE
+from remote.models.Host import Host
+from remote.models import nebr_base as base
 
 
 __author__ = 'Mike'
@@ -11,13 +14,13 @@ __author__ = 'Mike'
 
 cloud_owners = Table(
     'cloud_owners'
-    , db.Base.metadata
+    , base.metadata
     , Column('cloud_id', Integer, ForeignKey('cloud.id'))
     , Column('user_id', Integer, ForeignKey('user.id'))
     )
 cloud_contributors = Table(
     'cloud_contributors'
-    , db.Base.metadata
+    , base.metadata
     , Column('cloud_id', Integer, ForeignKey('cloud.id'))
     , Column('user_id', Integer, ForeignKey('user.id'))
     )
@@ -30,7 +33,7 @@ PUBLIC_CLOUD = 2  # anyone (host can still reject RDWR)
 # cont make a public link, then the cloud needs to be public, etc.
 
 
-class Cloud(db.Base):
+class Cloud(base):
     __tablename__ = 'cloud'
 
     id = Column(Integer, primary_key=True)
@@ -50,7 +53,7 @@ class Cloud(db.Base):
         )
     hosts = relationship('Host', backref='cloud', lazy='dynamic')
     last_update = Column(DateTime)
-    max_size = Column(Integer)  # Cloud size in bytes
+    max_size = Column(Integer, default=INFINITE_SIZE)  # Cloud size in bytes
     privacy = Column(Integer, default=PRIVATE_CLOUD)
 
     creator_id = Column(ForeignKey('user.id'))
@@ -119,6 +122,15 @@ class Cloud(db.Base):
     def full_name(self):
         return '{}/{}'.format(self.uname(), self.name)
 
+    def available_space(self):
+        """
+        Returns the minimum of the space available on this cloud.
+        :return:
+        """
+        min_host = self.hosts.order_by(Host.remaining_size).first()
+        min = min_host.remaining_size if min_host is not None else self.max_size
+        return min
+
     def to_dict(self):
         self_dict = {
             'uname': self.uname()
@@ -126,6 +138,7 @@ class Cloud(db.Base):
             , 'created_on': self.created_on.isoformat() + 'Z"'
             , 'last_update': self.last_update.isoformat() + 'Z"'
             , 'max_size': self.max_size
+            , 'available_space': self.available_space()
             , 'privacy': self.privacy
         }
         return self_dict

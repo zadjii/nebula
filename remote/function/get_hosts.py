@@ -1,12 +1,12 @@
 from common_util import mylog
 from messages import GetHostsResponseMessage, GetActiveHostsResponseMessage, InvalidStateMessage
 from msg_codes import send_generic_error_and_close, GET_HOSTS_REQUEST
-from remote import get_db, Host, Cloud
+from remote import Host, Cloud
 from remote.models.User import User
 
 
-def get_hosts_response(connection, address, msg_obj):
-    db = get_db()
+def get_hosts_response(remote_obj, connection, address, msg_obj):
+    db = remote_obj.get_db()
     host_id = msg_obj.id
     cloudname = msg_obj.cname
     cloud_uname = msg_obj.cloud_uname

@@ -1,14 +1,14 @@
 from datetime import datetime
 import getpass
 from werkzeug.security import generate_password_hash
-from remote import User, get_db
+from remote import User
 # from remote import remote_db as db
 
 __author__ = 'zadjii'
 
 
-def new_user(argv):
-    db = get_db()
+def new_user(instance, argv):
+    db = instance.get_db()
     print 'here we\'ll make a new user'
 
     email = raw_input('Enter an email for the new user: ').lower()

@@ -17,7 +17,7 @@
 
 0   , NEW_HOST              , string:ipv6, int:port     , int:wsport    , string:hostname
 1   , ASSIGN_HOST_ID        , int:id    , string:key    , string:cert
-2   , HOST_HANDSHAKE        , int:id    , string:ipv6   , int:port      , int:wsport    , update , string:hostname
+2   , HOST_HANDSHAKE        , int:id    , string:ipv6   , int:port      , int:wsport    , update , string:hostname, int:used_space, int:remaining_space
 
 3   , REMOTE_HANDSHAKE      , int:id    , string:key    , string:cert
 4   , REM_HANDSHAKE_GO_FETCH #todo not done
@@ -25,7 +25,7 @@
 5   , REQUEST_CLOUD         , int:id    , string:cloud_uname  , string:cname  , string:username  , string:passw
 # note: purposefully no wsport, this is for H->H only.
 # The owner_ids are used to set up the first mirror's PrivateData file.
-6   , GO_RETRIEVE_HERE      , int:id    , ip            , int:port      , blob:owner_ids
+6   , GO_RETRIEVE_HERE      , int:id    , ip            , int:port      , blob:owner_ids    , int:max_size
 
 # Note: Prepare for fetch is now deprecated, see GH:14
 # fixme remove from rest of codebase

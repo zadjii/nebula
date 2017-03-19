@@ -3,14 +3,14 @@ from messages import GoRetrieveHereMessage, HostVerifyHostFailureMessage, \
     HostVerifyHostSuccessMessage, InvalidStateMessage, MirrorFailureMessage, \
     AuthErrorMessage
 from msg_codes import send_generic_error_and_close
-from remote import get_db, Host, Cloud, Session
+from remote import Host, Cloud, Session
 from remote.models.User import User
 from remote.models.HostHostFetchMapping import HostHostFetchMapping
 from remote.util import get_cloud_by_name
 
 
-def mirror_complete(connection, address, msg_obj):
-    db = get_db()
+def mirror_complete(remote_obj, connection, address, msg_obj):
+    db = remote_obj.get_db()
     host_id = msg_obj.id
     cloudname = msg_obj.cname
 
@@ -35,8 +35,8 @@ def mirror_complete(connection, address, msg_obj):
     mylog('Host[{}] finished mirroring cloud \'{}\''.format(host_id, cloudname))
 
 
-def host_request_cloud(connection, address, msg_obj):
-    db = get_db()
+def host_request_cloud(remote_obj, connection, address, msg_obj):
+    db = remote_obj.get_db()
     host_id = msg_obj.id
     cloud_uname = msg_obj.cloud_uname
     cloudname = msg_obj.cname
@@ -90,8 +90,8 @@ def host_request_cloud(connection, address, msg_obj):
     respond_to_mirror_request(db, connection, address, matching_host, match)
 
 
-def client_mirror(connection, address, msg_obj):
-    db = get_db()
+def client_mirror(remote_obj, connection, address, msg_obj):
+    db = remote_obj.get_db()
     session_id = msg_obj.sid
     host_id = msg_obj.host_id
     cloud_uname = msg_obj.cloud_uname
@@ -163,7 +163,8 @@ def respond_to_mirror_request(db, connection, address, new_host, cloud):
         port = rand_host.port
 
         # Here we have to do what we did with HostClientVerify.
-        # The remote now makes an entry saying that the requester is going to
+        # The remote now makes an entry s
+        # aying that the requester is going to
         # rand_host. When the rand_host gets the HostHostFetch, then they'll ask
         # the remote if that host was told to fetch from rand_host.
         # we'll look up the entry, and return success/fail.
@@ -182,14 +183,14 @@ def respond_to_mirror_request(db, connection, address, new_host, cloud):
     target_host_id = 0 if rand_host is None else rand_host.id
     owner_ids = [owner.id for owner in cloud.owners]
     # GoRetrieveHere kinda acts as the MirrorSuccess message I guess...
-    msg = GoRetrieveHereMessage(target_host_id, ip, port, owner_ids)
+    msg = GoRetrieveHereMessage(target_host_id, ip, port, owner_ids, cloud.max_size)
     connection.send_obj(msg)
 
     mylog('nebr has reached the end of host_request_cloud')
 
 
-def host_verify_host(connection, address, msg_obj):
-    db = get_db()
+def host_verify_host(remote_obj, connection, address, msg_obj):
+    db = remote_obj.get_db()
     # the receiver recieved the HHF message, the sender sent it.
     # the receiver is the old mirror, the sender is the new mirror
     reciever_id = msg_obj.my_id

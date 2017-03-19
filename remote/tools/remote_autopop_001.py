@@ -1,10 +1,13 @@
+import sys
+
+from common.Instance import Instance
+from remote.NebrInstance import NebrInstance
 
 __author__ = 'zadjii'
 
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 
-import remote
 from remote.models.Cloud import Cloud
 from remote.models.User import User
 from remote.models.Host import Host
@@ -28,8 +31,9 @@ def make_simple_user(db, name):
     db.session.add(user)
     return user
 
-def repop():
-    db = remote.get_db()
+
+def repop(instance):
+    db = instance.get_db()
 
     mikegr = make_simple_user(db, 'Mike Griese')
     clairabel = make_simple_user(db, 'Claire Bovee')
@@ -80,4 +84,7 @@ def repop():
     print 'Remote DB populated with 001 data - "Wedding"'
 
 if __name__ == '__main__':
-    repop()
+    argv = sys.argv
+    working_dir, argv = Instance.get_working_dir(argv, True)
+    nebr_instance = NebrInstance(working_dir)
+    repop(nebr_instance)

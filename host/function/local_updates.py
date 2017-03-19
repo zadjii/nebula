@@ -4,7 +4,7 @@ import socket
 from stat import S_ISDIR
 import time
 from connections.RawConnection import RawConnection
-from host import FileNode, get_db, Cloud, HOST_PORT
+from host import FileNode, Cloud
 from host.function.network_updates import handle_remove_file
 from host.function.send_files import send_file_to_other, complete_sending_files, send_file_to_local
 from host.util import check_response, setup_remote_socket, mylog, get_ipv6_list, find_deletable_children
@@ -165,7 +165,7 @@ def local_file_delete(host_obj, directory_path, dir_node, filename, filenode, db
     # we don't need to recurse for the subdirs of this name
     # we do need to recurse on subnodes
     mirror = filenode.cloud
-    mylog('[{}] Found a deleted file {}'.format(mirror.my_id_from_remote, file_pathname), '33')
+    # mylog('[{}] Found a deleted file {}'.format(mirror.my_id_from_remote, file_pathname), '33')
     private_data = host_obj.get_private_data(mirror)
     if private_data is None:
         # this is a problem
@@ -257,10 +257,10 @@ def recursive_local_modifications_check(host_obj, directory_path, dir_node, db):
     num_nodes = len(nodes) if nodes is not None else 0
     original_total_nodes = db.session.query(FileNode).count()
     updates = []
-    mylog('[{}] curr children: <{}>, ({})'.format(mirror_id, files, [node.name for node in nodes]))
-    mylog('[{}] curr children parents: <{}>, ({})'.format(mirror_id, files, [node.parent.name if node.parent is not None else 'None' for node in nodes]))
+    # mylog('[{}] curr children: <{}>, ({})'.format(mirror_id, files, [node.name for node in nodes]))
+    # mylog('[{}] curr children parents: <{}>, ({})'.format(mirror_id, files, [node.parent.name if node.parent is not None else 'None' for node in nodes]))
     while (i < num_files) and (j < num_nodes):
-        mylog('[{}]Iterating on <{}>, ({})'.format(mirror_id, files[i], nodes[j].name))
+        # mylog('[{}]Iterating on <{}>, ({})'.format(mirror_id, files[i], nodes[j].name))
         if files[i] == nodes[j].name:
             update_updates = local_file_update(host_obj, directory_path, dir_node, files[i], nodes[j], db)
             updates.extend(update_updates)
@@ -313,7 +313,10 @@ def check_ipv6_changed(curr_ipv6):
 
 
 def new_main_thread(host_obj):
-    db = get_db()
+    # type: (HostController) -> object
+
+    db = host_obj.get_instance().make_db_session()
+
     mylog('Beginning to watch for local modifications')
     mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
     num_clouds_mirrored = 0  # mirrored_clouds.count()
@@ -330,6 +333,9 @@ def new_main_thread(host_obj):
     #     host_obj.send_remote_handshake(cloud)
     last_handshake = datetime.utcnow()
     db.session.close()
+
+    db = host_obj.get_instance().make_db_session()
+
     mylog('entering main loop')
     while not host_obj.is_shutdown_requested():
         # mylog('Top of Loop')
@@ -342,7 +348,7 @@ def new_main_thread(host_obj):
         host_obj.process_connections()
         # mylog('Done processing connections')
 
-        db = get_db()
+        # db = host_obj.get_db()
         mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
         all_mirrored_clouds = mirrored_clouds.all()
         # check if out ip has changed since last update
@@ -401,12 +407,9 @@ def new_main_thread(host_obj):
     mylog('Leaving main loop')
 
 
-
-
-
 def local_update_thread(host_obj):
-    db = get_db()
-    print 'Beginning to watch for local modifications'
+    db = host_obj.get_db()
+    mylog('Beginning to watch for local modifications')
     mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
     num_clouds_mirrored = 0  # mirrored_clouds.count()
 
@@ -420,7 +423,7 @@ def local_update_thread(host_obj):
         # process all of the incoming requests first
         host_obj.process_connections()
 
-        db = get_db()
+        db = host_obj.get_db()
         mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
         all_mirrored_clouds = mirrored_clouds.all()
 

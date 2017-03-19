@@ -9,8 +9,7 @@ from time import sleep
 from common_util import ResultAndData, Error, set_mylog_name
 from connections.RawConnection import RawConnection
 
-from host import Cloud, REMOTE_PORT, HOST_PORT, HOST_WS_PORT
-from host import get_db
+from host import Cloud, REMOTE_PORT
 from host.PrivateData import PrivateData
 from host.function.recv_files import recv_file_tree
 from host.util import check_response, setup_remote_socket, mylog, get_ipv6_list
@@ -26,7 +25,7 @@ __author__ = 'Mike'
 # because this is stupid so yea definitely combine them into one message
 
 
-def ask_remote_for_id(host, port, db):
+def ask_remote_for_id(instance, host, port, db):
     """This performs a code [0] message on the remote host at host:port.
      Awaits a code[1] from the remote.
      Creates a new Cloud for this host:port.
@@ -46,7 +45,10 @@ def ask_remote_for_id(host, port, db):
 
     ipv6_addr = ipv6_addresses[0]  # arbitrarily take the first one
 
-    msg = NewHostMessage(ipv6_addr, HOST_PORT, HOST_WS_PORT, platform.uname()[1])
+    msg = NewHostMessage(ipv6_addr
+                         , instance.host_port
+                         , instance.host_ws_port
+                         , platform.uname()[1])
     raw_conn.send_obj(msg)
 
     resp_obj = raw_conn.recv_obj()
@@ -117,6 +119,11 @@ def handle_go_retrieve(response, cloud, db):
     other_address = response.ip
     other_port = response.port
     other_id = response.id
+    max_size = response.max_size
+
+    cloud.max_size = max_size
+    db.session.commit()
+
     if other_address == '0' and other_port == 0:
         mylog('No other hosts in cloud')
         # note: falling out of this function takes us to the code that
@@ -157,14 +164,14 @@ def handle_go_retrieve(response, cloud, db):
     mylog('Bottom of go_retrieve')
 
 
-def attempt_wakeup():
+def attempt_wakeup(instance):
     mylog('Attempting to alert any existing nebs')
     try:
         local_sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         ips = get_ipv6_list()
         ip = ips[0]
         mylog('Local IP6 is {}'.format(ip))
-        local_sock.connect((ip, HOST_PORT, 0, 0))
+        local_sock.connect((ip, instance.host_port, 0, 0))
         mylog('connected to a nebs')
         conn = RawConnection(local_sock)
         msg = RefreshMessageMessage()
@@ -181,7 +188,8 @@ def mirror_usage():
     print ''
 
 
-def mirror(argv):
+def mirror(instance, argv):
+    # mylog(argv)
     """
     Things we need for this:
      - [-r address]
@@ -197,7 +205,7 @@ def mirror(argv):
      -- if not present, will prompt for a username and password.
     """
     set_mylog_name('mirror')
-    db = get_db()
+    db = instance.get_db()
     host = None
     port = REMOTE_PORT
     cloudname = None
@@ -266,7 +274,7 @@ def mirror(argv):
     # okay, so manually decipher the FQDN if they input one.
     # todo:30 verify that directory is empty, don't do anything if it isn't
     # also todo:25 ^
-    status, my_id = ask_remote_for_id(host, port, db)
+    status, my_id = ask_remote_for_id(instance, host, port, db)
     if not status == 0:
         raise Exception('Exception while mirroring:' +
                         ' could not get ID from remote')
@@ -304,7 +312,7 @@ def mirror(argv):
     if rd.success:
         sleep(1)
         # try waking up any hosts on this machine that this mirror should be tracked by.
-        attempt_wakeup()
+        attempt_wakeup(instance)
 
     # todo goto code that checks if a nebs.start process is running
 

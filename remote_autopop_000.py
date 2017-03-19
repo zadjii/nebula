@@ -1,4 +1,8 @@
+import sys
+
 import remote
+from common.Instance import Instance
+from remote.NebrInstance import NebrInstance
 
 __author__ = 'zadjii'
 
@@ -11,8 +15,8 @@ from remote.models.User import User
 from remote.models.Host import Host
 
 
-def repop():
-    remote_db = remote.get_db()
+def repop(instance):
+    remote_db = instance.get_db()
 
     asdf = User()
     asdf.created_on = datetime.utcnow()
@@ -65,4 +69,7 @@ def repop():
     print 'Remote DB populated'
 
 if __name__ == '__main__':
-    repop()
+    argv = sys.argv
+    working_dir, argv = Instance.get_working_dir(argv, True)
+    nebr_instance = NebrInstance(working_dir)
+    repop(nebr_instance)

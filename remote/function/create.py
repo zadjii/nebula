@@ -3,17 +3,18 @@ import getpass
 from werkzeug.security import check_password_hash
 
 from common_util import Error, Success
-from remote import User, Cloud, get_db
+from remote import User, Cloud
 # from remote import remote_db as db
 
 __author__ = 'zadjii'
 
 FOUR_GB = 4 * 1000 * 1000 * 1000
 
-def create(argv):
+
+def create(instance, argv):
     """Creates a new cloud in the db to be tracked. Needs the credentials of the
     User who owns it."""
-    db = get_db()
+    db = instance.get_db()
     print 'Creating a new cloud. First, enter credentials for the owner'
     owner_uname = raw_input('Enter the owner\'s username: ')
     owner_pass = getpass.getpass('Enter the owner\'s password: ')
@@ -41,12 +42,11 @@ def create(argv):
         max_size = FOUR_GB
     else:
         max_size = int(max_size)
-    create_cloud(owner_uname, owner_pass, cloud_name_in, max_size)
+    create_cloud(db, owner_uname, owner_pass, cloud_name_in, max_size)
     print 'Successfully created the', cloud_name_in, 'cloud for', owner_uname
 
 
-def create_cloud(username, password, cloudname, max_size):
-    db = get_db()
+def create_cloud(db, username, password, cloudname, max_size):
     owner = db.session.query(User).filter_by(username=username).first()
     if (owner is None) or (not (check_password_hash(owner.password, password))):
         raise Exception('Owner username/password combination invalid.')

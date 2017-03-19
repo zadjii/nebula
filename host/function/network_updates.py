@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 from common_util import ResultAndData, send_error_and_close, Error, Success
-from host import get_db, Cloud
+from host import Cloud
 # from host.function.network.ls_handler import list_files_handler
 from host.function.recv_files import recv_file_tree
 from host.function.send_files import send_tree
@@ -12,22 +12,27 @@ from msg_codes import *
 
 __author__ = 'Mike'
 
+
 def verify_host(db, cloud_uname, cname, local_id, other_id):
     """
     Returns either (False, error_string) or (True, matching_mirror)
     """
     rd = ResultAndData(False, None)
+    mylog('verify_host 0')
     # I'm naming this a mirror because that's what it is.
     # The other host was told to come look for a particular mirror here.
     # if that mirror isn't here, (but another mirror of that cloud is), don't
     # process this request.
     mirror = db.session.query(Cloud).filter_by(my_id_from_remote=local_id).first()
+    mylog('verify_host 1')
     if mirror is None:
         err = 'That mirror isn\'t on this host.'
         rd = ResultAndData(False, err)
+        mylog('verify_host 2')
     else:
         rd = mirror.get_remote_conn()
         if rd.success:
+            mylog('verify_host 3')
             rem_conn = rd.data
             msg = HostVerifyHostRequestMessage(local_id, other_id, cloud_uname, cname)
             try:
@@ -41,11 +46,14 @@ def verify_host(db, cloud_uname, cname, local_id, other_id):
                     rd = ResultAndData(False, 'Unknown error while attempting to verify host')
             except Exception, e:
                 rd = ResultAndData(False, e)
+    mylog('verify_host 4')
     return rd
 
 
 def handle_fetch(host_obj, connection, address, msg_obj):
-    db = get_db()
+    mylog('handle_fetch 0')
+    db = host_obj.get_instance().make_db_session ()
+    mylog('handle_fetch 1')
     # the id's are swapped because they are named from the origin host's POV.
     other_id = msg_obj.my_id
     local_id = msg_obj.other_id
@@ -59,6 +67,7 @@ def handle_fetch(host_obj, connection, address, msg_obj):
         err = HostVerifyHostFailureMessage(rd.data)
         send_error_and_close(err, connection)
         return
+    mylog('handle_fetch 2')
 
     matching_mirror = rd.data
 
@@ -67,13 +76,14 @@ def handle_fetch(host_obj, connection, address, msg_obj):
 
     send_tree(db, other_id, matching_mirror, requested_root, connection)
     mylog('Bottom of handle_fetch', '32')
+    mylog('handle_fetch 3')
 
 
 def handle_file_change(host_obj, connection, address, msg_obj):
     # This is called on HOST_FILE_PUSH, indicating that the next message
     # says what we're doing.
     # See .../host/function/local_updates.py@update_peer() for the other end.
-    db = get_db()
+    db = host_obj.get_db()
     my_id = msg_obj.tid
     cloudname = msg_obj.cname
     cloud_uname = msg_obj.cloud_uname
@@ -161,13 +171,13 @@ def do_remove_file(host_obj, mirror, relative_path, db):
             os.rmdir(full_child_path)
         else:
             os.remove(full_child_path)
-        mylog('Deleted node, file for {}'.format(full_child_path), '34')
+        # mylog('Deleted node, file for {}'.format(full_child_path), '34')
     db.session.delete(file_node)
     if os.path.isdir(full_path):
         os.rmdir(full_path)
     else:
         os.remove(full_path)
-    mylog('Deleted node, file for {}'.format(full_path), '35')
+    # mylog('Deleted node, file for {}'.format(full_path), '35')
     db.session.commit()
     rd = Success(deletables)
 

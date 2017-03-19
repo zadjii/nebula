@@ -2,9 +2,8 @@ from datetime import datetime
 
 from werkzeug.security import generate_password_hash
 
-from host import HOST_PORT
 from msg_codes import *
-from remote import get_db, Cloud
+from remote import Cloud
 
 __author__ = 'zadjii'
 
@@ -81,7 +80,7 @@ def test_msgs():
     print msg
 
     print '_____Making GET_HOSTS_RESPONSE[16] json_____'
-    db = get_db()
+    # db = get_db()
     cloud = db.session.query(Cloud).first()
     msg = make_get_hosts_response(cloud)
     print get_msg_size(msg), decode_msg_size(get_msg_size(msg))

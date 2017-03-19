@@ -1,7 +1,6 @@
 import os
 from stat import S_ISDIR, S_ISREG
 from host import Cloud
-from host import get_db
 
 __author__ = 'Mike'
 
@@ -16,8 +15,8 @@ def tree_usage():
     print ''
 
 
-def db_tree(argv):
-    db = get_db()
+def db_tree(instance, argv):
+    db = instance.get_db()
     if len(argv) < 1:
         db_tree_usage()
         return
@@ -35,17 +34,23 @@ def db_tree(argv):
         if arg == '-a':
             output_all = True
             args_eaten = 1
-            raise Exception('tree -a not implemented yet.')
+            # raise Exception('tree -a not implemented yet.')
         else:
             cloudname = arg
             args_eaten = 1
         argv = argv[args_eaten:]
     if cloudname is None:
         raise Exception('Must specify a cloud name to mirror')
+    matches = []
+    if output_all:
+        matches = db.session.query(Cloud).all()
+    else:
+        matches = db.session.query(Cloud).filter_by(name=cloudname).all()
     # match = db.session.query(Cloud).filter_by(name=cloudname).first()
-    matches = db.session.query(Cloud).filter_by(name=cloudname).all()
+    # matches = db.session.query(Cloud).filter_by(name=cloudname).all()
     if len(matches) == 0:
-        raise Exception('No clouds on this host with name', cloudname)
+        print('No clouds on this host with name {}'.format(cloudname))
+        return
 
     def print_filename(file_node, depth):
         print ('--' * depth) + (file_node.name)
@@ -61,8 +66,8 @@ def db_tree(argv):
             walk_db_recursive(top_level_node, 1, print_filename)
 
 
-def tree(argv):
-    db = get_db()
+def tree(instance, argv):
+    db = instance.get_db()
     if len(argv) < 1:
         tree_usage()
         return
@@ -101,7 +106,7 @@ def tree(argv):
         walktree(root_dir, 1, print_filename)
 
 
-def walktree(top,depth, callback):
+def walktree(top, depth, callback):
     """recursively descend the directory tree rooted at top,
        calling the callback function for each regular file"""
 

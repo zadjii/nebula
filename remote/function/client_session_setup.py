@@ -1,6 +1,6 @@
 from uuid import uuid4
 from common_util import mylog, send_error_and_close, ResultAndData, Error, Success
-from remote import User, Cloud, Session, get_db
+from remote import User, Cloud, Session
 from msg_codes import *
 from messages import *
 from remote.models.ClientCloudHostMapping import ClientCloudHostMapping
@@ -9,7 +9,7 @@ from remote.util import get_cloud_by_name, validate_session_id
 __author__ = 'Mike'
 
 
-def setup_client_session(connection, address, msg_obj):
+def setup_client_session(remote_obj, connection, address, msg_obj):
     msg_type = msg_obj.type
     if msg_type is not CLIENT_SESSION_REQUEST:
         err = InvalidStateMessage('Somehow tried to setup_client_session '
@@ -38,7 +38,7 @@ def setup_client_session(connection, address, msg_obj):
     #
     # # session.user = user
     # db.session.commit()
-    db = get_db()
+    db = remote_obj.get_db()
     rd = do_setup_client_session(db, username, password)
     if rd.success:
         session = rd.data
@@ -144,14 +144,14 @@ def do_client_get_cloud_host(db, cloud_uname, cloudname, session_id):
     return Success(host_mapping)
 
 
-def get_cloud_host(connection, address, msg_obj):
+def get_cloud_host(remote_obj, connection, address, msg_obj):
     msg_type = msg_obj.type
     if msg_type is not CLIENT_GET_CLOUD_HOST_REQUEST:
         err = InvalidStateMessage('Somehow tried to get_cloud_host '
                                   'without CLIENT_GET_CLOUD_HOST_REQUEST')
         send_error_and_close(err, connection)
         return
-    db = get_db()
+    db = remote_obj.get_db()
     cloudname = msg_obj.cname
     cloud_uname = msg_obj.cloud_uname
     session_id = msg_obj.sid
@@ -175,7 +175,7 @@ def get_cloud_host(connection, address, msg_obj):
 #   I'm not sure how to do that, so I did this instead.
 
 
-def host_verify_client(connection, address, msg_obj):
+def host_verify_client(remote_obj, connection, address, msg_obj):
     """
     Authorize the client's attempt to access the mirror that sent us this
     request. If there is no ClientCloudHostMapping for this request, then
@@ -188,7 +188,7 @@ def host_verify_client(connection, address, msg_obj):
                                   'without HOST_VERIFY_CLIENT_REQUEST')
         send_error_and_close(err, connection)
         return
-    db = get_db()
+    db = remote_obj.get_db()
     cloudname = msg_obj.cname
     cloud_uname = msg_obj.cloud_uname
     session_id = msg_obj.sid
