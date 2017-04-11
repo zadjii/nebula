@@ -339,6 +339,7 @@ class RemoteController(object):
         connection.close()
 
     def shutdown(self):
+        mylog('RemoteController.shutdown')
         if self.nebr_instance is not None:
             self.nebr_instance.shutdown()
 

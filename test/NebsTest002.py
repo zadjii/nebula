@@ -284,7 +284,6 @@ class MyTestCase(unittest.TestCase):
         read_data = rd.data
         self.assertEqual(read_data, drafts_readme_text, 'Mr B read drafts/readme.md incorrectly')
 
-
     def test_client_setup(self):
         log_text('### Client Setup Test ###', '7')
         # Create a valid session
@@ -306,10 +305,6 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(True, True)
 
 
-if __name__ == '__main__':
-    unittest.main()
-
-
 ###############################################################################
 # User Getters
 ###############################################################################
@@ -317,19 +312,31 @@ def get_mike(testcase):
     rd = retrieve_client_session('Mike-Griese', 'Mike Griese')
     testcase.assertTrue(rd.success, 'successfully created Mike client')
     return rd.data
+
+
 def get_claire(testcase):
     rd = retrieve_client_session('Claire-Bovee', 'Claire Bovee')
     testcase.assertTrue(rd.success, 'successfully created Claire client')
     return rd.data
+
+
 def get_hannah(testcase):
     rd = retrieve_client_session('Hannah-Bovee', 'Hannah Bovee')
     testcase.assertTrue(rd.success, 'successfully created Hannah client')
     return rd.data
+
+
 def get_alli(testcase):
     rd = retrieve_client_session('Alli-Anderson', 'Alli Anderson')
     testcase.assertTrue(rd.success, 'successfully created Alli client')
     return rd.data
 
+
+def main():
+    unittest.main()
+
+if __name__ == '__main__':
+    main()
 ###############################################################################
 # Logging Pieces
 ###############################################################################

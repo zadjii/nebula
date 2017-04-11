@@ -4,6 +4,7 @@ from common.Instance import Instance
 from common_util import enable_vt_support
 from host.NebsInstance import NebsInstance
 from host.HostController import HostController
+from host.function.migrate_db import migrate_db
 from host.function.dbg_mirrors import dbg_mirrors
 from host.function.dbg_nodes import dbg_nodes
 from host.function.list_clouds import list_clouds
@@ -15,6 +16,10 @@ def start(instance, argv):
     host_controller = HostController(instance)
     host_controller.start(argv=argv)
 
+def kill(instance, argv):
+    rd = instance.kill()
+    print(rd.data)
+
 
 commands = {
     'mirror': mirror
@@ -24,6 +29,8 @@ commands = {
     , 'db-tree': db_tree
     , 'dbg-nodes': dbg_nodes
     , 'dbg-mirrors': dbg_mirrors
+    , 'migrate-db': migrate_db
+    , 'kill': kill
 }
 
 command_descriptions = {
@@ -34,6 +41,8 @@ command_descriptions = {
     , 'db-tree': '\tdisplays the db structure of a cloud on this host.'
     , 'dbg-mirrors': '\tdebug information on the mirrors present on this instance'
     , 'export-nebs': '\tWrites out the .nebs of matching clouds as json'
+    , 'migrate-db': '\tPerforms a database upgrade. This probably shouldn\'t be callable by the user'
+    , 'kill': '\t\tkills an instance if it\'s running.' 
 }
 
 

@@ -3,6 +3,8 @@ import sys
 from common.Instance import Instance
 from remote.NebrInstance import NebrInstance
 from remote.RemoteController import RemoteController
+from remote.function.migrate_db import migrate_db
+
 from remote.function.query_db import list_users, list_clouds
 from remote.function.create import create
 from remote.function.new_user import new_user
@@ -12,12 +14,20 @@ def start(instance, argv):
     remote_controller = RemoteController(instance)
     remote_controller.start(argv=argv)
 
+
+def kill(instance, argv):
+    rd = instance.kill()
+    print(rd.data)
+
+
 commands = {
     'new-user': new_user
     , 'start': start
     , 'create': create
     , 'list-users': list_users
     , 'list-clouds': list_clouds
+    , 'migrate-db': migrate_db
+    , 'kill': kill
 }
 command_descriptions = {
     'new-user': '\tadd a new user to the database'
@@ -25,6 +35,8 @@ command_descriptions = {
     , 'create': '\t\tcreate a new cloud to track'
     , 'list-users': '\tlist all current users'
     , 'list-clouds': '\tlist all current clouds'
+    , 'migrate-db': '\tPerforms a database upgrade. This probably shouldn\'t be callable by the user'
+    , 'kill': '\t\tkills an instance if it\'s running.' 
 }
 
 

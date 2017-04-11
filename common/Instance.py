@@ -1,5 +1,6 @@
 import ConfigParser
 import os
+import imp
 
 import threading
 from StringIO import StringIO
@@ -10,9 +11,11 @@ import subprocess
 
 import signal
 
+from migrate.versioning import api
+
 from common.SimpleDB import SimpleDB
 from common_util import ResultAndData, Error, Success
-
+import time
 
 def get_from_conf(config, key, default):
     return config.get('root', key) \
@@ -135,9 +138,9 @@ class Instance(object):
         rd = Error()
         if os.path.exists(pid_file):
             if force:
-                with open(pid_file) as handle:
-                    pid = handle.read()
-                    os.kill(int(pid), signal.SIGTERM)
+                rd = self.kill()
+                # if rd.success:
+                #     print(rd.data)
             else:
                 return Error('Process already exists')
         handle = open(pid_file, mode='wb')
@@ -146,13 +149,46 @@ class Instance(object):
         handle.close()
         return Success(pid)
 
+    def kill(self):
+        rd = Error()
+        pid_file = self._get_pid_file_path()
+        if os.path.exists(pid_file):
+            with open(pid_file) as handle:
+                pid = handle.read()
+                os.kill(int(pid), signal.SIGTERM)
+                rd = Success('Successfully killed process {}'.format(pid))
+
+            time.sleep(.5)
+            self.shutdown()
+        else:
+            rd = Success('No process is already running for working directory {}'.format(self._working_dir))
+
+        return rd
+
+
     def shutdown(self):
         pid_file = self._get_pid_file_path()
         if os.path.exists(pid_file):
             os.remove(pid_file)
         pass
 
-        
+    def migrate(self):
+        repo = self._db_migrate_repo()
+        uri = self._db_uri()
+        db = self.get_db()
+        migration_name = '%04d_migration.py' % (api.db_version(uri, repo) + 1)
+        migration = repo + '/versions/' + migration_name
+        tmp_module = imp.new_module('old_model')
+        old_model = api.create_model(uri, repo)
+        exec old_model in tmp_module.__dict__
+        script = api.make_update_script_for_model(uri, repo, tmp_module.meta, db.Base.metadata)
+        open(migration, "wt").write(script)
+        api.upgrade(uri, repo)
+        print 'New migration saved as ' + migration
+        print 'Current database version: ' + str(api.db_version(uri, repo))
+        api.upgrade(uri, repo)
+        print 'New database version: ' + str(api.db_version(uri, repo))
+
 
 
 
