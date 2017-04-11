@@ -59,6 +59,7 @@ def usage(instance, argv):
 
 
 def nebs_main(argv):
+
     # if there weren't any args, print the usage and return
     if len(argv) < 2:
         usage(None, argv)
@@ -66,6 +67,12 @@ def nebs_main(argv):
 
     working_dir, argv = Instance.get_working_dir(argv, is_remote=False)
     nebs_instance = NebsInstance(working_dir)
+
+    # if there weren't any args, print the usage and return
+    # Do this again, because get_working_dir may have removed all the args
+    if len(argv) < 2:
+        usage(None, argv)
+        sys.exit(0)
 
     command = argv[1]
 

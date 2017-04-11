@@ -56,6 +56,12 @@ def nebr_main(argv):
     working_dir, argv = Instance.get_working_dir(argv, True)
     nebr_instance = NebrInstance(working_dir)
 
+    # if there weren't any args, print the usage and return
+    # Do this again, because get_working_dir may have removed all the args
+    if len(argv) < 2:
+        usage(None, argv)
+        sys.exit(0)
+        
     command = argv[1]
 
     selected = commands.get(command, usage)
