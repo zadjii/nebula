@@ -21,19 +21,28 @@ def Success(data=None):
 __author__ = 'Mike'
 
 mylog_name = None
+mylog_file = None
 
 def set_mylog_name(name):
     global mylog_name
     mylog_name = name
 
+def set_mylog_file(filename):
+    global mylog_file
+    mylog_file = filename
 
 def mylog(message, sgr_seq='0'):
     now = datetime.utcnow()
     now_string = now.strftime('%y%m-%d %H:%M:%S.') + now.strftime('%f')[0:2]
     if mylog_name is not None:
-        print '{}|[{}] \x1b[{}m{}\x1b[0m'.format(now_string, mylog_name, sgr_seq, message)
+        message = '{}|[{}] \x1b[{}m{}\x1b[0m'.format(now_string, mylog_name, sgr_seq, message)
     else:
-        print '{}| \x1b[{}m{}\x1b[0m'.format(now_string, sgr_seq, message)
+        message = '{}| \x1b[{}m{}\x1b[0m'.format(now_string, sgr_seq, message)
+    if mylog_file is not None:
+        with open(mylog_file, mode='a') as handle:
+            handle.write(message + '\n')
+    else:
+        print(message)
 
 
 def enable_vt_support():

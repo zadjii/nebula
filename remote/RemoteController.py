@@ -6,7 +6,7 @@ from OpenSSL import SSL
 from werkzeug.security import generate_password_hash
 
 from common_util import send_error_and_close, Success, Error, enable_vt_support
-from common_util import set_mylog_name, mylog
+from common_util import set_mylog_name, set_mylog_file, mylog
 from connections.RawConnection import RawConnection
 from messages import *
 from msg_codes import *

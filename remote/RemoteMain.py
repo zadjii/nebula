@@ -1,6 +1,7 @@
 import sys
 
 from common.Instance import Instance
+from common_util import set_mylog_name, set_mylog_file, mylog
 from remote.NebrInstance import NebrInstance
 from remote.RemoteController import RemoteController
 from remote.function.migrate_db import migrate_db
@@ -48,12 +49,44 @@ def usage(instamce, argv):
         print '\t', command, command_descriptions[command]
 
 
+
+def get_log_path(argv):
+    # type: ([str]) -> (str, [str])
+    """
+    If there's a [-l <path>] or [--log <path>] in argv,
+    it removes the pair and returns it.
+    Else it returns None
+
+    :param argv:
+    :param is_remote: If the instance is a remote instance or a host instance
+    :return: (path, [argv] - [-l, path]) or (None, argv)
+    """
+    # print('initial argv={}'.format(argv))
+    remaining_argv = []
+    log_path = None
+    for index, arg in enumerate(argv):
+        if index >= (len(argv) - 1):
+            remaining_argv.append(arg)
+        if (arg == '-l') or (arg == '--log'):
+            log_path = argv[index+1]
+            remaining_argv.extend(argv[index+2:])
+            break
+        else:
+            remaining_argv.append(arg)
+
+    # print('remaining_argv={}'.format(remaining_argv))
+    return log_path, remaining_argv
+
 def nebr_main(argv):
     if len(argv) < 2:
         usage(None, argv)
         sys.exit(0)
 
     working_dir, argv = Instance.get_working_dir(argv, True)
+    log_path, argv = get_log_path(argv)
+    if log_path is not None:
+        set_mylog_file(log_path)
+
     nebr_instance = NebrInstance(working_dir)
 
     # if there weren't any args, print the usage and return
@@ -61,7 +94,7 @@ def nebr_main(argv):
     if len(argv) < 2:
         usage(None, argv)
         sys.exit(0)
-        
+
     command = argv[1]
 
     selected = commands.get(command, usage)
