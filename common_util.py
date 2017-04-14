@@ -37,23 +37,23 @@ def mylog(message, sgr_seq='0'):
     use_sgr = sgr_seq is not '0' and mylog_file is None
     output = '{}|'.format(now_string)
     if mylog_name is not None:
-        output += '[{}]'.forma(mylog_name)
+        output += '[{}]'.format(mylog_name)
     output += ' '
     if use_sgr:
         output += '\x1b[{}m'.format(sgr_seq)
     output += message
     if use_sgr:
         output += '\x1b[0m'
-        
+
     # if mylog_name is not None:
     #     message = '{}|[{}] \x1b[{}m{}\x1b[0m'.format(now_string, mylog_name, sgr_seq, message)
     # else:
     #     message = '{}| \x1b[{}m{}\x1b[0m'.format(now_string, sgr_seq, message)
     if mylog_file is not None:
         with open(mylog_file, mode='a') as handle:
-            handle.write(message + '\n')
+            handle.write(output + '\n')
     else:
-        print(message)
+        print(output)
 
 
 def enable_vt_support():
