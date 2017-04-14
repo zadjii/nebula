@@ -20,7 +20,7 @@ do
     dir=${dir%*/}
     instance=${dir##*/}
     echo Migrating remote instance \'$instance\'
-    python nebr.py -i $instance db-migrate
+    python nebr.py -i $instance migrate-db
 done
 
 cd $NEB_OUT_PATH
@@ -29,7 +29,7 @@ do
     dir=${dir%*/}
     instance=${dir##*/}
     echo Migrating host instance \'$instance\'
-    python nebs.py -i $instance db-migrate
+    python nebs.py -i $instance migrate-db
 done
 
 cd $start_dir

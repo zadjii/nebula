@@ -59,7 +59,7 @@ class NetworkThread(object):
                     failure_count += 1
                     mylog('Failed {} time(s) to bind to {}'.format(
                         failure_count, (ip_address, self.port)), '34')
-                    mylog(e)
+                    mylog(e.message)
                     if failure_count > 4:
                         raise e
                     sleep(1)
