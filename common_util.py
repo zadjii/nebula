@@ -57,6 +57,34 @@ def enable_vt_support():
         ctypes.windll.kernel32.SetConsoleMode(hOut, out_modes)
 
 
+def get_log_path(argv):
+    # type: ([str]) -> (str, [str])
+    """
+    If there's a [-l <path>] or [--log <path>] in argv,
+    it removes the pair and returns it.
+    Else it returns None
+
+    :param argv:
+    :return: (path, [argv] - [-l, path]) or (None, argv)
+    """
+    # print('initial argv={}'.format(argv))
+    remaining_argv = []
+    log_path = None
+    for index, arg in enumerate(argv):
+        if index >= (len(argv) - 1):
+            remaining_argv.append(arg)
+        if (arg == '-l') or (arg == '--log'):
+            log_path = argv[index+1]
+            remaining_argv.extend(argv[index+2:])
+            break
+        else:
+            remaining_argv.append(arg)
+
+    # print('remaining_argv={}'.format(remaining_argv))
+    return log_path, remaining_argv
+
+
+
 def send_error_and_close(message, connection):
     connection.send_obj(message)
     connection.close()

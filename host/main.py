@@ -67,6 +67,10 @@ def nebs_main(argv):
 
     working_dir, argv = Instance.get_working_dir(argv, is_remote=False)
     nebs_instance = NebsInstance(working_dir)
+    
+    log_path, argv = get_log_path(argv)
+    if log_path is not None:
+        set_mylog_file(log_path)
 
     # if there weren't any args, print the usage and return
     # Do this again, because get_working_dir may have removed all the args
