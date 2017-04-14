@@ -2,6 +2,7 @@ import sys
 
 from common.Instance import Instance
 from common_util import enable_vt_support
+from common_util import set_mylog_name, set_mylog_file, mylog, get_log_path
 from host.NebsInstance import NebsInstance
 from host.HostController import HostController
 from host.function.migrate_db import migrate_db

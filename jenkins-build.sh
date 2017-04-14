@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# This should probably make sure it 
+# pip install -r requirements.txt
+
 python nebr.py kill -i jenkins
 python nebr.py -i jenkins
 # rm ./instances/remote/jenkins/nebr.conf
