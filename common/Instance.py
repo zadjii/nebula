@@ -14,7 +14,7 @@ import signal
 from migrate.versioning import api
 
 from common.SimpleDB import SimpleDB
-from common_util import ResultAndData, Error, Success
+from common_util import ResultAndData, Error, Success, INSTANCES_ROOT
 import time
 
 def get_from_conf(config, key, default):
@@ -48,7 +48,7 @@ class Instance(object):
                 remaining_argv.extend(argv[index+2:])
                 break
             if (arg == '-i') or (arg == '--instance'):
-                working_dir = os.path.join('./instances/{}/'.format(instance_type), argv[index+1])
+                working_dir = os.path.join('{}/{}/'.format(INSTANCES_ROOT, instance_type), argv[index+1])
                 remaining_argv.extend(argv[index+2:])
                 break
             else:

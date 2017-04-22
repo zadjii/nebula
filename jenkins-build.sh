@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# "echo on"
+set -o xtrace
+
 # This should probably make sure it 
 # pip install -r requirements.txt
 
@@ -9,7 +12,7 @@ python nebr.py -i jenkins
 
 # This is for nebs, not nebr
 # echo "PORT = 23457\nWSPORT = 34568" > ./instances/remote/jenkins/nebr.conf
-echo on
+
 python nebr.py migrate-db -i jenkins -l nebr.log
 echo "Migrated old DB"
 python nebr.py start -i jenkins -l nebr.log &
