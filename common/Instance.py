@@ -66,7 +66,8 @@ class Instance(object):
                             Can be relative, will be stored as absolute
         """
         if working_dir is None:
-            working_dir = './instances/default'
+            raise Exception('You should not be calling Instance::__init__ without a working_dir param! THe sub-classes need to set that!')
+            # working_dir = '{}/default'.format(INSTANCES_ROOT)
 
         self._working_dir = os.path.abspath(working_dir)
         self._db = None

@@ -378,8 +378,8 @@ class PrivateData(object):
             #     self._cloud.my_id_from_remote, self._cloud.name), '32')
             rd = ResultAndData(True, None)
         except IOError, e:
-            rd = ResultAndData(False, e)
-            mylog(e)
+            rd = ResultAndData(False, str(e))
+            mylog(str(e))
         return rd
 
     def read_backend(self):
@@ -390,7 +390,7 @@ class PrivateData(object):
             data = in_file.read()
             rd = ResultAndData(True, data)
         except IOError, e:
-            rd = ResultAndData(False, e)
+            rd = ResultAndData(False, str(e))
         return rd
 
     def export_v0(self):

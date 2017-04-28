@@ -6,7 +6,7 @@ from common.Instance import Instance, get_from_conf
 from common_util import NEBULA_ROOT
 from remote import models
 from common.SimpleDB import SimpleDB
-
+from common_util import ResultAndData, Error, Success, INSTANCES_ROOT
 
 class NebrInstance(Instance):
     def __init__(self, working_dir=None):
@@ -18,7 +18,7 @@ class NebrInstance(Instance):
                             Can be relative, will be stored as absolute
         """
         if working_dir is None:
-            working_dir = './instances/remote/default'
+            working_dir = '{}/remote/default'.format(INSTANCES_ROOT)
         super(NebrInstance, self).__init__(working_dir)
 
         # todo: This is a bit of a hack. Each instance should probably

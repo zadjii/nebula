@@ -267,6 +267,14 @@ def mirror(instance, argv):
         raise Exception('Cloudname must be formatted as username/cloudname')
 
     abs_root = os.path.abspath(root)
+    if not os.path.exists(abs_root):
+
+        try:
+            os.makedirs(abs_root)
+        except Exception, e:
+            mylog('Exception while trying to create target directory {}'.format(abs_root))
+            mylog(str(e))
+            return
 
     mylog('attempting to get cloud named "{}" from remote at [{}]:{} into root'
           ' directory <{}>'.format(cloudname, host, port, abs_root))

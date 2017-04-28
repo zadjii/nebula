@@ -43,7 +43,7 @@ command_descriptions = {
     , 'dbg-mirrors': '\tdebug information on the mirrors present on this instance'
     , 'export-nebs': '\tWrites out the .nebs of matching clouds as json'
     , 'migrate-db': '\tPerforms a database upgrade. This probably shouldn\'t be callable by the user'
-    , 'kill': '\t\tkills an instance if it\'s running.' 
+    , 'kill': '\t\tkills an instance if it\'s running.'
 }
 
 
@@ -56,7 +56,7 @@ def usage(instance, argv):
     print ''
     print 'Use [-w, --working-dir <path>] to specify a working dir for the instance,'
     print ' or [-i, --instance <name>] to provide the instance name'
-    print '                            (same as `-w ./instances/host/<name>`)'
+    print '                            (same as `-w {nebula path}/instances/host/<name>`)'
 
 
 def nebs_main(argv):
@@ -68,7 +68,7 @@ def nebs_main(argv):
 
     working_dir, argv = Instance.get_working_dir(argv, is_remote=False)
     nebs_instance = NebsInstance(working_dir)
-    
+
     log_path, argv = get_log_path(argv)
     if log_path is not None:
         set_mylog_file(log_path)
@@ -90,3 +90,5 @@ def nebs_main(argv):
 
 if __name__ == '__main__':
     nebs_main(sys.argv)
+
+

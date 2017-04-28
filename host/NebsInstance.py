@@ -5,7 +5,7 @@ from StringIO import StringIO
 from common.Instance import Instance, get_from_conf
 from host import models
 from common.SimpleDB import SimpleDB
-
+from common_util import ResultAndData, Error, Success, INSTANCES_ROOT
 
 class NebsInstance(Instance):
 
@@ -18,7 +18,7 @@ class NebsInstance(Instance):
                             Can be relative, will be stored as absolute
         """
         if working_dir is None:
-            working_dir = './instances/host/default'
+            working_dir = '{}/host/default'.format(INSTANCES_ROOT)
         super(NebsInstance, self).__init__(working_dir)
 
         self.host_host = ''
