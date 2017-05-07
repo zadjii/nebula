@@ -183,7 +183,11 @@ class HostController:
         while num_conns > 0:
             (conn, addr) = self.active_network_obj.connection_queue.pop(0)
             # for (conn, addr) in self.active_network_obj.connection_queue[:]:
-            self.filter_func(conn, addr)
+            try:
+                self.filter_func(conn, addr)
+            except Exception, e:
+                mylog('Error handling connection')
+                mylog(e.message)
             num_conns -= 1
             mylog('processed {} from {}'.format(conn.__class__, addr))
 

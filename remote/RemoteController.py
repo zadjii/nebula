@@ -290,8 +290,11 @@ class RemoteController(object):
             # thread = Thread(target=self.filter_func, args=[raw_connection, address])
             # thread.start()
             # thread.join()
-
-            self.filter_func(raw_connection, address)
+            try:
+                self.filter_func(raw_connection, address)
+            except Exception, e:
+                mylog('Error handling connection')
+                mylog(e.message)
 
             # echo_func(connection, address)
             # todo: possible that we might want to thread.join here.

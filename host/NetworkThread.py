@@ -1,4 +1,6 @@
 import socket
+
+from common_util import Error, Success, ResultAndData
 from connections.RawConnection import RawConnection
 from util import mylog
 from connections.WebSocketConnection import MyBigFuckingLieServerProtocol, \
@@ -70,29 +72,37 @@ class NetworkThread(object):
             mylog('Bound to ipv4 address={}'.format(ip_address))
 
     def setup_web_socket(self, ip_address):
+        # type: (str) -> ResultAndData
         mylog('top of ws thread')
-        self._make_internal_socket()
-        self.ws_event_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.ws_event_loop)
-        txaio.use_asyncio()
-        txaio.start_logging()
-        factory = WebSocketServerFactory(
-            u"ws://[{}]:{}".format(ip_address, self.ws_port)
-        )
-        factory.protocol = MyBigFuckingLieServerProtocol
-        MyBigFuckingLieServerProtocol.net_thread = self
+        rd = self._make_internal_socket()
+        if rd.success:
+            self.ws_event_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.ws_event_loop)
+            txaio.use_asyncio()
+            txaio.start_logging()
+            factory = WebSocketServerFactory(
+                u"ws://[{}]:{}".format(ip_address, self.ws_port)
+            )
+            factory.protocol = MyBigFuckingLieServerProtocol
+            MyBigFuckingLieServerProtocol.net_thread = self
 
-        # reuse address is needed so that we can swap networks relatively
-        # seamlessly. I'm not sure what side effect it may have, todo:19
-        self.ws_coro = self.ws_event_loop.create_server(factory
-                                                        , ip_address
-                                                        , self.ws_port
-                                                        , reuse_address=True)
+            # reuse address is needed so that we can swap networks relatively
+            # seamlessly. I'm not sure what side effect it may have, todo:19
+            self.ws_coro = self.ws_event_loop.create_server(factory
+                                                            , ip_address
+                                                            , self.ws_port
+                                                            , reuse_address=True)
 
-        mylog('Bound websocket to (ip, port)=({},{})'
-              .format(ip_address, self.ws_port))
+            mylog('Bound websocket to (ip, port)=({},{})'
+                  .format(ip_address, self.ws_port))
+
+        if not rd.success:
+            mylog('Failed to create a websocket.')
+
+        return rd
 
     def _make_internal_socket(self):
+        # type: () -> ResultAndData
         """Creates the internal server socket that accepts connections from
         MBFLSP. These connections are then added to the connection_queue.
         MBFLSP talks to the world over :34567
@@ -101,18 +111,32 @@ class NetworkThread(object):
             WebsocketConnection to wrap the connection, then adds to the queue
         The main thread then pops the connection off, and processes it.
         """
-        mylog('Creating a internal server in NetworkThread')
+        mylog('Creating a internal server in NetworkThread...')
         self.ws_internal_server_socket = socket.socket()
         mylog('NT - before bind')
-        try:
-            self.ws_internal_server_socket.bind(
-                ('localhost', self.ws_internal_port))
-            mylog('NT - bound to {}'.format(self.ws_internal_port), '32;46')
-        except Exception as e:
-            mylog('oof i fucked up')
-            mylog(e.message)
 
-        mylog('[-- Completed internal server in NetworkThread --]', '46')
+        failures = 0
+        rd = Error()
+        while True:
+            try:
+                self.ws_internal_server_socket.bind(
+                    ('localhost', self.ws_internal_port))
+                mylog('Successfully bound internal server socket on {}'.format(
+                    self.ws_internal_port), '32;46')
+                rd = Success()
+                break
+            except Exception as e:
+                mylog('Failed binding internal server socket on {}'.format(
+                    self.ws_internal_port), '31;103')
+                mylog(e.message)
+                failures += 1
+                if failures > 4:
+                    break
+                mylog('Retrying...')
+                sleep(1)
+        if rd.success:
+            mylog('[-- Completed internal server in NetworkThread --]', '46')
+        return rd
 
     def work_thread(self):
         self.server_sock.listen(5)
@@ -130,7 +154,12 @@ class NetworkThread(object):
             self.server_sock.shutdown(socket.SHUT_RDWR)
 
     def ws_work_thread(self):
-        self.setup_web_socket(self.ipv6_address)
+        rd = self.setup_web_socket(self.ipv6_address)
+        if not rd.success:
+            mylog('Failed to setup websocket. Shutting down host.')
+            self._host.shutdown()
+            return
+
         self.ws_internal_server_socket.listen(5)
 
         mylog('ws work thread - 0')

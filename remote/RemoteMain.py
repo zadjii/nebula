@@ -6,7 +6,7 @@ from remote.NebrInstance import NebrInstance
 from remote.RemoteController import RemoteController
 from remote.function.migrate_db import migrate_db
 
-from remote.function.query_db import list_users, list_clouds
+from remote.function.query_db import list_users, list_clouds, list_hosts
 from remote.function.create import create
 from remote.function.new_user import new_user
 
@@ -29,6 +29,7 @@ commands = {
     , 'list-clouds': list_clouds
     , 'migrate-db': migrate_db
     , 'kill': kill
+    , 'list-hosts': list_hosts
 }
 command_descriptions = {
     'new-user': '\tadd a new user to the database'
@@ -37,7 +38,8 @@ command_descriptions = {
     , 'list-users': '\tlist all current users'
     , 'list-clouds': '\tlist all current clouds'
     , 'migrate-db': '\tPerforms a database upgrade. This probably shouldn\'t be callable by the user'
-    , 'kill': '\t\tkills an instance if it\'s running.' 
+    , 'kill': '\t\tkills an instance if it\'s running.'
+    , 'list-hosts': '\t\tLists details about hosts'
 }
 
 
