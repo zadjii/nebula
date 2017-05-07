@@ -112,7 +112,7 @@ class NetworkThread(object):
             mylog('oof i fucked up')
             mylog(e.message)
 
-        mylog('  \x1b[46mCompleted internal server in NetworkThread\x1b[0m')
+        mylog('[-- Completed internal server in NetworkThread --]', '46')
 
     def work_thread(self):
         self.server_sock.listen(5)

@@ -185,6 +185,7 @@ def make_message_deserializer(messages):
     handle.write('import json\n')
     handle.write('from msg_codes import *\n')
     handle.write('from messages import *\n')
+    handle.write('from common_util import set_mylog_name, set_mylog_file, mylog\n')
     handle.write('_decoder_table = {\n')
     msg0 = messages[0]
     handle.write('    {}: {}.deserialize # {}\n'.format(msg0.CAPS, msg0.class_name, msg0.code))

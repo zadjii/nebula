@@ -42,3 +42,20 @@ Default remote location is localhost.
 Default cloudname is qwer.
 User/pass is asdf asdf.
 
+
+## aliases
+
+You'll probably want to add the following aliases to your `.bashrc`
+I generally place the "installed" nebula at `var/lib/nebula`, I don't know if that
+  really makes any sense but that's what I like.
+
+`` sh
+alias nebs='python /var/lib/nebula/nebs.py'
+``
+
+
+`` sh
+alias nebr='python /var/lib/nebula/nebr.py'
+``
+`
+

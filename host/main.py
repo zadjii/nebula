@@ -73,6 +73,8 @@ def nebs_main(argv):
     if log_path is not None:
         set_mylog_file(log_path)
 
+    mylog('DB URI: {}'.format(nebs_instance._db_uri()))
+
     # if there weren't any args, print the usage and return
     # Do this again, because get_working_dir may have removed all the args
     if len(argv) < 2:

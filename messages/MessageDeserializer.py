@@ -2,6 +2,8 @@
 import json
 from msg_codes import *
 from messages import *
+from common_util import set_mylog_name, set_mylog_file, mylog
+
 _decoder_table = {
     ADD_CONTRIBUTOR_FAILURE: AddContributorFailureMessage.deserialize # -17
     , ADD_OWNER_FAILURE: AddOwnerFailureMessage.deserialize # -16
@@ -79,7 +81,7 @@ _decoder_table = {
 class MessageDeserializer(object):
     @staticmethod
     def decode_msg(json_string):
-        print '		-> decoding"{}"'.format(json_string)
+        mylog('\t->decoding "{}"'.format(json_string))
         json_dict = json.loads(json_string)
         if 'type' not in json_dict.keys():
             raise
