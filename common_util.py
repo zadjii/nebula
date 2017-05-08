@@ -41,7 +41,7 @@ def mylog(message, sgr_seq='0'):
     output += ' '
     if use_sgr:
         output += '\x1b[{}m'.format(sgr_seq)
-    output += message
+    output += str(message)
     if use_sgr:
         output += '\x1b[0m'
 
