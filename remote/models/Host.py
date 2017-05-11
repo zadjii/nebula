@@ -67,8 +67,8 @@ class Host(base):
             , 'ws_port': self.ws_port
             , 'hostname': self.hostname
             , 'remaining_size': self.remaining_size
-            , 'last_update': self.last_update.isoformat() + 'Z'
-            , 'last_handshake': self.last_handshake.isoformat() + 'Z'
+            , 'last_update': (self.last_update.isoformat() + 'Z') if self.last_update else None
+            , 'last_handshake': (self.last_handshake.isoformat() + 'Z') if self.last_handshake else None
         }
         return self_dict
 
