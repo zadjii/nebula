@@ -21,16 +21,15 @@ def mirror_complete(remote_obj, connection, address, msg_obj):
         connection.send_obj(resp)
         connection.close()
         return
-
-    matching_cloud = db.session.query(Cloud).filter_by(name=cloudname).first()
-    if matching_cloud is None:
-        msg = 'No cloud with name {}'.format(cloudname)
-        resp = InvalidStateMessage(msg)
-        connection.send_obj(resp)
-        connection.close()
-        return
-
-    matching_cloud.hosts.append(matching_host)
+    matching_host.completed_mirroring = True
+    # matching_cloud = db.session.query(Cloud).filter_by(name=cloudname).first()
+    # if matching_cloud is None:
+    #     msg = 'No cloud with name {}'.format(cloudname)
+    #     resp = InvalidStateMessage(msg)
+    #     connection.send_obj(resp)
+    #     connection.close()
+    #     return
+    # matching_cloud.hosts.append(matching_host)
     db.session.commit()
     mylog('Host[{}] finished mirroring cloud \'{}\''.format(host_id, cloudname))
 
@@ -153,6 +152,10 @@ def respond_to_mirror_request(db, connection, address, new_host, cloud):
     """Assumes that the requester has already been validated"""
     ip = '0'
     port = 0
+
+    cloud.hosts.append(new_host)
+    db.session.commit()
+
     # rand_host = match.hosts.first()
     rand_host = None
     if len(cloud.active_hosts()) > 0:

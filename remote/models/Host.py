@@ -28,12 +28,15 @@ class Host(base):
     hostname = Column(String)
     # sessions = relationship('Session', backref='host', lazy='dynamic')
     client_mappings = relationship('ClientCloudHostMapping', backref='host', lazy='dynamic')
+    completed_mirroring = Column(Boolean)
 
     # note: leaving this here. The host will only be in the list of hosts
     # cont    for a cloud if it's sent a completed_mirroring.
     # completed_mirroring = Column(Boolean, default=False)
 
     def is_active(self):
+        if not self.completed_mirroring:
+            return False
         if self.last_handshake is None:
             return False
         delta = datetime.utcnow() - self.last_handshake

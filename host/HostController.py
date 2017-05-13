@@ -3,6 +3,7 @@ import collections
 import os
 import signal
 import sys
+from _socket import gaierror
 from inspect import getframeinfo, currentframe
 from threading import Thread, Event, Lock, Semaphore
 
@@ -11,7 +12,7 @@ from connections.RawConnection import RawConnection
 from host.NetworkThread import NetworkThread
 from host.PrivateData import PrivateData, NO_ACCESS, READ_ACCESS
 from host.WatchdogThread import WatchdogWorker
-from host.function.local_updates import local_update_thread, new_main_thread
+from host.function.local_updates import new_main_thread
 from host.function.network.client import list_files_handler, \
     handle_recv_file_from_client, handle_read_file_request, \
     handle_client_add_owner, handle_client_add_contributor
@@ -165,18 +166,34 @@ class HostController:
         # mylog('Telling {}\'s remote that [{}]\'s at {}'.format(
         #     cloud.name, cloud.my_id_from_remote, self.active_ipv6())
         # )
-        remote_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
-        remote_conn = RawConnection(remote_sock)
-        msg = cloud.generate_handshake(
-            self.active_network_obj.ipv6_address
-            , self.active_network_obj.port
-            , self.active_network_obj.ws_port
-        )
+        remote_conn = None
+        try:
+            remote_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
+            remote_conn = RawConnection(remote_sock)
+            msg = cloud.generate_handshake(
+                self.active_network_obj.ipv6_address
+                , self.active_network_obj.port
+                , self.active_network_obj.ws_port
+            )
 
-        remote_conn.send_obj(msg)
-        # todo
-        # response = remote_conn.recv_obj()
-        remote_conn.close()
+            remote_conn.send_obj(msg)
+            # todo
+            # response = remote_conn.recv_obj()
+        except gaierror, e:
+            mylog('Failed to connect to remote')
+            mylog('likely a network failure.')
+            mylog('Even more likely, network disconnected.')
+            mylog(e.message)
+            self.shutdown()
+            mylog('I\'m shutting it down, because I don\'t know how to recover quite yet.')
+        except Exception, e:
+            mylog('some other error handshaking remote')
+            mylog(e.message)
+            self.shutdown()
+            mylog('I\'m shutting it down, because I don\'t know how to recover quite yet.')
+        finally:
+            if remote_conn is not None:
+                remote_conn.close()
 
     def process_connections(self):
         num_conns = len(self.active_network_obj.connection_queue)
