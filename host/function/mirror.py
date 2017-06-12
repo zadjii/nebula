@@ -45,9 +45,16 @@ def ask_remote_for_id(instance, host, port, db):
 
     ipv6_addr = ipv6_addresses[0]  # arbitrarily take the first one
 
-    msg = NewHostMessage(ipv6_addr
-                         , instance.host_port
-                         , instance.host_ws_port
+    # todo: I think we can take the IP out of this message.
+    # This message is only used to create a new host model in the remote.
+    # The host that we're going to connect to doesn't need to know this.
+    # msg = NewHostMessage(ipv6_addr
+    #                      , instance.host_port
+    #                      , instance.host_ws_port
+    #                      , platform.uname()[1])
+    msg = NewHostMessage('0'
+                         , 0
+                         , 0
                          , platform.uname()[1])
     raw_conn.send_obj(msg)
 
@@ -63,7 +70,7 @@ def ask_remote_for_id(instance, host, port, db):
     mylog('Remote says my cert is {}'.format(cert))
 
     sslSocket.close()
-    return 0, my_id # returning a status code as well...
+    return 0, my_id  # returning a status code as well...
     # I've been in kernel land too long, haven't I...
 
 
@@ -137,9 +144,12 @@ def handle_go_retrieve(response, cloud, db):
         return
 
     mylog('requesting host at [{}]({},{})'.format(other_id, other_address, other_port))
+    is_ipv6 = ':' in other_address
+    sock_type = socket.AF_INET6 if is_ipv6 else socket.AF_INET
+    sock_addr = (other_address, other_port, 0, 0) if is_ipv6 else (other_address, other_port)
 
-    host_sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-    host_sock.connect((other_address, other_port, 0, 0))
+    host_sock = socket.socket(sock_type, socket.SOCK_STREAM)
+    host_sock.connect(sock_addr)
     host_conn = RawConnection(host_sock)
     # host_sock = setup_remote_socket(other_address, other_port)
     # todo:8 initialize our ssl context here
@@ -165,22 +175,46 @@ def handle_go_retrieve(response, cloud, db):
 
 
 def attempt_wakeup(instance):
+    # type: (NebsInstance) -> None
     mylog('Attempting to alert any existing nebs')
-    try:
-        local_sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-        ips = get_ipv6_list()
-        ip = ips[0]
-        mylog('Local IP6 is {}'.format(ip))
-        local_sock.connect((ip, instance.host_port, 0, 0))
-        mylog('connected to a nebs')
-        conn = RawConnection(local_sock)
-        msg = RefreshMessageMessage()
-        conn.send_obj(msg)
-        mylog('refreshed host')
-        conn.recv_obj()
-        conn.close()
-    except Exception, e:
-        mylog('Failed to alert any other hosts on this machine')
+    my_addr = instance.get_existing_ip()
+    port = instance.get_existing_port()
+
+    if port is not None and my_addr is not None:
+        try:
+            local_sock = socket.socket
+            is_ipv6 = ':' in my_addr
+            sock_type = socket.AF_INET6 if is_ipv6 else socket.AF_INET
+            sock_addr = (my_addr, port, 0, 0) if is_ipv6 else (my_addr, port)
+
+            host_sock = socket.socket(sock_type, socket.SOCK_STREAM)
+            host_sock.connect(sock_addr)
+            mylog('connected to a nebs')
+            conn = RawConnection(host_sock)
+            msg = RefreshMessageMessage()
+            conn.send_obj(msg)
+            mylog('refreshed host')
+            conn.recv_obj()
+            conn.close()
+        except Exception, e:
+            mylog('Failed to alert any other hosts on this machine:')
+            mylog(e.message, '31')
+    # todo: Will this work with miniupnp?
+    # try:
+    #     local_sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    #     ips = get_ipv6_list()
+    #     ip = ips[0]
+    #     mylog('Local IP6 is {}'.format(ip))
+    #     local_sock.connect((ip, instance.host_port, 0, 0))
+    #     mylog('connected to a nebs')
+    #     conn = RawConnection(local_sock)
+    #     msg = RefreshMessageMessage()
+    #     conn.send_obj(msg)
+    #     mylog('refreshed host')
+    #     conn.recv_obj()
+    #     conn.close()
+    # except Exception, e:
+    #     mylog('Failed to alert any other hosts on this machine')
 
 def mirror_usage():
     print 'usage: neb mirror [--test][-r address][-p port]' + \

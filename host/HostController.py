@@ -1,14 +1,13 @@
 import atexit
-import collections
 import os
 import signal
 import sys
 from _socket import gaierror
-from inspect import getframeinfo, currentframe
-from threading import Thread, Event, Lock, Semaphore
+from threading import Thread, Event, Lock
 
-from common_util import mylog, ResultAndData
+from common_util import mylog, ResultAndData, Success, Error
 from connections.RawConnection import RawConnection
+from host.NetworkController import NetworkController
 from host.NetworkThread import NetworkThread
 from host.PrivateData import PrivateData, NO_ACCESS, READ_ACCESS
 from host.WatchdogThread import WatchdogWorker
@@ -16,17 +15,14 @@ from host.function.local_updates import new_main_thread
 from host.function.network.client import list_files_handler, \
     handle_recv_file_from_client, handle_read_file_request, \
     handle_client_add_owner, handle_client_add_contributor
-from host.function.network_updates import handle_fetch, handle_file_change, \
-    handle_remove_file
+from host.function.network_updates import handle_fetch, handle_file_change
 from host.models.Cloud import Cloud
 from host.util import set_mylog_name, mylog, get_ipv6_list, setup_remote_socket, \
     get_client_session, permissions_are_sufficient
 from messages.RefreshMessageMessage import RefreshMessageMessage
 from messages import InvalidPermissionsMessage
-from messages.HostHandshakeMessage import  HostHandshakeMessage
-import platform
 
-from msg_codes import HOST_HOST_FETCH, HOST_FILE_PUSH, REMOVE_FILE, \
+from msg_codes import HOST_HOST_FETCH, HOST_FILE_PUSH, \
     STAT_FILE_REQUEST, LIST_FILES_REQUEST, CLIENT_FILE_PUT, READ_FILE_REQUEST, \
     CLIENT_ADD_OWNER, CLIENT_ADD_CONTRIBUTOR, REFRESH_MESSAGE
 
@@ -49,6 +45,7 @@ class HostController:
         self._io_lock = Lock()
         self.watchdog_worker = WatchdogWorker(self)
         self._nebs_instance = nebs_instance
+        self._network_controller = None
 
     def start(self, argv):
         # type: ([str]) -> None
@@ -72,13 +69,31 @@ class HostController:
         if force_kill:
             mylog('Forcing shutdown of previous instance')
         rd = self._nebs_instance.start(force_kill)
+
         if rd.success:
-            ipv6_addresses = get_ipv6_list()
-            if len(ipv6_addresses) < 1:
-                mylog('Couldn\'t acquire an IPv6 address')
+            try:
+                self._network_controller = NetworkController(self)
+            except Exception, e:
+                mylog('Failed to instantiate NetworkController')
+                mylog(e.message, '31')
+                self.shutdown()
+                sys.exit(-1)
+
+        if rd.success:
+            rd = self._network_controller.refresh_external_ip()
+            if rd.success:
+                connected = rd.data
+                if connected:
+                    self.spawn_net_thread()
             else:
-                self.spawn_net_thread(ipv6_addresses[0])
-                # local_update thread will handle the first handshake/host setup
+                err_msg = rd.data
+                mylog(err_msg)
+            # ipv6_addresses = get_ipv6_list()
+            # if len(ipv6_addresses) < 1:
+            #     mylog('Couldn\'t acquire an IPv6 address')
+            # else:
+            #     self.spawn_net_thread(ipv6_addresses[0])
+            #     # local_update thread will handle the first handshake/host setup
 
             try:
                 self.do_local_updates()
@@ -102,12 +117,16 @@ class HostController:
         self._local_update_thread.start()
         self._local_update_thread.join()
 
-    def spawn_net_thread(self, ipv6_address):
+    def spawn_net_thread(self):
         if self.active_network_obj is not None:
             # todo make sure connections from the old thread get dequeue'd
             self.active_network_obj.shutdown()
-        mylog('Spawning new server thread on {}'.format(ipv6_address))
-        self.active_network_obj = NetworkThread(ipv6_address, self)
+            self._do_network_shutdown()
+
+        # mylog('Spawning new server thread on {}'.format(ipv6_address))
+        external_ip, internal_ip = self._network_controller.get_external_ip(), self._network_controller.get_local_ip()
+        mylog('Spawning new server thread on mapping [{}->{}]'.format(external_ip, internal_ip))
+        self.active_network_obj = NetworkThread(external_ip, internal_ip, self)
 
         self.active_network_thread = Thread(
             target=self.active_network_obj.work_thread, args=[]
@@ -125,42 +144,130 @@ class HostController:
         else:
             return None
 
+
+    def check_ipv6_changed(self, curr_ipv6):
+        ipv6_addresses = get_ipv6_list()
+        if curr_ipv6 is None:
+            if len(ipv6_addresses) > 0:
+                return True, ipv6_addresses[0]
+            else:
+                return False, None
+        if curr_ipv6 in ipv6_addresses:
+            return False, None
+        else:
+            new_addr = None
+            if len(ipv6_addresses) > 1:
+                new_addr = ipv6_addresses[0]
+            return True, new_addr
+
+    def update_network_status(self):
+        # New
+        rd = self._network_controller.refresh_external_ip()
+        if rd.success:
+            changed = rd.data
+            if changed:
+                rd = self.change_ip()
+                if rd.success:
+                    # handshake remotes will send all of them our new IP/port/wsport
+                    rd = self.handshake_remotes()
+        # If these fail, we probably don't have a network anymore.
+        # If they're fatal, they'll have thrown an exception (hopefully)
+
+        return rd
+
+
+    # def check_network_change(self):
+    #     """
+    #     Checks to see if the state of the network has changed.
+    #     If it has, it tries to reconnect to the remote using the new information.
+    #     """
+    #     # OLD
+    #     rd = Success()
+    #     mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
+    #     all_mirrored_clouds = mirrored_clouds.all()
+    #     # check if out ip has changed since last update
+    #     ip_changed, new_ip = False, None
+    #     if self.is_ipv6():
+    #         ip_changed, new_ip = check_ipv6_changed(self.active_ipv6())
+    #     # mylog('Done checking IP change')
+    #     # if the ip is different, move our server over
+    #     if ip_changed:
+    #         rd = self.change_ip(new_ip, all_mirrored_clouds)
+    #         # todo: what if one of the remotes fails to handshake?
+    #         # should store the last handshake per remote
+    #         # if rd.success:
+    #         #     last_handshake = datetime.utcnow()
+    #         #     current_ipv6 = new_ip
+    #
+    #     return rd
+
     def is_shutdown_requested(self):
         return self._shutdown_requested
 
     def shutdown(self):
         mylog('Calling HostController.shutdown()')
         self._shutdown_requested = True
-        if self.active_network_obj is not None:
-            self.active_network_obj.shutdown()
+        self._do_network_shutdown()
 
         if self._local_update_thread is not None:
-            self._local_update_thread.join()
+            try:
+                self._local_update_thread.join()
+            except RuntimeError, e:
+                pass
 
         if self._nebs_instance is not None:
             self._nebs_instance.shutdown()
 
-    def change_ip(self, new_ip, clouds):
-        if new_ip is None:
-            if self.active_ipv6() is not None:
-                mylog('I should tell all the remotes that I\'m dead now.')  # fixme
-                mylog('DISCONNECTED FROM IPv6')  # fixme
-            # at this point, how is my active net thread connected to anything?
-            if self.active_network_obj is not None:
-                self.active_network_obj.shutdown()
-        else:
-            self.spawn_net_thread(new_ip)
-            for cloud in clouds:
-                self.send_remote_handshake(cloud)
+    def _do_network_shutdown(self):
+        if self.active_network_obj is not None:
+            self.active_network_obj.shutdown()
+        # TODO make sure to kill these threads too.
+        if self.active_network_thread is not None:
+            pass
+        if self.active_ws_thread is not None:
+            pass
 
-    def handshake_clouds(self, clouds):
-        mylog('Telling {}\'s remote that {}\'s at {}'.format(
-            [cloud.name for cloud in clouds]
-            , [cloud.my_id_from_remote for cloud in clouds]
-            , self.active_ipv6())
-        )
-        for cloud in clouds:
+    def change_ip(self):
+        if self.active_network_obj is not None:
+            self.active_network_obj.shutdown()
+        self.spawn_net_thread()
+        return Success()
+
+    # def change_ip(self, new_ip, clouds):
+    #     if new_ip is None:
+    #         if self.active_ipv6() is not None:
+    #             mylog('I should tell all the remotes that I\'m dead now.')  # fixme
+    #             mylog('DISCONNECTED FROM IPv6')  # fixme
+    #         # at this point, how is my active net thread connected to anything?
+    #         if self.active_network_obj is not None:
+    #             self.active_network_obj.shutdown()
+    #     else:
+    #         self.spawn_net_thread(new_ip)
+    #         for cloud in clouds:
+    #             self.send_remote_handshake(cloud)
+    #     return Success()
+
+    # def handshake_clouds(self, clouds):
+    #     mylog('Telling {}\'s remote that {}\'s at {}'.format(
+    #         [cloud.name for cloud in clouds]
+    #         , [cloud.my_id_from_remote for cloud in clouds]
+    #         , self.active_ipv6())
+    #     )
+    #     for cloud in clouds:
+    #         self.send_remote_handshake(cloud)
+
+    def handshake_remotes(self):
+        db = self._nebs_instance.get_db()
+
+        mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
+        all_mirrored_clouds = mirrored_clouds.all()
+        # todo: In the future, have one Remote object in the host DB for each remote
+        # and handshake that remote once.
+        # todo: And then update that Remote's handshake
+        for cloud in all_mirrored_clouds:
             self.send_remote_handshake(cloud)
+        # map(self.send_remote_handshake, all_mirrored_clouds)
+        return Success()
 
     def send_remote_handshake(self, cloud):
         # mylog('Telling {}\'s remote that [{}]\'s at {}'.format(
@@ -171,9 +278,9 @@ class HostController:
             remote_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
             remote_conn = RawConnection(remote_sock)
             msg = cloud.generate_handshake(
-                self.active_network_obj.ipv6_address
-                , self.active_network_obj.port
-                , self.active_network_obj.ws_port
+                self.active_network_obj.get_external_ip()
+                , self.active_network_obj.get_external_port()
+                , self.active_network_obj.get_external_ws_port()
             )
 
             remote_conn.send_obj(msg)
@@ -377,3 +484,6 @@ class HostController:
 
     def get_instance(self):
         return self._nebs_instance
+
+    def get_net_controller(self):
+        return self._network_controller

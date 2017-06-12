@@ -7,7 +7,8 @@ from connections.RawConnection import RawConnection
 from host import FileNode, Cloud
 from host.function.network_updates import handle_remove_file
 from host.function.send_files import send_file_to_other, complete_sending_files, send_file_to_local
-from host.util import check_response, setup_remote_socket, mylog, get_ipv6_list, find_deletable_children
+from common_util import mylog, ResultAndData, Success, Error
+from host.util import check_response, setup_remote_socket, get_ipv6_list, find_deletable_children
 from msg_codes import *
 from messages import *
 
@@ -38,8 +39,16 @@ def update_peer(host_obj, db, cloud, host, updates):
     host_id = host['id']  # id of host to recv files
     host_ip = host['ip']
     host_port = host['port']
-    host_sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-    host_sock.connect((host_ip, host_port, 0, 0))
+
+    is_ipv6 = ':' in host_ip
+    sock_type = socket.AF_INET6 if is_ipv6 else socket.AF_INET
+    sock_addr = (host_ip, host_port, 0, 0) if is_ipv6 else (host_ip, host_port)
+
+    host_sock = socket.socket(sock_type, socket.SOCK_STREAM)
+    host_sock.connect(sock_addr)
+
+    # host_sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    # host_sock.connect((host_ip, host_port, 0, 0))
     raw_connection = RawConnection(host_sock)
 
     # fixme: Change it to one FILE_PUSH per update.
@@ -296,22 +305,6 @@ def check_local_modifications(host_obj, cloud, db):
         send_updates(host_obj, db, cloud, updates)
 
 
-def check_ipv6_changed(curr_ipv6):
-    ipv6_addresses = get_ipv6_list()
-    if curr_ipv6 is None:
-        if len(ipv6_addresses) > 0:
-            return True, ipv6_addresses[0]
-        else:
-            return False, None
-    if curr_ipv6 in ipv6_addresses:
-        return False, None
-    else:
-        new_addr = None
-        if len(ipv6_addresses) > 1:
-            new_addr = ipv6_addresses[0]
-        return True, new_addr
-
-
 def new_main_thread(host_obj):
     # type: (HostController) -> object
 
@@ -321,8 +314,9 @@ def new_main_thread(host_obj):
     mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
     num_clouds_mirrored = 0  # mirrored_clouds.count()
 
-    current_ipv6 = host_obj.active_ipv6()
-    host_obj.handshake_clouds(mirrored_clouds.all())
+    # current_ipv6 = host_obj.active_ipv6()
+    host_obj.handshake_remotes()
+    # host_obj.handshake_clouds(mirrored_clouds.all())
 
     host_obj.acquire_lock()
     host_obj.watchdog_worker.watch_all_clouds(mirrored_clouds.all())
@@ -345,21 +339,15 @@ def new_main_thread(host_obj):
         host_obj.process_connections()
         # mylog('Done processing connections')
 
-        # db = host_obj.get_db()
         mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
         all_mirrored_clouds = mirrored_clouds.all()
-        # check if out ip has changed since last update
-        ip_changed, new_ip = False, None
-        if host_obj.is_ipv6():
-            ip_changed, new_ip = check_ipv6_changed(current_ipv6)
-        # mylog('Done checking IP change')
-        # if the ip is different, move our server over
-        if ip_changed:
-            host_obj.change_ip(new_ip, all_mirrored_clouds)
+        
+        # rd = host_obj.check_network_change()
+        rd = host_obj.update_network_status()
+        if rd.success:
             # todo: what if one of the remotes fails to handshake?
             # should store the last handshake per remote
             last_handshake = datetime.utcnow()
-            current_ipv6 = new_ip
 
         # if the number of mirrors has changed...
         if num_clouds_mirrored < mirrored_clouds.count():
@@ -377,7 +365,8 @@ def new_main_thread(host_obj):
             for cloud in all_mirrored_clouds:
                 # load_private_data doesn't duplicate existing data
                 host_obj.load_private_data(cloud)
-                host_obj.send_remote_handshake(cloud)
+                # host_obj.send_remote_handshake(cloud)
+            host_obj.handshake_remotes()
 
             last_handshake = datetime.utcnow()
         # mylog('Done checking for changes to number of clouds')
@@ -394,7 +383,8 @@ def new_main_thread(host_obj):
         # if more that 30s have passed since the last handshake, handshake
         delta = datetime.utcnow() - last_handshake
         if delta.seconds > 30:
-            host_obj.handshake_clouds(all_mirrored_clouds)
+            # host_obj.handshake_clouds(all_mirrored_clouds)
+            host_obj.handshake_remotes()
             # for cloud in all_mirrored_clouds:
             #     host_obj.send_remote_handshake(cloud)
             last_handshake = datetime.utcnow()

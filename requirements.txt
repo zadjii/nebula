@@ -1,14 +1,14 @@
 SQLAlchemy==1.0.8
 Tempita==0.5.2
 Werkzeug==0.10.4
-cffi==1.2.1
+cffi>=1.2.1
 cryptography>=1.0.1
 decorator==4.0.2
 enum34==1.0.4
-idna==2.0
+idna>=2.0
 ipaddress>=1.0.14
 pbr==1.8.0
-pyOpenSSL==0.15.1
+pyOpenSSL>=0.15.1
 pyasn1==0.1.8
 pycparser==2.14
 six>=1.9.0
@@ -18,5 +18,5 @@ wsgiref==0.1.2
 autobahn>=0.10.9
 trollius==2.1
 watchdog==0.8.3
-netifaces==0.10.4
+netifaces>=0.10.4
 

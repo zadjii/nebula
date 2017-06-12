@@ -15,63 +15,79 @@ from time import sleep
 
 
 class NetworkThread(object):
-    def __init__(self, ip_address, host, use_ipv6=True):
+    def __init__(self, external_ip, internal_ip, host):
+        self._use_ipv6 = ':' in external_ip
         self.shutdown_requested = False
-        self.server_sock = None
-        self._use_ipv6 = use_ipv6
-        self.ipv4_address = None
-        self.ipv6_address = None
-        if self._use_ipv6:
-            self.ipv6_address = ip_address
-        else:
-            self.ipv4_address = ip_address
+        self.server_sock = None  # This is the local socket for the TCP server
+        self._ws_sock = None  # This is the local socket for the WS server
+        self._external_ip = external_ip
+        self._internal_ip = internal_ip
 
-        self.port = host.get_instance().host_port
-        self.ws_port = host.get_instance().host_ws_port
+        # These may all be 0 - indicating that they should be bound to whatever's open.
+        # When binding, ALWAYS get the real port back from the socket.
+        # These are the "internal" ports that we're actually bound to -
+        #    We may map to a different port on the upnp layer.
 
-        self.setup_socket(ip_address, self._use_ipv6)
+        self._port = host.get_instance().host_port
+        self._ws_port = host.get_instance().host_ws_port
+        # This however isn't going to have an external component, ever.
+        self._ws_internal_port = host.get_instance().host_internal_port
+
+        self._external_port = None
+        self._external_ws_port = None
+
         self.connection_queue = []
 
         self.ws_event_loop = None
         self.ws_coro = None
         self.ws_server_protocol_instance = None
         self.ws_internal_server_socket = None
-        self.ws_internal_port = self.ws_port + 1
 
         # This lock belongs to the Host that spawned us.
         self._host = host
+        mylog('[1]NetworkThread._host={}'.format(self._host))
+
+        self.setup_socket()
 
         # This V is done when the ws_work_thread is started,
         #   to keep in another thread
         # self.setup_web_socket(ipv6_address)
 
-    def setup_socket(self, ip_address, use_ipv6=True):
-        if use_ipv6:
-            self.server_sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-            failure_count = 0
-            succeeded = False
-            while not succeeded:
-                try:
-                    self.server_sock.setsockopt(socket.SOL_SOCKET,
-                                                socket.SO_REUSEADDR, 1)
-                    self.server_sock.bind((ip_address, self.port, 0, 0))
-                    succeeded = True
-                    break
-                except socket.error, e:
-                    failure_count += 1
-                    mylog('Failed {} time(s) to bind to {}'.format(
-                        failure_count, (ip_address, self.port)), '34')
-                    mylog(e.message)
-                    if failure_count > 4:
-                        raise e
-                    sleep(1)
-            mylog('Bound to ipv6 address={}'.format(ip_address))
-        else:
-            self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.server_sock.bind((ip_address, self.port))
-            mylog('Bound to ipv4 address={}'.format(ip_address))
+    def setup_socket(self):
+        sock_type = socket.AF_INET6 if self._use_ipv6 else socket.AF_INET
+        sock_addr = (self._internal_ip, self._port, 0, 0) if self._use_ipv6 else (self._internal_ip, self._port)
+        self.server_sock = socket.socket(sock_type, socket.SOCK_STREAM)
+        failure_count = 0
+        succeeded = False
+        while not succeeded:
+            try:
+                self.server_sock.setsockopt(socket.SOL_SOCKET,
+                                            socket.SO_REUSEADDR, 1)
+                self.server_sock.bind(sock_addr)
+                succeeded = True
+                self._port = self.server_sock.getsockname()[1]
+                mylog('[2]NetworkThread._host={}'.format(self._host))
 
-    def setup_web_socket(self, ip_address):
+                rd = self._host.get_net_controller().create_port_mapping(self._port)
+                if rd.success:
+                    self._external_port = rd.data
+                    self._host.get_instance().persist_ip(self._external_ip)
+                    self._host.get_instance().persist_port(self._external_port)
+                else:
+                    raise Exception(rd.data)
+                break
+            except socket.error, e:
+                failure_count += 1
+                mylog('Failed {} time(s) to bind to {}'.format(
+                    failure_count, sock_addr), '34')
+                mylog(e.message)
+                if failure_count > 4:
+                    self.shutdown()
+                    raise e
+                sleep(1)
+        mylog('Bound to ip address={}'.format(self._internal_ip))
+
+    def setup_web_socket(self):
         # type: (str) -> ResultAndData
         mylog('top of ws thread')
         rd = self._make_internal_socket()
@@ -81,20 +97,55 @@ class NetworkThread(object):
             txaio.use_asyncio()
             txaio.start_logging()
             factory = WebSocketServerFactory(
-                u"ws://[{}]:{}".format(ip_address, self.ws_port)
+                u"ws://[{}]:{}".format(self._external_ip, self._ws_port)
             )
             factory.protocol = MyBigFuckingLieServerProtocol
+            # fixme woah this seems terrible
+            # is this a class static value that's being set to this instance? yikes
             MyBigFuckingLieServerProtocol.net_thread = self
+
+            # Create a socket for the event loop to use:
+            sock_type = socket.AF_INET6 if self._use_ipv6 else socket.AF_INET
+            sock_addr = (self._internal_ip, self._ws_port, 0, 0) if self._use_ipv6 else (self._internal_ip, self._ws_port)
+            self._ws_sock = socket.socket(sock_type, socket.SOCK_STREAM)
+            failure_count = 0
+            succeeded = False
+            while not succeeded:
+                try:
+                    self._ws_sock.setsockopt(socket.SOL_SOCKET,
+                                             socket.SO_REUSEADDR, 1)
+                    self._ws_sock.bind(sock_addr)
+                    succeeded = True
+                    self._ws_port = self._ws_sock.getsockname()[1]
+                    rd = self._host.get_net_controller().create_port_mapping(self._ws_port)
+                    if rd.success:
+                        self._external_ws_port = rd.data
+                    else:
+                        raise Exception(rd.data)
+                    break
+                except socket.error, e:
+                    failure_count += 1
+                    mylog('Failed {} time(s) to bind to {}'.format(
+                        failure_count, sock_addr), '34')
+                    mylog(e.message)
+                    if failure_count > 4:
+                        self.shutdown()
+                        raise e
+                    sleep(1)
 
             # reuse address is needed so that we can swap networks relatively
             # seamlessly. I'm not sure what side effect it may have, todo:19
+            # self.ws_coro = self.ws_event_loop.create_server(factory
+            #                                                 , ip_address
+            #                                                 , self.ws_port
+            #                                                 , reuse_address=True)
             self.ws_coro = self.ws_event_loop.create_server(factory
-                                                            , ip_address
-                                                            , self.ws_port
+                                                            , host=None, port=None
+                                                            , sock=self._ws_sock
                                                             , reuse_address=True)
 
             mylog('Bound websocket to (ip, port)=({},{})'
-                  .format(ip_address, self.ws_port))
+                  .format(self._internal_ip, self._ws_port))
 
         if not rd.success:
             mylog('Failed to create a websocket.')
@@ -120,14 +171,15 @@ class NetworkThread(object):
         while True:
             try:
                 self.ws_internal_server_socket.bind(
-                    ('localhost', self.ws_internal_port))
+                    ('localhost', self._ws_internal_port))
+                self._ws_internal_port = self.ws_internal_server_socket.getsockname()[1]
                 mylog('Successfully bound internal server socket on {}'.format(
-                    self.ws_internal_port), '32;46')
+                    self._ws_internal_port), '32;46')
                 rd = Success()
                 break
             except Exception as e:
                 mylog('Failed binding internal server socket on {}'.format(
-                    self.ws_internal_port), '31;103')
+                    self._ws_internal_port), '31;103')
                 mylog(e.message)
                 failures += 1
                 if failures > 4:
@@ -154,7 +206,11 @@ class NetworkThread(object):
             self.server_sock.shutdown(socket.SHUT_RDWR)
 
     def ws_work_thread(self):
-        rd = self.setup_web_socket(self.ipv6_address)
+        try:
+            rd = self.setup_web_socket()
+        except Exception, e:
+            self.shutdown()
+            raise e
         if not rd.success:
             mylog('Failed to setup websocket. Shutting down host.')
             self._host.shutdown()
@@ -189,8 +245,8 @@ class NetworkThread(object):
             self.ws_internal_server_socket.close()
         if self.server_sock is not None:
             self.server_sock.close()
-        mylog('Shut down server socket on {}'.format(
-            self.ipv6_address if self._use_ipv6 else self.ipv4_address))
+        mylog('Shut down server socket on {}->{}'.format(
+            self._external_ip, self._internal_ip))
 
     def add_ws_conn(self, mbflsp):
         mylog('adding ws conn')
@@ -211,5 +267,11 @@ class NetworkThread(object):
     def is_ipv6(self):
         return self._use_ipv6
 
+    def get_external_ip(self):
+        return self._external_ip
 
+    def get_external_port(self):
+        return self._external_port
 
+    def get_external_ws_port(self):
+        return self._external_ws_port

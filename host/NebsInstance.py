@@ -5,7 +5,8 @@ from StringIO import StringIO
 from common.Instance import Instance, get_from_conf
 from host import models
 from common.SimpleDB import SimpleDB
-from common_util import ResultAndData, Error, Success, INSTANCES_ROOT
+from common_util import ResultAndData, Error, Success, INSTANCES_ROOT, mylog
+
 
 class NebsInstance(Instance):
 
@@ -22,13 +23,22 @@ class NebsInstance(Instance):
         super(NebsInstance, self).__init__(working_dir)
 
         self.host_host = ''
-        self.host_port = 23456
         self.host_ws_host = '127.0.0.1'
-        self.host_ws_port = 34567
+        # Values of 0 will be used by bind() to pick a port automatically.
+        self.host_port = 0
+        self.host_ws_port = 0
+        self.host_internal_port = 0
+        # self.host_port = 23456
+        # self.host_ws_port = 34567
+        # self.host_internal_port = 34568
+
+        self.local_debug = False
 
         self._db_name = 'host.db'
         self._db_models = models.nebs_base
         self._conf_file_name = 'nebs.conf'
+        self._port_file_name = 'nebs.port'
+        self._ip_file_name = 'nebs.ip'
         self._pid_name = 'nebs'
 
         self.init_dir()
@@ -45,6 +55,51 @@ class NebsInstance(Instance):
 
             self.host_port = get_from_conf(config, 'PORT', self.host_port)
             self.host_ws_port = get_from_conf(config, 'WS_PORT', self.host_ws_port)
+            self.host_internal_port = get_from_conf(config, 'INTERNAL_PORT', self.host_internal_port)
+            self.local_debug = get_from_conf(config, 'LOCAL_DEBUG', self.local_debug)
+
+    def get_existing_port(self):
+        port = None
+        port_file_path = os.path.join(self._working_dir, self._port_file_name)
+        if os.path.exists(port_file_path):
+            with open(port_file_path, mode='rb') as f:
+                port = f.read()
+                port = int(port)
+        return port
+
+    def persist_port(self, port):
+        mylog('persist_port({})'.format(port))
+        port_file_path = os.path.join(self._working_dir, self._port_file_name)
+        if os.path.exists(port_file_path):
+            os.remove(port_file_path)
+        with open(port_file_path, mode='wb') as f:
+            f.write('{}'.format(port))
+
+    def get_existing_ip(self):
+        ip = None
+        ip_file_path = os.path.join(self._working_dir, self._ip_file_name)
+        if os.path.exists(ip_file_path):
+            with open(ip_file_path, mode='rb') as f:
+                ip = f.read()
+        return ip
+
+    def persist_ip(self, ip):
+        mylog('persist_ip({})'.format(ip))
+        ip_file_path = os.path.join(self._working_dir, self._ip_file_name)
+        if os.path.exists(ip_file_path):
+            os.remove(ip_file_path)
+        with open(ip_file_path, mode='wb') as f:
+            f.write('{}'.format(ip))
+
+    def shutdown(self):
+        super(NebsInstance, self).shutdown()
+        port_file_path = os.path.join(self._working_dir, self._port_file_name)
+        if os.path.exists(port_file_path):
+            os.remove(port_file_path)
+        ip_file_path = os.path.join(self._working_dir, self._ip_file_name)
+        if os.path.exists(ip_file_path):
+            os.remove(ip_file_path)
+
 
 
 

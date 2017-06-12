@@ -78,7 +78,11 @@ class MyTestCase(unittest.TestCase):
 
         print 'Reset the dirs for {}, {}'.format(nebr_working_dir, nebs_working_dir)
 
-        os.environ['NEBULA_LOCAL_DEBUG'] = '1'
+        # os.environ['NEBULA_LOCAL_DEBUG'] = '1'
+        os.mkdir(nebs_working_dir)
+        with open(os.path.join(nebs_working_dir, 'nebs.conf'), mode='wb') as f:
+            f.write('LOCAL_DEBUG = True')
+
         global remote_proc, host_proc
         remote_proc, host_proc = start_nebr_and_nebs_instance(test_root)
         print '\x1b[30;42m##### Nebula processes started #####\x1b[0m'
