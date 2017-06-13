@@ -93,7 +93,7 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
         self._internal_client_socket = socket.socket()
         self._internal_client_socket.connect(
             ('localhost'
-             , MyBigFuckingLieServerProtocol.net_thread.ws_internal_port))
+             , MyBigFuckingLieServerProtocol.net_thread._ws_internal_port))
         MyBigFuckingLieServerProtocol.net_thread.add_ws_conn(self)
         mylog('Bottom of MBFLSP.onConnect')
 

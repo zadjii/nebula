@@ -167,9 +167,9 @@ class HostController:
             changed = rd.data
             if changed:
                 rd = self.change_ip()
-                if rd.success:
-                    # handshake remotes will send all of them our new IP/port/wsport
-                    rd = self.handshake_remotes()
+        if rd.success:
+            # handshake remotes will send all of them our new IP/port/wsport
+            rd = self.handshake_remotes()
         # If these fail, we probably don't have a network anymore.
         # If they're fatal, they'll have thrown an exception (hopefully)
 
