@@ -1,6 +1,8 @@
 import ctypes
 import os
 import platform
+from logging import *
+import logging.handlers
 from os import path
 from datetime import datetime
 ###############################################################################
@@ -20,40 +22,96 @@ def Success(data=None):
 ###############################################################################
 __author__ = 'Mike'
 
+class Mylog(object):
+    def __init__(self):
+        self._log_name = None
+        self._log_file = None
+        self._log_file_handler = None
+        self._log_level = DEBUG
+        self._log = getLogger()
+        self._log.setLevel(DEBUG)
+        logging.basicConfig(format='%(message)s')
+
+    def construct_message(self, message, sgr_seq='0'):
+        now = datetime.utcnow()
+        now_string = now.strftime('%y%m-%d %H:%M:%S.') + now.strftime('%f')[0:2]
+        output = '{}|'.format(now_string)
+
+        if self._log_name is not None:
+            output += '[{}]'.format(self._log_name)
+        output += ' '
+
+        use_sgr = sgr_seq is not '0' and not self.using_file()
+        if use_sgr:
+            output += '\x1b[{}m'.format(sgr_seq)
+        output += str(message)
+        if use_sgr:
+            output += '\x1b[0m'
+
+        return output
+
+    def mylog(self, message, sgr_seq='0'):
+        output = self.construct_message(message, sgr_seq)
+        self.debug(output)
+
+    def debug(self, message):
+        self._log.debug(message)
+
+    def set_name(self, log_name):
+        self._log_name = log_name
+
+
+    def set_file(self, log_file):
+        self._log_file = log_file
+        if self._log_file_handler is not None:
+            self._log.removeHandler(self._log_file_handler)
+        self._log_file_handler = logging.handlers.RotatingFileHandler(
+            self._log_file, maxBytes=100*1024*1024, backupCount=5)
+        self._log.addHandler(self._log_file_handler)
+
+    def using_file(self):
+        return self._log_file is not None
+
+
 mylog_name = None
 mylog_file = None
 
+log_instance = Mylog()
+
 def set_mylog_name(name):
-    global mylog_name
-    mylog_name = name
+    # global mylog_name
+    # mylog_name = name
+    log_instance.set_name(name)
 
 def set_mylog_file(filename):
-    global mylog_file
-    mylog_file = filename
+    # global mylog_file
+    # mylog_file = filename
+    log_instance.set_file(filename)
 
 def mylog(message, sgr_seq='0'):
-    now = datetime.utcnow()
-    now_string = now.strftime('%y%m-%d %H:%M:%S.') + now.strftime('%f')[0:2]
-    use_sgr = sgr_seq is not '0' and mylog_file is None
-    output = '{}|'.format(now_string)
-    if mylog_name is not None:
-        output += '[{}]'.format(mylog_name)
-    output += ' '
-    if use_sgr:
-        output += '\x1b[{}m'.format(sgr_seq)
-    output += str(message)
-    if use_sgr:
-        output += '\x1b[0m'
-
+    log_instance.mylog(message, sgr_seq)
+    # now = datetime.utcnow()
+    # now_string = now.strftime('%y%m-%d %H:%M:%S.') + now.strftime('%f')[0:2]
+    # use_sgr = sgr_seq is not '0' and mylog_file is None
+    # output = '{}|'.format(now_string)
     # if mylog_name is not None:
-    #     message = '{}|[{}] \x1b[{}m{}\x1b[0m'.format(now_string, mylog_name, sgr_seq, message)
+    #     output += '[{}]'.format(mylog_name)
+    # output += ' '
+    # if use_sgr:
+    #     output += '\x1b[{}m'.format(sgr_seq)
+    # output += str(message)
+    # if use_sgr:
+    #     output += '\x1b[0m'
+    #
+    # # if mylog_name is not None:
+    # #     message = '{}|[{}] \x1b[{}m{}\x1b[0m'.format(now_string, mylog_name, sgr_seq, message)
+    # # else:
+    # #     message = '{}| \x1b[{}m{}\x1b[0m'.format(now_string, sgr_seq, message)
+    # if mylog_file is not None:
+    #     with open(mylog_file, mode='a') as handle:
+    #         handle.write(output + '\n')
     # else:
-    #     message = '{}| \x1b[{}m{}\x1b[0m'.format(now_string, sgr_seq, message)
-    if mylog_file is not None:
-        with open(mylog_file, mode='a') as handle:
-            handle.write(output + '\n')
-    else:
-        print(output)
+    #     print(output)
 
 
 def enable_vt_support():
