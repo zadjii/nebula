@@ -41,6 +41,8 @@ class NebrInstance(Instance):
             return
 
         config = ConfigParser.RawConfigParser()
+        # TODO: After self reflection, this is dumb. Don't add [root] to the start. 
+        #       have that in the file itself.
         with open(conf_file) as stream:
             stream = StringIO("[root]\n" + stream.read())
             config.readfp(stream)
