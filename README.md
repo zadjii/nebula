@@ -189,3 +189,13 @@ def Success(data=None):
 This probably isn't a real programming pattern, it's just something dumb that I do.
 I can only really get away with it because python isn't strongly typed.
 
+## branching
+```
+master/
+dev/
+├──<user> : eg zadjii, maxmorgan
+│   └── <feature or whatever> : you can do whatever you want under that
+hotfix/
+├──<source of hotfix> : eg. 'surface', 'azure'
+│   └── <title of hotfix>
+```
