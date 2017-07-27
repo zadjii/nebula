@@ -55,6 +55,7 @@ def config_logger(name='nebula', filename=None, level=logging.INFO):
     formatter = logging.Formatter('%(asctime)s|[%(name)s](%(levelname)s) %(message)s')
     hdlr.setFormatter(formatter)
     _log.addHandler(hdlr)
+    _log.propagate = False
     # print _log.handlers
     # print _log
     # print _log.name
@@ -154,6 +155,7 @@ def set_mylog_file(filename):
 def mylog(message, sgr_seq='0'):
     # mlog.mylog(message, sgr_seq)
     # global _log
+
     __log = get_mylog()
     if not __log:
         print 'Fool! You have\'nt configured the log yet!'
