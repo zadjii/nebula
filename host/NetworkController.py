@@ -98,7 +98,6 @@ class NetworkController(object):
             self._last_external_ip = external_ipaddress
             self._last_local_ip = local_ipaddress
             _log.debug('old, now= {}, {}'.format(old_ip, external_ipaddress))
-            print _log.handlers
             rd = Success(external_ipaddress != old_ip)
         except Exception, e:
             rd = Error('Exception during miniupnpc operation: {}'.format(e.message))

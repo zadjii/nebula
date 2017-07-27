@@ -1,15 +1,6 @@
-import ConfigParser
-import logging
 import os
 import imp
-
-import threading
-from StringIO import StringIO
-
 import thread
-
-import subprocess
-
 import signal
 
 from migrate.versioning import api
@@ -175,7 +166,6 @@ class Instance(object):
             rd = Success('No process is already running for working directory {}'.format(self._working_dir))
 
         return rd
-
 
     def shutdown(self):
         pid_file = self._get_pid_file_path()

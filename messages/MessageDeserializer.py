@@ -83,10 +83,8 @@ _decoder_table = {
 class MessageDeserializer(object):
     @staticmethod
     def decode_msg(json_string):
-        # _log = logging.getLogger(__name__)
         _log = get_mylog()
-        _log.debug('\t->decoding "{}"'.format(json_string))
-        # mlog.debug('\t->decoding "{}"'.format(json_string))
+        _log.debug('->decoding "{}"'.format(json_string))
         json_dict = json.loads(json_string)
         if 'type' not in json_dict.keys():
             raise

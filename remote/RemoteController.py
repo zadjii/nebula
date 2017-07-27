@@ -42,7 +42,7 @@ def host_handshake(remote_obj, connection, address, msg_obj):
     if host is not None:
         if not host.ipv6 == ipv6:
             # mylog('Host [{}] moved from "{}" to "{}"'.format(host.id, host.ipv6, ipv6))
-            _log.info('Host [{}] moved from "{}" to "{}"'.format(host.id, host.ipv6, ipv6))
+            _log.debug('Host [{}] moved from "{}" to "{}"'.format(host.id, host.ipv6, ipv6))
         host.ipv6 = ipv6
         host.port = msg_obj.port
         host.ws_port = msg_obj.wsport
@@ -54,6 +54,7 @@ def host_handshake(remote_obj, connection, address, msg_obj):
 
 
 def client_session_refresh(remote_obj, connection, address, msg_obj):
+    _log = get_mylog()
     db = remote_obj.get_db()
     session_id = msg_obj.sid
     # refreshes the session
@@ -61,7 +62,7 @@ def client_session_refresh(remote_obj, connection, address, msg_obj):
     # db.session.commit()
 
     if not rd.success:
-        mylog('Remote failed to refresh session {}, "{}"'.format(session_id, rd.data))
+        _log.warning('Remote failed to refresh session {}, "{}"'.format(session_id, rd.data))
     # This particular message doesn't want a response
 
 
@@ -69,15 +70,16 @@ def do_client_get_clouds(db, session_id):
     # type: (SimpleDB, str) -> ResultAndData
     # type: (SimpleDB, str) -> ResultAndData(True, ([dict], [dict]) )
     # type: (SimpleDB, str) -> ResultAndData(False, BaseMessage )
+    _log = get_mylog()
     rd = get_user_from_session(db, session_id)
     if not rd.success:
         msg = 'generic CGCHsR error: "{}"'.format(rd.data)
-        mylog(msg, '31')
+        _log.error(msg)
         return Error(InvalidStateMessage(msg))
     else:
         user = rd.data
 
-    mylog('getting clouds for {}'.format(user.username))
+    _log.debug('getting clouds for {}'.format(user.username))
 
     owned_clouds = [c.to_dict() for c in user.owned_clouds.all()]
     contributed_clouds = [c.to_dict() for c in user.contributed_clouds.all()]
@@ -88,6 +90,7 @@ def do_add_user(db, username, password, email):
     # type: (SimpleDB) -> ResultAndData
     # type: (SimpleDB) -> ResultAndData(True, int)
     # type: (SimpleDB) -> ResultAndData(False, BaseMessage )
+    _log = get_mylog()
     if (username is None) or (password is None) or (email is None):
         return Error(InvalidStateMessage('Must provide username, password and email'))
 
@@ -107,7 +110,7 @@ def do_add_user(db, username, password, email):
     db.session.add(user)
     db.session.commit()
 
-    mylog('Added new user {}'.format(user.username))
+    _log.info('Added new user {}'.format(user.username))
 
     return Success(user.id)
 
@@ -278,16 +281,13 @@ class RemoteController(object):
         address = (HOST, PORT)  # ipv4
         s.bind(address)
         _log = get_mylog()
-        _log.debug('DEBUG Listening on {}'.format(address))
-        _log.info('INFO Listening on {}'.format(address))
+        _log.info('Listening on {}'.format(address))
 
         s.listen(5)
-        _log.debug('Listening...')
         while True:
             (connection, address) = s.accept()
             raw_connection = RawConnection(connection)
             _log.debug('Connected by {}'.format(address))
-            _log.info('INFO Connected by {}'.format(address))
             # This is kinda really dumb.
             # I guess the thread just catches any exceptions and prevents the main
             #   from crashing, otherwise it has no purpose.

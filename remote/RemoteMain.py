@@ -50,6 +50,7 @@ def usage(instamce, argv):
     for command in command_descriptions.keys():
         print '\t', command, command_descriptions[command]
 
+
 def nebr_main(argv):
     if len(argv) < 2:
         usage(None, argv)
@@ -57,28 +58,14 @@ def nebr_main(argv):
 
     working_dir, argv = Instance.get_working_dir(argv, True)
     log_path, argv = get_log_path(argv)
-    # if log_path is not None:
-    #     set_mylog_file(log_path)
-
     log_level, argv = get_log_verbosity(argv)
-    # if log_level is not None:
-    #     mlog.set_level(log_level)
 
-    # config_logger(log_path, log_level)
     config_logger('nebr', log_path, log_level)
     _log = get_mylog()
-    print __name__, _log
 
     _log.info('Configured logging {}, {}'.format(log_path, log_level))
     if log_path is not None:
         print 'Writing log to {}'.format(log_path)
-
-    print '1'
-    _log.debug('2')
-    _log.info('3')
-    _log.warn('4')
-    _log.error('5')
-    _log.critical('6')
 
     nebr_instance = NebrInstance(working_dir)
 

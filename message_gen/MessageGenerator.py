@@ -185,7 +185,7 @@ def make_message_deserializer(messages):
     handle.write('import json\n')
     handle.write('from msg_codes import *\n')
     handle.write('from messages import *\n')
-    handle.write('from common_util import set_mylog_name, set_mylog_file, mylog\n')
+    handle.write('from common_util import *\n')
     handle.write('_decoder_table = {\n')
     msg0 = messages[0]
     handle.write('    {}: {}.deserialize # {}\n'.format(msg0.CAPS, msg0.class_name, msg0.code))
@@ -197,7 +197,8 @@ def make_message_deserializer(messages):
 class MessageDeserializer(object):
     @staticmethod
     def decode_msg(json_string):
-        print '\t\t-> decoding"{}"'.format(json_string)
+        _log = get_mylog()
+        _log.debug('->decoding "{}"'.format(json_string))
         json_dict = json.loads(json_string)
         if 'type' not in json_dict.keys():
             raise

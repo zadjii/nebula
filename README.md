@@ -49,13 +49,17 @@ You'll probably want to add the following aliases to your `.bashrc`
 I generally place the "installed" nebula at `var/lib/nebula`, I don't know if that
   really makes any sense but that's what I like.
 
-`` sh
+``` sh
 alias nebs='python /var/lib/nebula/nebs.py'
-``
+```
 
 
-`` sh
+``` sh
 alias nebr='python /var/lib/nebula/nebr.py'
-``
-`
+```
 
+
+Might be useful for watching log
+``` sh
+alias logr='less +F --follow-name -B'
+```
