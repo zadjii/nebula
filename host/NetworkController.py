@@ -1,10 +1,11 @@
+
 import os
 import platform
 from netifaces import interfaces, ifaddresses, AF_INET6
 
 import sys
 
-from common_util import ResultAndData, Success, Error, mylog, NEBULA_ROOT
+from common_util import *
 
 
 class NetworkController(object):
@@ -53,9 +54,10 @@ class NetworkController(object):
     #     else
 
     def refresh_external_ip(self):
+        _log = get_mylog()
         rd = Error()
         if self.miniupnp_available():
-            mylog('using miniupnp to get my IP')
+            _log.debug('using miniupnp to get my IP')
             rd = self._upnp_refresh_external_ip()
             if rd.success:
                 # make sure that our upnp state is updated
@@ -64,7 +66,7 @@ class NetworkController(object):
             # try to fallback to local
             inst = self._host_controller.get_instance()
             if inst.local_debug:
-                mylog('Falling back to local debug mode')
+                _log.debug('Falling back to local debug mode')
                 self._using_upnp = False
                 rd = self._legacy_refresh_ip()
             else:
@@ -73,13 +75,14 @@ class NetworkController(object):
                 # and hope that we come back.
                 # TODO - Also prevent us from trying to make new outgoing connections. <---- BIG
                 rd = Error('Failed to connect to a upnp device. We should handle this gracefully.')
-        mylog('refresh_external_ip->RD({},{})'.format(rd.success, rd.data))
+        _log.debug('refresh_external_ip->RD({},{})'.format(rd.success, rd.data))
         return rd
 
     def _upnp_refresh_external_ip(self):
         # () -> ResultAndData(True, bool:changed)
         # () -> ResultAndData(False, str:message)
         rd = Error()
+        _log = get_mylog()
         old_ip = self._last_external_ip
         try:
             # todo: There's probably a way to enumerate all the upnp devices to make sure that if we have an IP already,
@@ -91,10 +94,11 @@ class NetworkController(object):
             self._miniupnp.selectigd()
             local_ipaddress = self._miniupnp.lanaddr
             external_ipaddress = self._miniupnp.externalipaddress()
-            mylog('Woo we got an external ID!')
+            _log.debug('Woo we got an external ID!')
             self._last_external_ip = external_ipaddress
             self._last_local_ip = local_ipaddress
-            mylog('old, now= {}, {}'.format(old_ip, external_ipaddress))
+            _log.debug('old, now= {}, {}'.format(old_ip, external_ipaddress))
+            print _log.handlers
             rd = Success(external_ipaddress != old_ip)
         except Exception, e:
             rd = Error('Exception during miniupnpc operation: {}'.format(e.message))

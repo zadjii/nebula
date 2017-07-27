@@ -1,12 +1,12 @@
 import atexit
+import logging
 import socket
 from datetime import datetime
 
 from OpenSSL import SSL
 from werkzeug.security import generate_password_hash
 
-from common_util import send_error_and_close, Success, Error, enable_vt_support
-from common_util import set_mylog_name, set_mylog_file, mylog
+from common_util import *
 from connections.RawConnection import RawConnection
 from messages import *
 from msg_codes import *
@@ -35,12 +35,14 @@ PORT = 12345              # Arbitrary non-privileged port
 
 
 def host_handshake(remote_obj, connection, address, msg_obj):
+    _log = get_mylog()
     db = remote_obj.get_db()
     ipv6 = msg_obj.ipv6
     host = db.session.query(Host).get(msg_obj.id)
     if host is not None:
         if not host.ipv6 == ipv6:
-            mylog('Host [{}] moved from "{}" to "{}"'.format(host.id, host.ipv6, ipv6))
+            # mylog('Host [{}] moved from "{}" to "{}"'.format(host.id, host.ipv6, ipv6))
+            _log.info('Host [{}] moved from "{}" to "{}"'.format(host.id, host.ipv6, ipv6))
         host.ipv6 = ipv6
         host.port = msg_obj.port
         host.ws_port = msg_obj.wsport
@@ -275,13 +277,17 @@ class RemoteController(object):
         s = SSL.Connection(context, s)
         address = (HOST, PORT)  # ipv4
         s.bind(address)
-        mylog('Listening on {}'.format(address))
+        _log = get_mylog()
+        _log.debug('DEBUG Listening on {}'.format(address))
+        _log.info('INFO Listening on {}'.format(address))
 
         s.listen(5)
+        _log.debug('Listening...')
         while True:
             (connection, address) = s.accept()
             raw_connection = RawConnection(connection)
-            mylog('Connected by {}'.format(address))
+            _log.debug('Connected by {}'.format(address))
+            _log.info('INFO Connected by {}'.format(address))
             # This is kinda really dumb.
             # I guess the thread just catches any exceptions and prevents the main
             #   from crashing, otherwise it has no purpose.
@@ -293,13 +299,14 @@ class RemoteController(object):
             try:
                 self.filter_func(raw_connection, address)
             except Exception, e:
-                mylog('Error handling connection')
-                mylog(e.message)
+                print 'just in case'
+                _log.error('Error handling connection')
+                _log.error(e.message)
 
             # echo_func(connection, address)
             # todo: possible that we might want to thread.join here.
             # cont  Make it so that each req gets handled before blindly continuing
-
+        _log.error('Fell out the bottom og the while(true)')
 
     def filter_func(self, connection, address):
         msg_obj = connection.recv_obj()

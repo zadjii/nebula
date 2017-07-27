@@ -1,8 +1,8 @@
 import sys
 
 from common.Instance import Instance
-from common_util import enable_vt_support
-from common_util import set_mylog_name, set_mylog_file, mylog, get_log_path
+from common_util import *
+# from common_util import set_mylog_name, set_mylog_file, mylog, get_log_path
 from host.NebsInstance import NebsInstance
 from host.HostController import HostController
 from host.function.migrate_db import migrate_db
@@ -70,10 +70,31 @@ def nebs_main(argv):
     nebs_instance = NebsInstance(working_dir)
 
     log_path, argv = get_log_path(argv)
-    if log_path is not None:
-        set_mylog_file(log_path)
+    # if log_path is not None:
+    #     set_mylog_file(log_path)
 
-    mylog('DB URI: {}'.format(nebs_instance._db_uri()))
+    log_level, argv = get_log_verbosity(argv)
+    # if log_level is not None:
+    #     mlog.set_level(log_level)
+
+    config_logger('nebs', log_path, log_level)
+    # _log = logging.getLogger(__name__)
+    _log = get_mylog()
+
+    print __name__, _log
+    _log.info('Configured logging {}, {}'.format(log_path, log_level))
+    if log_path is not None:
+        print 'Writing log to {}'.format(log_path)
+
+    print '1'
+    _log.debug('2')
+    _log.info('3')
+    _log.warn('4')
+    _log.error('5')
+    _log.critical('6')
+
+    _log.debug('DB URI: {}'.format(nebs_instance._db_uri()))
+    # mylog('DB URI: {}'.format(nebs_instance._db_uri()))
 
     # if there weren't any args, print the usage and return
     # Do this again, because get_working_dir may have removed all the args

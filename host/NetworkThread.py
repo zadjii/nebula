@@ -1,6 +1,6 @@
 import socket
 
-from common_util import Error, Success, ResultAndData
+from common_util import *
 from connections.RawConnection import RawConnection
 from util import mylog
 from connections.WebSocketConnection import MyBigFuckingLieServerProtocol, \

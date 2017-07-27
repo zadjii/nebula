@@ -1,4 +1,5 @@
 import ConfigParser
+import logging
 import os
 import imp
 
@@ -14,8 +15,9 @@ import signal
 from migrate.versioning import api
 
 from common.SimpleDB import SimpleDB
-from common_util import ResultAndData, Error, Success, INSTANCES_ROOT
+from common_util import *
 import time
+
 
 def get_from_conf(config, key, default):
     return config.get('root', key) \
@@ -76,6 +78,12 @@ class Instance(object):
         self._conf_file_name = None
         self._db_map = {}
         self._pid_name = None
+
+    def get_instance_name(self):
+        return os.path.split(self._working_dir)[1]
+
+    def get_full_name(self):
+        return self._pid_name + self.get_instance_name()
 
     def init_dir(self):
         """
@@ -156,6 +164,8 @@ class Instance(object):
         if os.path.exists(pid_file):
             with open(pid_file) as handle:
                 pid = handle.read()
+                _log = get_mylog()
+                _log.debug(pid)
                 os.kill(int(pid), signal.SIGTERM)
                 rd = Success('Successfully killed process {}'.format(pid))
 

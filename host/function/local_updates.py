@@ -7,7 +7,7 @@ from connections.RawConnection import RawConnection
 from host import FileNode, Cloud
 from host.function.network_updates import handle_remove_file
 from host.function.send_files import send_file_to_other, complete_sending_files, send_file_to_local
-from common_util import mylog, ResultAndData, Success, Error
+from common_util import *
 from host.util import check_response, setup_remote_socket, get_ipv6_list, find_deletable_children
 from msg_codes import *
 from messages import *
@@ -310,6 +310,8 @@ def new_main_thread(host_obj):
 
     db = host_obj.get_instance().make_db_session()
 
+    _log = get_mylog()
+
     mylog('Beginning to watch for local modifications')
     mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
     num_clouds_mirrored = 0  # mirrored_clouds.count()
@@ -326,8 +328,8 @@ def new_main_thread(host_obj):
     db.session.close()
 
     db = host_obj.get_instance().make_db_session()
+    _log.info('entering main loop')
 
-    mylog('entering main loop')
     while not host_obj.is_shutdown_requested():
         # mylog('Top of Loop')
         timed_out = host_obj.network_signal.wait(30)
@@ -355,9 +357,10 @@ def new_main_thread(host_obj):
             # TODO: If a cloud is mirrored while we're waiting on the signal, then the
             #       host process won't automatically wake up. We need an inter-process way
             #       to signal that it's time for the thread to wake up again
-            mylog('number of clouds changed.')
+            _log.info('number of clouds changed.')
+
             host_obj.watchdog_worker.watch_all_clouds(all_mirrored_clouds)
-            mylog('checking for updates on {}'.format([cloud.my_id_from_remote for cloud in all_mirrored_clouds]))
+            _log.info('checking for updates on {}'.format([cloud.my_id_from_remote for cloud in all_mirrored_clouds]))
             num_clouds_mirrored = mirrored_clouds.count()
             # if the number of clouds is different:
             # - handshake all of them
@@ -391,7 +394,7 @@ def new_main_thread(host_obj):
         db.session.close()
         host_obj.release_lock()
         # mylog('Bottom of loop')
-    mylog('Leaving main loop')
+    _log.info('Leaving main loop')
 
 # This is deprecated
 # def local_update_thread(host_obj):
