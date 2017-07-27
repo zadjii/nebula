@@ -1,11 +1,12 @@
 import atexit
+import logging
 import os
 import signal
 import sys
 from _socket import gaierror
 from threading import Thread, Event, Lock
 
-from common_util import mylog, ResultAndData, Success, Error
+from common_util import *
 from connections.RawConnection import RawConnection
 from host.NetworkController import NetworkController
 from host.NetworkThread import NetworkThread
@@ -49,6 +50,7 @@ class HostController:
 
     def start(self, argv):
         # type: ([str]) -> None
+        _log = get_mylog()
         set_mylog_name('nebs')
         # todo process start() args here
 
@@ -67,14 +69,14 @@ class HostController:
 
         force_kill = '--force' in argv
         if force_kill:
-            mylog('Forcing shutdown of previous instance')
+            _log.info('Forcing shutdown of previous instance')
         rd = self._nebs_instance.start(force_kill)
 
         if rd.success:
             try:
                 self._network_controller = NetworkController(self)
             except Exception, e:
-                mylog('Failed to instantiate NetworkController')
+                _log.error('Failed to instantiate NetworkController')
                 mylog(e.message, '31')
                 self.shutdown()
                 sys.exit(-1)
@@ -87,7 +89,7 @@ class HostController:
                     self.spawn_net_thread()
             else:
                 err_msg = rd.data
-                mylog(err_msg)
+                _log.error(err_msg)
             # ipv6_addresses = get_ipv6_list()
             # if len(ipv6_addresses) < 1:
             #     mylog('Couldn\'t acquire an IPv6 address')
@@ -100,8 +102,8 @@ class HostController:
             finally:
                 self.shutdown()
 
-            mylog('Both the local update checking thread and the network thread'
-                  ' have exited.')
+            _log.info('Both the local update checking thread and the network thread'
+                      ' have exited.')
             sys.exit()
 
     def do_local_updates(self):
@@ -118,6 +120,8 @@ class HostController:
         self._local_update_thread.join()
 
     def spawn_net_thread(self):
+        # _log = logging.getLogger(__name__)
+        _log = get_mylog()
         if self.active_network_obj is not None:
             # todo make sure connections from the old thread get dequeue'd
             self.active_network_obj.shutdown()
@@ -125,7 +129,7 @@ class HostController:
 
         # mylog('Spawning new server thread on {}'.format(ipv6_address))
         external_ip, internal_ip = self._network_controller.get_external_ip(), self._network_controller.get_local_ip()
-        mylog('Spawning new server thread on mapping [{}->{}]'.format(external_ip, internal_ip))
+        _log.info('Spawning new server thread on mapping [{}->{}]'.format(external_ip, internal_ip))
         self.active_network_obj = NetworkThread(external_ip, internal_ip, self)
 
         self.active_network_thread = Thread(

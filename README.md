@@ -101,6 +101,9 @@ I generally place the "installed" nebula at `var/lib/nebula`, I don't know if th
 alias nebs='python /var/lib/nebula/nebs.py'
 
 alias nebr='python /var/lib/nebula/nebr.py'
+
+# Might be useful for watching log
+alias logr='less +F --follow-name -B'
 ```
 
 
@@ -188,4 +191,5 @@ def Success(data=None):
 
 This probably isn't a real programming pattern, it's just something dumb that I do.
 I can only really get away with it because python isn't strongly typed.
+
 

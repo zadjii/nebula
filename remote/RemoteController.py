@@ -1,12 +1,12 @@
 import atexit
+import logging
 import socket
 from datetime import datetime
 
 from OpenSSL import SSL
 from werkzeug.security import generate_password_hash
 
-from common_util import send_error_and_close, Success, Error, enable_vt_support
-from common_util import set_mylog_name, set_mylog_file, mylog
+from common_util import *
 from connections.RawConnection import RawConnection
 from messages import *
 from msg_codes import *
@@ -35,12 +35,14 @@ PORT = 12345              # Arbitrary non-privileged port
 
 
 def host_handshake(remote_obj, connection, address, msg_obj):
+    _log = get_mylog()
     db = remote_obj.get_db()
     ipv6 = msg_obj.ipv6
     host = db.session.query(Host).get(msg_obj.id)
     if host is not None:
         if not host.ipv6 == ipv6:
-            mylog('Host [{}] moved from "{}" to "{}"'.format(host.id, host.ipv6, ipv6))
+            # mylog('Host [{}] moved from "{}" to "{}"'.format(host.id, host.ipv6, ipv6))
+            _log.debug('Host [{}] moved from "{}" to "{}"'.format(host.id, host.ipv6, ipv6))
         host.ipv6 = ipv6
         host.port = msg_obj.port
         host.ws_port = msg_obj.wsport
@@ -52,6 +54,7 @@ def host_handshake(remote_obj, connection, address, msg_obj):
 
 
 def client_session_refresh(remote_obj, connection, address, msg_obj):
+    _log = get_mylog()
     db = remote_obj.get_db()
     session_id = msg_obj.sid
     # refreshes the session
@@ -59,7 +62,7 @@ def client_session_refresh(remote_obj, connection, address, msg_obj):
     # db.session.commit()
 
     if not rd.success:
-        mylog('Remote failed to refresh session {}, "{}"'.format(session_id, rd.data))
+        _log.warning('Remote failed to refresh session {}, "{}"'.format(session_id, rd.data))
     # This particular message doesn't want a response
 
 
@@ -67,15 +70,16 @@ def do_client_get_clouds(db, session_id):
     # type: (SimpleDB, str) -> ResultAndData
     # type: (SimpleDB, str) -> ResultAndData(True, ([dict], [dict]) )
     # type: (SimpleDB, str) -> ResultAndData(False, BaseMessage )
+    _log = get_mylog()
     rd = get_user_from_session(db, session_id)
     if not rd.success:
         msg = 'generic CGCHsR error: "{}"'.format(rd.data)
-        mylog(msg, '31')
+        _log.error(msg)
         return Error(InvalidStateMessage(msg))
     else:
         user = rd.data
 
-    mylog('getting clouds for {}'.format(user.username))
+    _log.debug('getting clouds for {}'.format(user.username))
 
     owned_clouds = [c.to_dict() for c in user.owned_clouds.all()]
     contributed_clouds = [c.to_dict() for c in user.contributed_clouds.all()]
@@ -86,6 +90,7 @@ def do_add_user(db, username, password, email):
     # type: (SimpleDB) -> ResultAndData
     # type: (SimpleDB) -> ResultAndData(True, int)
     # type: (SimpleDB) -> ResultAndData(False, BaseMessage )
+    _log = get_mylog()
     if (username is None) or (password is None) or (email is None):
         return Error(InvalidStateMessage('Must provide username, password and email'))
 
@@ -105,7 +110,7 @@ def do_add_user(db, username, password, email):
     db.session.add(user)
     db.session.commit()
 
-    mylog('Added new user {}'.format(user.username))
+    _log.info('Added new user {}'.format(user.username))
 
     return Success(user.id)
 
@@ -275,13 +280,14 @@ class RemoteController(object):
         s = SSL.Connection(context, s)
         address = (HOST, PORT)  # ipv4
         s.bind(address)
-        mylog('Listening on {}'.format(address))
+        _log = get_mylog()
+        _log.info('Listening on {}'.format(address))
 
         s.listen(5)
         while True:
             (connection, address) = s.accept()
             raw_connection = RawConnection(connection)
-            mylog('Connected by {}'.format(address))
+            _log.debug('Connected by {}'.format(address))
             # This is kinda really dumb.
             # I guess the thread just catches any exceptions and prevents the main
             #   from crashing, otherwise it has no purpose.
@@ -293,13 +299,14 @@ class RemoteController(object):
             try:
                 self.filter_func(raw_connection, address)
             except Exception, e:
-                mylog('Error handling connection')
-                mylog(e.message)
+                print 'just in case'
+                _log.error('Error handling connection')
+                _log.error(e.message)
 
             # echo_func(connection, address)
             # todo: possible that we might want to thread.join here.
             # cont  Make it so that each req gets handled before blindly continuing
-
+        _log.error('Fell out the bottom og the while(true)')
 
     def filter_func(self, connection, address):
         msg_obj = connection.recv_obj()

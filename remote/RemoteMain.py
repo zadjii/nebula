@@ -1,7 +1,7 @@
 import sys
 
 from common.Instance import Instance
-from common_util import set_mylog_name, set_mylog_file, mylog, get_log_path
+from common_util import *
 from remote.NebrInstance import NebrInstance
 from remote.RemoteController import RemoteController
 from remote.function.migrate_db import migrate_db
@@ -50,6 +50,7 @@ def usage(instamce, argv):
     for command in command_descriptions.keys():
         print '\t', command, command_descriptions[command]
 
+
 def nebr_main(argv):
     if len(argv) < 2:
         usage(None, argv)
@@ -57,8 +58,14 @@ def nebr_main(argv):
 
     working_dir, argv = Instance.get_working_dir(argv, True)
     log_path, argv = get_log_path(argv)
+    log_level, argv = get_log_verbosity(argv)
+
+    config_logger('nebr', log_path, log_level)
+    _log = get_mylog()
+
+    _log.info('Configured logging {}, {}'.format(log_path, log_level))
     if log_path is not None:
-        set_mylog_file(log_path)
+        print 'Writing log to {}'.format(log_path)
 
     nebr_instance = NebrInstance(working_dir)
 
