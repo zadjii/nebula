@@ -2,7 +2,7 @@ import os
 import imp
 import thread
 import signal
-
+import psutil
 from migrate.versioning import api
 
 from common.SimpleDB import SimpleDB
@@ -134,42 +134,113 @@ class Instance(object):
 
     def start(self, force=False):
         # type: (bool) -> ResultAndData
-        pid_file = self._get_pid_file_path()
+        _log = get_mylog()
+        my_pid = os.getpid()
         rd = Error()
-        if os.path.exists(pid_file):
-            if force:
-                rd = self.kill()
-                # if rd.success:
-                #     print(rd.data)
-            else:
-                return Error('Process already exists')
-        handle = open(pid_file, mode='wb')
-        pid = os.getpid()
-        handle.write(str(pid))
-        handle.close()
-        return Success(pid)
+        other_pids = Instance.get_other_processes()
+        if force:
+            rd = Instance.kill_pids(other_pids)
+        else:
+            if len(other_pids) > 0:
+                msg = 'Process already exists'
+                _log.error(msg)
+                rd = Error(msg)
+        if rd.success:
+            rd = Success(my_pid)
+        return rd
+
+    @staticmethod
+    def kill_pids(pids):
+        rd = Success()
+        _log = get_mylog()
+        try:
+            for pid in pids:
+                process = psutil.Process(pid)
+                _log.info('Killing existing process {}'.format(pid))
+                process.kill()
+        except Exception:
+            rd = Error('Failed to kill other instances')
+        return rd
+
+    @staticmethod
+    def get_other_processes():
+        _log = get_mylog()
+        my_pid = os.getpid()
+        pids = Instance._get_existing_process()
+        _log.debug('Found these processes={}'.format(pids))
+        other_pids = [p for p in pids if p != my_pid]
+        _log.debug('These are the other ones={}'.format(other_pids))
+        return other_pids
+
+    @staticmethod
+    def _get_existing_process():
+        # type: () -> List[int]
+        _log = get_mylog()
+        argv = sys.argv
+        # process_name = argv[0]
+        _log.debug('These are my args={}'.format(argv))
+        matching_pids = []
+        for pid in psutil.pids():
+            try:
+                p = psutil.Process(pid)
+                pname = p.name()
+                is_python = pname in ['python', 'python.exe', 'py', 'py.exe']
+                if is_python and Instance._is_process_running_instance(p):
+                    matching_pids.append(pid)
+            except psutil.NoSuchProcess:
+                pass
+        return matching_pids
+
+    @staticmethod
+    def _is_process_running_instance(process):
+        _log = get_mylog()
+        argv = sys.argv
+        process_name = argv[0]
+        # _log.debug('These are my args={}'.format(argv))
+        try:
+            cmdline = process.cmdline()
+            # _log.debug('is {} an nebula({}) instance?'.format(cmdline, process_name))
+            if process.cmdline() > 2:
+                is_us = process_name in cmdline[1]
+                is_start = 'start' in cmdline
+                if is_us and is_start:
+                    # _log.debug('\t Yes it is!')
+                    return True
+
+        except Exception, e:
+            # _log.error('Error checking if pid({}, \'{}\') is a running instance of nebula'.format(process.pid, process.name()))
+            pass
+        return False
 
     def kill(self):
         rd = Error()
-        pid_file = self._get_pid_file_path()
-        if os.path.exists(pid_file):
-            with open(pid_file) as handle:
-                pid = handle.read()
-                _log = get_mylog()
-                _log.debug(pid)
-                os.kill(int(pid), signal.SIGTERM)
-                rd = Success('Successfully killed process {}'.format(pid))
 
-            time.sleep(.5)
-            self.shutdown()
-        else:
-            rd = Success('No process is already running for working directory {}'.format(self._working_dir))
+        _log = get_mylog()
+        my_pid = os.getpid()
+        other_pids = Instance.get_other_processes()
+        rd = Instance.kill_pids(other_pids)
+        # pid_file = self._get_pid_file_path()
+        # if os.path.exists(pid_file):
+        #     with open(pid_file) as handle:
+        #         pid = handle.read()
+        #         _log = get_mylog()
+        #         _log.debug(pid)
+        #         os.kill(int(pid), signal.SIGTERM)
+        #         rd = Success('Successfully killed process {}'.format(pid))
+        #
+        #     time.sleep(.5)
+        #     self.shutdown()
+        # else:
+        #     rd = Success('No process is already running for working directory {}'.format(self._working_dir))
 
         return rd
 
     def shutdown(self):
+        _log = get_mylog()
+        _log.debug('Instance.shutdown')
         pid_file = self._get_pid_file_path()
         if os.path.exists(pid_file):
+            _log.debug('Instance.shutdown - removing pid file')
             os.remove(pid_file)
         pass
 

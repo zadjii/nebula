@@ -180,6 +180,7 @@ def attempt_wakeup(instance):
     my_addr = instance.get_existing_ip()
     port = instance.get_existing_port()
 
+
     if port is not None and my_addr is not None:
         try:
             local_sock = socket.socket
