@@ -21,44 +21,60 @@ def create(instance, argv):
     owner = db.session.query(User).filter_by(username=owner_uname).first()
 
     if (owner is None) or (not (check_password_hash(owner.password, owner_pass))):
-        print 'username/password combination invalid.'
+        print('username/password combination invalid.')
         return
     cloud_name_in = raw_input('Please enter the name of the new cloud: ')
     owned_clouds_dups_check = owner.owned_clouds\
         .filter_by(name=cloud_name_in)\
         .first()
-    contributed_clouds_dups_check = owner.contributed_clouds\
-        .filter_by(name=cloud_name_in)\
-        .first()
-    if (owned_clouds_dups_check is not None) \
-            or (contributed_clouds_dups_check is not None):
-        print owner.name, 'already has a cloud named', cloud_name_in
+    # contributed_clouds_dups_check = owner.contributed_clouds\
+    #     .filter_by(name=cloud_name_in)\
+    #     .first()
+    if (owned_clouds_dups_check is not None): # \
+            # or (contributed_clouds_dups_check is not None):
+        print('{} already has a cloud named {}'.format(owner.name, cloud_name_in))
         return
+
     max_size = raw_input(
         'Enter a max size for the cloud in bytes' +
         ' (leave blank to default to 4 GB(40000000000)'
     )
+
     if max_size is None or max_size is '':
         max_size = FOUR_GB
     else:
         max_size = int(max_size)
-    create_cloud(db, owner_uname, owner_pass, cloud_name_in, max_size)
+    
+    rd = create_cloud(db, owner_uname, owner_pass, cloud_name_in, max_size)
+    
     print 'Successfully created the', cloud_name_in, 'cloud for', owner_uname
 
 
 def create_cloud(db, username, password, cloudname, max_size):
+    rd = Error()
+
     owner = db.session.query(User).filter_by(username=username).first()
+    
     if (owner is None) or (not (check_password_hash(owner.password, password))):
-        raise Exception('Owner username/password combination invalid.')
+        msg = 'Owner username/password combination invalid.'
+        print(msg)
+        return Error(msg)
+        # raise Exception('Owner username/password combination invalid.')
+    
     owned_clouds_dups_check = owner.owned_clouds\
         .filter_by(name=cloudname)\
         .first()
-    contributed_clouds_dups_check = owner.contributed_clouds\
-        .filter_by(name=cloudname)\
-        .first()
-    if (owned_clouds_dups_check is not None) \
-            or (contributed_clouds_dups_check is not None):
-        raise Exception(owner.name, 'already has a cloud named', cloudname)
+    
+    # contributed_clouds_dups_check = owner.contributed_clouds\
+    #     .filter_by(name=cloudname)\
+    #     .first()
+    if (owned_clouds_dups_check is not None): # \
+            # or (contributed_clouds_dups_check is not None):
+        msg = '{} already has a cloud named {}'.format(owner.name, cloud_name_in)
+        print msg
+        return Error(msg)
+        # print('{} already has a cloud named {}'.format(owner.name, cloud_name_in))
+        # raise Exception(owner.name, 'already has a cloud named', cloudname)
 
     if max_size is None:
         max_size = FOUR_GB
