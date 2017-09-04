@@ -145,6 +145,8 @@ class Instance(object):
                 msg = 'Process already exists'
                 _log.error(msg)
                 rd = Error(msg)
+            else:
+                rd = Success()
         if rd.success:
             rd = Success(my_pid)
         return rd
