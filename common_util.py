@@ -187,6 +187,10 @@ def get_free_space_bytes(dirname):
 INFINITE_SIZE = -1
 
 
+def get_full_cloudname(uname, cname):
+    return uname + '/' + cname
+
+
 def validate_cloudname(cloudname_string):
     rd = Error()
     parts = cloudname_string.split('/')

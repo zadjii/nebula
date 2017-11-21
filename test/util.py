@@ -182,6 +182,7 @@ def create_sock_and_send(ip, port, msg):
     conn = RawConnection(host_sock)
     conn.send_obj(msg)
     return conn
+
 def get_client_session(uname, password):
     try:
         rem_sock = setup_remote_socket(REMOTE_HOST, REMOTE_PORT)

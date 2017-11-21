@@ -27,6 +27,8 @@ def make_simple_user(db, name):
     user.email = name
     user.name = name
     user.username = name.replace(' ', '-')
+    # note to future self:
+    # The password is based on the *name* e.g. 'Mike Griese' not 'Mike-Griese'
     user.password = generate_password_hash(name)
     db.session.add(user)
     return user

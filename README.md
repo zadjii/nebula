@@ -32,6 +32,14 @@ openssl req -new -x509 -nodes -sha1 -days 365 -key remote/key > remote/cert
 
 TODO: Find out how do do this w/in python.
 
+  The host will definitely need certs/keys too. I'll give the host come as well.
+
+``` bash
+openssl genrsa 1024 > host/host.key
+
+openssl req -new -x509 -nodes -sha1 -days 365 -key host/host.key > host/host.crt
+```
+
 ## Running nebula
 
 There are two different components of nebula - the "remote" and the "host".

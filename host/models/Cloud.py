@@ -63,6 +63,9 @@ class Cloud(base):
         return rd
 
     def translate_relative_path(self, rel_path):
+        # todo make sure all paths are actually relative paths.
+        if rel_path == '/':
+            return self.root_directory
         full_path = os.path.join(self.root_directory, rel_path)
         return full_path
 

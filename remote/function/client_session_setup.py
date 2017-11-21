@@ -1,5 +1,5 @@
 from uuid import uuid4
-from common_util import mylog, send_error_and_close, ResultAndData, Error, Success
+from common_util import mylog, send_error_and_close, ResultAndData, Error, Success, get_mylog
 from remote import User, Cloud, Session
 from msg_codes import *
 from messages import *
@@ -54,15 +54,16 @@ def setup_client_session(remote_obj, connection, address, msg_obj):
 def do_setup_client_session(db, username, password):
     # type: (SimpleDB, str, str) -> ResultAndData
     rd = Error()
+    _log = get_mylog()
     user = db.session.query(User).filter_by(username=username).first()
     if user is None:
         msg = 'ERR: user was none'
-        mylog(msg)
+        _log.debug(msg)
         return Error(msg)
 
     if not user.check_password(password):
         msg = 'ERR: user pass wrong'
-        mylog(msg)
+        _log.debug(msg)
         return Error(msg)
 
     # At this point, user exists, provided correct password.

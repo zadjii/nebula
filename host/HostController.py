@@ -33,6 +33,7 @@ __author__ = 'Mike'
 class HostController:
     def __init__(self, nebs_instance):
         # type: (NebsInstance) -> HostController
+
         self.active_network_obj = None
         self.active_network_thread = None
         self.active_ws_thread = None
@@ -90,12 +91,6 @@ class HostController:
             else:
                 err_msg = rd.data
                 _log.error(err_msg)
-            # ipv6_addresses = get_ipv6_list()
-            # if len(ipv6_addresses) < 1:
-            #     mylog('Couldn\'t acquire an IPv6 address')
-            # else:
-            #     self.spawn_net_thread(ipv6_addresses[0])
-            #     # local_update thread will handle the first handshake/host setup
 
             try:
                 self.do_local_updates()
@@ -107,20 +102,17 @@ class HostController:
             sys.exit()
 
     def do_local_updates(self):
-        # signal.signal(signal.CTRL_C_EVENT, self.shutdown())
         signal.signal(signal.SIGINT, self.shutdown)
         signal.signal(signal.SIGTERM, self.shutdown)
 
         # local_update_thread(self)
         self._local_update_thread = Thread(
             target=new_main_thread, args=[self]
-            # target = local_update_thread, args = [self]
         )
         self._local_update_thread.start()
         self._local_update_thread.join()
 
     def spawn_net_thread(self):
-        # _log = logging.getLogger(__name__)
         _log = get_mylog()
         if self.active_network_obj is not None:
             # todo make sure connections from the old thread get dequeue'd
@@ -148,8 +140,8 @@ class HostController:
         else:
             return None
 
-
-    def check_ipv6_changed(self, curr_ipv6):
+    @staticmethod
+    def check_ipv6_changed(curr_ipv6):
         ipv6_addresses = get_ipv6_list()
         if curr_ipv6 is None:
             if len(ipv6_addresses) > 0:
@@ -178,7 +170,6 @@ class HostController:
         # If they're fatal, they'll have thrown an exception (hopefully)
 
         return rd
-
 
     # def check_network_change(self):
     #     """
@@ -236,29 +227,6 @@ class HostController:
             self.active_network_obj.shutdown()
         self.spawn_net_thread()
         return Success()
-
-    # def change_ip(self, new_ip, clouds):
-    #     if new_ip is None:
-    #         if self.active_ipv6() is not None:
-    #             mylog('I should tell all the remotes that I\'m dead now.')  # fixme
-    #             mylog('DISCONNECTED FROM IPv6')  # fixme
-    #         # at this point, how is my active net thread connected to anything?
-    #         if self.active_network_obj is not None:
-    #             self.active_network_obj.shutdown()
-    #     else:
-    #         self.spawn_net_thread(new_ip)
-    #         for cloud in clouds:
-    #             self.send_remote_handshake(cloud)
-    #     return Success()
-
-    # def handshake_clouds(self, clouds):
-    #     mylog('Telling {}\'s remote that {}\'s at {}'.format(
-    #         [cloud.name for cloud in clouds]
-    #         , [cloud.my_id_from_remote for cloud in clouds]
-    #         , self.active_ipv6())
-    #     )
-    #     for cloud in clouds:
-    #         self.send_remote_handshake(cloud)
 
     def handshake_remotes(self):
         db = self._nebs_instance.get_db()
@@ -487,7 +455,9 @@ class HostController:
         # self.network_signal.release()
 
     def get_instance(self):
+        # type: () -> NebsInstance
         return self._nebs_instance
 
     def get_net_controller(self):
+        # type: () -> NetworkController
         return self._network_controller

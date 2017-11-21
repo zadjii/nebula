@@ -84,7 +84,8 @@ class MessageDeserializer(object):
     @staticmethod
     def decode_msg(json_string):
         _log = get_mylog()
-        _log.debug('->decoding "{}"'.format(json_string))
+        if _log is not None:
+            _log.debug('->decoding "{}"'.format(json_string))
         json_dict = json.loads(json_string)
         if 'type' not in json_dict.keys():
             raise
