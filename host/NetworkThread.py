@@ -1,5 +1,5 @@
 import socket
-
+import ssl
 from common_util import *
 from connections.RawConnection import RawConnection
 from util import mylog
@@ -16,6 +16,7 @@ from time import sleep
 
 class NetworkThread(object):
     def __init__(self, external_ip, internal_ip, host):
+        # type: (str, str, HostController) -> NetworkThread
         self._use_ipv6 = ':' in external_ip
         self.shutdown_requested = False
         self.server_sock = None  # This is the local socket for the TCP server
@@ -89,7 +90,9 @@ class NetworkThread(object):
 
     def setup_web_socket(self):
         # type: (str) -> ResultAndData
-        mylog('top of ws thread')
+        _log = get_mylog()
+        _log.debug('top of ws thread')
+        host_instance = self._host.get_instance()
         rd = self._make_internal_socket()
         if rd.success:
             self.ws_event_loop = asyncio.new_event_loop()
@@ -135,13 +138,14 @@ class NetworkThread(object):
 
             # reuse address is needed so that we can swap networks relatively
             # seamlessly. I'm not sure what side effect it may have, todo:19
-            # self.ws_coro = self.ws_event_loop.create_server(factory
-            #                                                 , ip_address
-            #                                                 , self.ws_port
-            #                                                 , reuse_address=True)
+
+            sslcontext = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+            sslcontext.load_cert_chain(host_instance.cert_file, host_instance.key_file)
+
             self.ws_coro = self.ws_event_loop.create_server(factory
                                                             , host=None, port=None
                                                             , sock=self._ws_sock
+                                                            , ssl=sslcontext
                                                             , reuse_address=True)
 
             mylog('Bound websocket to (ip, port)=({},{})'
