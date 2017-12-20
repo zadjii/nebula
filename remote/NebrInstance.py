@@ -23,8 +23,8 @@ class NebrInstance(Instance):
 
         # todo: This is a bit of a hack. Each instance should probably
         #   auto-generate a key/cert, but for now just use the default ones
-        self.key_file = os.path.join(NEBULA_ROOT, './remote/key')
-        self.cert_file = os.path.join(NEBULA_ROOT, './remote/cert')
+        self.key_file = os.path.join(NEBULA_ROOT, './remote/remote.key')
+        self.cert_file = os.path.join(NEBULA_ROOT, './remote/remote.crt')
         # self.host_ws_host = '127.0.0.1'
         # self.host_ws_port = 34567
 
@@ -41,7 +41,7 @@ class NebrInstance(Instance):
             return
 
         config = ConfigParser.RawConfigParser()
-        # TODO: After self reflection, this is dumb. Don't add [root] to the start. 
+        # TODO: After self reflection, this is dumb. Don't add [root] to the start.
         #       have that in the file itself.
         with open(conf_file) as stream:
             stream = StringIO("[root]\n" + stream.read())

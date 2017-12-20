@@ -69,3 +69,4 @@ instances/
 *.log.*
 *.crt
 *.key
+.nebulas/
