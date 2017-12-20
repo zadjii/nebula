@@ -247,10 +247,12 @@ def mirror(instance, argv):
     root = '.'
     test_enabled = False
     session_id = None
-    if len(argv) < 1:
+    if len(argv) < 7:
         mirror_usage()
         return
-    print 'mirror', argv
+
+    print('mirror args={}'.format(argv))
+
     while len(argv) > 0:
         arg = argv[0]
         args_left = len(argv)
@@ -265,7 +267,7 @@ def mirror(instance, argv):
             if args_left < 2:
                 # throw some exception
                 raise Exception('not enough args supplied to mirror')
-            port = argv[1]
+            port = int(argv[1])
             args_eaten = 2
         elif arg == '-d':
             if args_left < 2:
