@@ -7,7 +7,9 @@ from _socket import gaierror
 from threading import Thread, Event, Lock
 
 from common_util import *
+from connections.AbstractConnection import AbstractConnection
 from connections.RawConnection import RawConnection
+from host.NebsInstance import NebsInstance
 from host.NetworkController import NetworkController
 from host.NetworkThread import NetworkThread
 from host.PrivateData import PrivateData, NO_ACCESS, READ_ACCESS
@@ -18,6 +20,7 @@ from host.function.network.client import list_files_handler, \
     handle_client_add_owner, handle_client_add_contributor
 from host.function.network_updates import handle_fetch, handle_file_change
 from host.models.Cloud import Cloud
+from host.models.Remote import Remote
 from host.util import set_mylog_name, mylog, get_ipv6_list, setup_remote_socket, \
     get_client_session, permissions_are_sufficient
 from messages.RefreshMessageMessage import RefreshMessageMessage
@@ -32,7 +35,7 @@ __author__ = 'Mike'
 
 class HostController:
     def __init__(self, nebs_instance):
-        # type: (NebsInstance) -> HostController
+        # type: (NebsInstance) -> None
 
         self.active_network_obj = None
         self.active_network_thread = None
@@ -75,7 +78,7 @@ class HostController:
 
         if rd.success:
             try:
-                self._network_controller = NetworkController(self)
+                self._network_controller = NetworkController(self.get_instance())
             except Exception, e:
                 _log.error('Failed to instantiate NetworkController')
                 mylog(e.message, '31')
@@ -234,7 +237,7 @@ class HostController:
         mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
         all_mirrored_clouds = mirrored_clouds.all()
         # todo: In the future, have one Remote object in the host DB for each remote
-        # and handshake that remote once.
+        #   and handshake that remote once.
         # todo: And then update that Remote's handshake
         for cloud in all_mirrored_clouds:
             self.send_remote_handshake(cloud)
@@ -247,7 +250,10 @@ class HostController:
         # )
         remote_conn = None
         try:
-            remote_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
+            rd = setup_remote_socket(cloud)
+            if not rd.success:
+                raise Exception(rd.data)
+            remote_sock = rd.data
             remote_conn = RawConnection(remote_sock)
             msg = cloud.generate_handshake(
                 self.active_network_obj.get_external_ip()

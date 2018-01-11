@@ -5,9 +5,9 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table
 from sqlalchemy.orm import relationship, backref
 
 from common_util import INFINITE_SIZE
-from remote.models.Host import Host
 from remote.models import nebr_base as base
-
+from remote.models.Host import Host
+from remote.models.Mirror import Mirror
 
 __author__ = 'Mike'
 
@@ -51,7 +51,8 @@ class Cloud(base):
         , backref=backref('contributed_clouds', lazy='dynamic')
         , lazy='dynamic'
         )
-    hosts = relationship('Host', backref='cloud', lazy='dynamic')
+    # hosts = relationship('Host', backref='cloud', lazy='dynamic')
+    mirrors = relationship('Mirror', backref='cloud', lazy='dynamic')
     last_update = Column(DateTime)
     max_size = Column(Integer, default=INFINITE_SIZE)  # Cloud size in bytes
     privacy = Column(Integer, default=PRIVATE_CLOUD)
@@ -99,11 +100,11 @@ class Cloud(base):
             return True
 
     def active_hosts(self):
-        hosts = []
-        for host in self.hosts.all():
-            if host.is_active():
-                hosts.append(host)
-        return hosts
+        mirrors = []
+        for mirror in self.mirrors.all():
+            if mirror.is_active():
+                mirrors.append(mirror)
+        return mirrors
 
     def creator_name(self):
         # todo/fixme: this is temporary until I add uname properly to the DB
@@ -114,12 +115,15 @@ class Cloud(base):
         return self.uname()
 
     def uname(self):
+        # type: () -> str
         return self.creator.username
 
     def cname(self):
+        # type: () -> str
         return self.name
 
     def full_name(self):
+        # type: () -> str
         return '{}/{}'.format(self.uname(), self.name)
 
     def available_space(self):
@@ -127,7 +131,7 @@ class Cloud(base):
         Returns the minimum of the space available on this cloud.
         :return:
         """
-        min_host = self.hosts.order_by(Host.remaining_size).first()
+        min_host = self.mirrors.order_by(Mirror.remaining_size).first()
         min = min_host.remaining_size if min_host is not None else self.max_size
         return min
 
@@ -147,3 +151,27 @@ class Cloud(base):
         # todo: Replace this with a proper marshmallow implementation
         return json.dumps(self.to_dict())
 
+    def get_get_hosts_dict(self, active_only=False):
+        # type: (bool) -> [dict]
+        """
+        The GetHostsResponse and the GetActiveHostsResponse messages have this
+          weird array of dicts that they respond with, containing info for
+          each of the mirrors. This gets the relevant data for those messages.
+        :param active_only:
+        :return:
+        """
+        mirror_dicts = []
+        for mirror in self.mirrors:
+            if active_only and not mirror.is_active():
+                continue
+            mirror_obj = {
+                'ip': mirror.host.ip()
+                , 'port': mirror.host.port
+                , 'wsport': mirror.host.ws_port
+                , 'id': mirror.id
+                , 'update': mirror.last_update
+                , 'hndshk': mirror.last_handshake.isoformat()
+                , 'hostname': mirror.host.hostname
+            }
+            mirror_dicts.append(mirror_obj)
+        return mirror_dicts

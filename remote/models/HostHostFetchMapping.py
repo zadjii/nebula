@@ -10,8 +10,8 @@ __author__ = 'Mike'
 class HostHostFetchMapping(base):
     __tablename__ = 'hosthostfetchmapping'
     id = Column(Integer, primary_key=True)
-    new_host_id = Column(ForeignKey('host.id'))
-    old_host_id = Column(ForeignKey('host.id'))
+    new_host_id = Column(ForeignKey('mirror.id'))
+    old_host_id = Column(ForeignKey('mirror.id'))
     cloud_id = Column(ForeignKey('cloud.id'))
 
     created_on = Column(DateTime)

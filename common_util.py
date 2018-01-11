@@ -10,13 +10,11 @@ import sys
 
 NEBULA_ROOT = path.abspath(path.dirname(__file__))
 INSTANCES_ROOT = path.abspath(path.join(NEBULA_ROOT, './instances'))
-
-
+###############################################################################
+INVALID_HOST_ID = -1
 ###############################################################################
 from collections import namedtuple
 ResultAndData = namedtuple('ResultAndData', 'success, data')
-
-
 def Error(data=None):
     return ResultAndData(False, data)
 def Success(data=None):

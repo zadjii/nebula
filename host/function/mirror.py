@@ -6,13 +6,21 @@ from sys import stdin
 import platform
 from time import sleep
 
-from common_util import ResultAndData, Error, set_mylog_name
+from OpenSSL import crypto
+
+from common.SimpleDB import SimpleDB
+from common_util import *
+from connections.AbstractConnection import AbstractConnection
 from connections.RawConnection import RawConnection
 
 from host import Cloud, REMOTE_PORT
+from host.NebsInstance import NebsInstance
+from host.NetworkController import NetworkController
 from host.PrivateData import PrivateData
 from host.function.recv_files import recv_file_tree
-from host.util import check_response, setup_remote_socket, mylog, get_ipv6_list
+from host.models.Remote import Remote
+from host.util import check_response, setup_remote_socket, mylog, get_ipv6_list, lookup_remote, create_key_pair, \
+    create_cert_request, setup_ssl_socket_for_address
 from messages import *
 from msg_codes import *
 
@@ -25,110 +33,121 @@ __author__ = 'Mike'
 # because this is stupid so yea definitely combine them into one message
 
 
-def ask_remote_for_id(instance, host, port, db):
-    """This performs a code [0] message on the remote host at host:port.
-     Awaits a code[1] from the remote.
-     Creates a new Cloud for this host:port.
-     Returns a (0,cloud.id) if it successfully gets something back.
-     """
-    sslSocket = setup_remote_socket(host, port)
-    raw_conn = RawConnection(sslSocket)
-    # write_msg(make_new_host_json(HOST_PORT), sslSocket)
-    ipv6_addresses = get_ipv6_list()
-    if len(ipv6_addresses) < 1:
-        mylog('MY IPV6\'s ARE {}'.format(ipv6_addresses), '31')
-        mylog('ERR: could not find an ipv6 address for this host.'
-              ' Don\'t really know what to do...')
-        return -1, None
-    else:
-        mylog('MY IPV6\'s ARE {}'.format(ipv6_addresses), '35')
+# def ask_remote_for_id(instance, host, port, db):
+#     """This performs a code [0] message on the remote host at host:port.
+#      Awaits a code[1] from the remote.
+#      Creates a new Cloud for this host:port.
+#      Returns a (0,cloud.id) if it successfully gets something back.
+#      """
+#     sslSocket = setup_remote_socket(host, port)
+#     raw_conn = RawConnection(sslSocket)
+#     # write_msg(make_new_host_json(HOST_PORT), sslSocket)
+#     ipv6_addresses = get_ipv6_list()
+#     if len(ipv6_addresses) < 1:
+#         mylog('MY IPV6\'s ARE {}'.format(ipv6_addresses), '31')
+#         mylog('ERR: could not find an ipv6 address for this host.'
+#               ' Don\'t really know what to do...')
+#         return -1, None
+#     else:
+#         mylog('MY IPV6\'s ARE {}'.format(ipv6_addresses), '35')
+#
+#     ipv6_addr = ipv6_addresses[0]  # arbitrarily take the first one
+#
+#     # todo: I think we can take the IP out of this message.
+#     # This message is only used to create a new host model in the remote.
+#     # The host that we're going to connect to doesn't need to know this.
+#     # msg = NewHostMessage(ipv6_addr
+#     #                      , instance.host_port
+#     #                      , instance.host_ws_port
+#     #                      , platform.uname()[1])
+#     msg = NewHostMessage('0'
+#                          , 0
+#                          , 0
+#                          , platform.uname()[1])
+#     raw_conn.send_obj(msg)
+#
+#     resp_obj = raw_conn.recv_obj()
+#     check_response(ASSIGN_HOST_ID, resp_obj.type)
+#
+#     my_id = resp_obj.id
+#     mylog('Remote says my id is {}'.format(my_id))
+#     # I have no idea wtf to do with this.
+#     key = resp_obj.key
+#     mylog('Remote says my key is {}'.format(key))
+#     cert = resp_obj.cert
+#     mylog('Remote says my cert is {}'.format(cert))
+#
+#     sslSocket.close()
+#     return 0, my_id  # returning a status code as well...
+#     # I've been in kernel land too long, haven't I...
 
-    ipv6_addr = ipv6_addresses[0]  # arbitrarily take the first one
 
-    # todo: I think we can take the IP out of this message.
-    # This message is only used to create a new host model in the remote.
-    # The host that we're going to connect to doesn't need to know this.
-    # msg = NewHostMessage(ipv6_addr
-    #                      , instance.host_port
-    #                      , instance.host_ws_port
-    #                      , platform.uname()[1])
-    msg = NewHostMessage('0'
-                         , 0
-                         , 0
-                         , platform.uname()[1])
-    raw_conn.send_obj(msg)
-
-    resp_obj = raw_conn.recv_obj()
-    check_response(ASSIGN_HOST_ID, resp_obj.type)
-
-    my_id = resp_obj.id
-    mylog('Remote says my id is {}'.format(my_id))
-    # I have no idea wtf to do with this.
-    key = resp_obj.key
-    mylog('Remote says my key is {}'.format(key))
-    cert = resp_obj.cert
-    mylog('Remote says my cert is {}'.format(cert))
-
-    sslSocket.close()
-    return 0, my_id  # returning a status code as well...
-    # I've been in kernel land too long, haven't I...
-
-
-def request_cloud(cloud, test_enabled, db):
-    sslSocket = setup_remote_socket(cloud.remote_host, cloud.remote_port)
+def request_cloud(remote, cloud, test_enabled, db):
+    # type: (Remote, Cloud, bool, SimpleDB) -> ResultAndData
+    full_name = cloud.full_name()
     if test_enabled:
-        print('please enter username for {}:'.format(cloud.name))
+        print('please enter username for {}:'.format(full_name))
         username = stdin.readline()[:-1]
-        print('Enter the password for ' + cloud.name + ':')
+        print('Enter the password for {}:'.format(full_name))
         password = stdin.readline()[:-1]  # todo this is yea, bad.
     else:
-        username = raw_input('Enter the username for ' + cloud.name + ':').lower()
-        print('Enter the password for ' + cloud.name + ':')
+        username = raw_input('Enter the username for {}:'.format(full_name)).lower()
+        print('Enter the password for {}:'.format(full_name))
         password = getpass.getpass()
 
-    raw_conn = RawConnection(sslSocket)
-    msg = RequestCloudMessage(cloud.my_id_from_remote, cloud.uname(), cloud.cname(), username, password)
+    rd = remote.setup_socket()
+    if not rd.success:
+        return rd
+    raw_conn = RawConnection(rd.data)
+
+    msg = RequestCloudMessage(remote.my_id_from_remote, cloud.uname(), cloud.cname(), username, password)
     raw_conn.send_obj(msg)
 
-    # resp_obj = raw_conn.recv_obj()
-    # handle_go_retrieve(resp_obj, cloud, db)
-    return finish_request_cloud(db, raw_conn, cloud)
+    return finish_request_cloud(remote, cloud, db, raw_conn)
 
 
-def client_request_cloud(cloud, session_id, db):
-    sslSocket = setup_remote_socket(cloud.remote_host, cloud.remote_port)
-    raw_conn = RawConnection(sslSocket)
+def client_request_cloud(remote, cloud, session_id, db):
+    # type: (Remote, Cloud, str, SimpleDB) -> ResultAndData
 
-    msg = ClientMirrorMessage(session_id, cloud.my_id_from_remote, cloud.uname(), cloud.cname())
+    rd = remote.setup_socket()
+    if not rd.success:
+        return rd
+    raw_conn = RawConnection(rd.data)
+
+    msg = ClientMirrorMessage(session_id, remote.my_id_from_remote, cloud.uname(), cloud.cname())
     raw_conn.send_obj(msg)
 
-    return finish_request_cloud(db, raw_conn, cloud)
+    return finish_request_cloud(remote, cloud, db, raw_conn)
 
 
-def finish_request_cloud(db, connection, cloud):
-    # type: (SimpleDB, AbstractConnection, Cloud) -> ResultAndData
+def finish_request_cloud(remote, cloud, db, connection):
+    # type: (Remote, Cloud, SimpleDB, AbstractConnection) -> ResultAndData
     resp_obj = connection.recv_obj()
     if not resp_obj.type == GO_RETRIEVE_HERE:
         msg = 'Error while mirroring, {}'.format(resp_obj.__dict__)
         mylog(msg, '31')
         rd = ResultAndData(False, msg)
     else:
-        handle_go_retrieve(resp_obj, cloud, db)
+        handle_go_retrieve(resp_obj, remote, cloud, db)
         rd = ResultAndData(True, None)
         # attempt_wakeup()
     return rd
 
 
-def handle_go_retrieve(response, cloud, db):
-    # type: (GoRetrieveHereMessage, Cloud, SimpleDB) -> None
+def handle_go_retrieve(response, remote, cloud, db):
+    # type: (GoRetrieveHereMessage, Remote, Cloud, SimpleDB) -> None
 
     check_response(GO_RETRIEVE_HERE, response.type)
     other_address = response.ip
     other_port = response.port
-    other_id = response.id
+    requester_id = response.requester_id
+    other_id = response.other_id
     max_size = response.max_size
 
+    cloud.my_id_from_remote = requester_id
     cloud.max_size = max_size
+    db.session.add(cloud)
+    remote.clouds.append(cloud)
     db.session.commit()
 
     if other_address == '0' and other_port == 0:
@@ -174,12 +193,31 @@ def handle_go_retrieve(response, cloud, db):
     mylog('Bottom of go_retrieve')
 
 
+def complete_mirroring(db, cloud):
+    # type: (SimpleDB, Cloud) -> ResultAndData
+    _log = get_mylog()
+    rd = setup_remote_socket(cloud)
+    if rd.success:
+        new_rem_sock = rd.data
+        remote_conn = RawConnection(new_rem_sock)
+        msg = MirroringCompleteMessage(cloud.my_id_from_remote, cloud.uname(), cloud.cname())
+        remote_conn.send_obj(msg)
+
+        cloud.completed_mirroring = True
+        db.session.commit()
+
+        new_rem_sock.close()
+    else:
+        msg = 'Failed to complete_mirroring {}'.format(rd.data)
+        _log.error(msg)
+    return rd
+
+
 def attempt_wakeup(instance):
     # type: (NebsInstance) -> None
     mylog('Attempting to alert any existing nebs')
     my_addr = instance.get_existing_ip()
     port = instance.get_existing_port()
-
 
     if port is not None and my_addr is not None:
         try:
@@ -217,10 +255,56 @@ def attempt_wakeup(instance):
     # except Exception, e:
     #     mylog('Failed to alert any other hosts on this machine')
 
-def mirror_usage():
-    print 'usage: neb mirror [--test][-r address][-p port]' + \
-        '[-d root directory][cloudname]'
-    print ''
+
+def acquire_remote(instance, address, port):
+    # type: (NebsInstance, str, int) -> ResultAndData
+    _log = get_mylog()
+    db = instance.get_db()
+    net_controller = NetworkController(instance)
+    net_controller.refresh_external_ip()
+
+    new_key = create_key_pair(crypto.TYPE_RSA, 2048)
+    ip = net_controller.get_external_ip()
+    req = create_cert_request(new_key, CN=ip)
+    certificate_request_string = crypto.dump_certificate_request(crypto.FILETYPE_PEM, req)
+    message = HostMoveRequestMessage(INVALID_HOST_ID, ip, certificate_request_string)
+
+    rd = setup_ssl_socket_for_address(address, port)
+    if rd.success:
+        ssl_socket = rd.data
+        raw_conn = RawConnection(ssl_socket)
+        _log.info('Acquiring remote... (sending initial CSR for {})'.format(ip))
+        raw_conn.send_obj(message)
+        resp_obj = raw_conn.recv_obj()
+        if resp_obj.type == HOST_MOVE_RESPONSE:
+            remote = Remote()
+            remote.set_certificate(ip, resp_obj.crt)
+            remote.my_id_from_remote = resp_obj.host_id
+            remote.key = crypto.dump_privatekey(crypto.FILETYPE_PEM, new_key)
+            remote.remote_address = address
+            remote.remote_port = port
+            db.session.add(remote)
+            rd = Success(remote)
+        else:
+            msg = 'Failed to create the new host with the remote - got bad response.'
+            _log.error(msg)
+            _log.error('response was "{}"'.format(resp_obj.serialize()))
+            rd = Error(msg)
+    return rd
+
+
+def locate_remote(instance, address, port):
+    # type: (NebsInstance, str, int) -> ResultAndData
+    _log = get_mylog()
+    rd = lookup_remote(instance.get_db(), address, port)
+    if rd.success:
+        remote = rd.data
+        if remote is not None:
+            rd = Success(remote)
+        else:
+            rd = acquire_remote(instance, address, port)
+    _log.debug('Found remote for {},{}'.format(address, port))
+    return rd
 
 
 def mirror(instance, argv):
@@ -313,46 +397,46 @@ def mirror(instance, argv):
             mylog(str(e))
             return
 
+    rd = locate_remote(instance, host, port)
+    if not rd.success:
+        msg = 'Failed to locate the remote for remote address ({}, {})'.format(host, port)
+        print(msg)
+        return
+    remote = rd.data
+
     mylog('attempting to get cloud named "{}" from remote at [{}]:{} into root'
           ' directory <{}>'.format(cloudname, host, port, abs_root))
 
-    # okay, so manually decipher the FQDN if they input one.
-    # todo:30 verify that directory is empty, don't do anything if it isn't
-    # also todo:25 ^
-    status, my_id = ask_remote_for_id(instance, host, port, db)
-    if not status == 0:
-        raise Exception('Exception while mirroring:' +
-                        ' could not get ID from remote')
+    # # okay, so manually decipher the FQDN if they input one.
+    # # todo:30 verify that directory is empty, don't do anything if it isn't
+    # # also todo:25 ^
+    # status, my_id = ask_remote_for_id(instance, host, port, db)
+    # if not status == 0:
+    #     raise Exception('Exception while mirroring:' +
+    #                     ' could not get ID from remote')
+
     cloud = Cloud()
     cloud.mirrored_on = datetime.utcnow()
-    cloud.my_id_from_remote = my_id
-    cloud.remote_host = host
-    cloud.remote_port = port
-    db.session.add(cloud)
-    cloud.root_directory = abs_root
-
+    # cloud.my_id_from_remote = my_id
     cloud.name = cname
     cloud.username = uname
+    cloud.root_directory = abs_root
+    # cloud.remote_host = host
+    # cloud.remote_port = port
 
-    db.session.commit()
+    # db.session.add(cloud)
+    # remote.clouds.append(cloud)
+    # db.session.commit()
+    # At this point, the cloud is not yet in the DB.
     rd = Error()
     if session_id is None:
-        rd = request_cloud(cloud, test_enabled, db)
+        rd = request_cloud(remote, cloud, test_enabled, db)
     else:
-        rd = client_request_cloud(cloud, session_id, db)
+        rd = client_request_cloud(remote, cloud, session_id, db)
     mylog('finished requesting cloud')
 
     if rd.success:
-        # complete mirroring
-        new_rem_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
-        remote_conn = RawConnection(new_rem_sock)
-        msg = MirroringCompleteMessage(cloud.my_id_from_remote, cloud.uname(), cloud.cname())
-        remote_conn.send_obj(msg)
-
-        cloud.completed_mirroring = True
-        db.session.commit()
-
-        new_rem_sock.close()
+        rd = complete_mirroring(db, cloud)
 
     if rd.success:
         sleep(1)
@@ -363,3 +447,8 @@ def mirror(instance, argv):
 
     mylog('nebs reached bottom of mirror()')
 
+
+def mirror_usage():
+    print 'usage: neb mirror [--test][-r address][-p port]' + \
+        '[-d root directory][cloudname]'
+    print ''

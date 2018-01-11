@@ -202,7 +202,7 @@ class MessageDeserializer(object):
             _log.debug('->decoding "{}"'.format(json_string))
         json_dict = json.loads(json_string)
         if 'type' not in json_dict.keys():
-            raise
+            raise Exception()
         msg_type = json_dict['type']
         return _decoder_table[msg_type](json_dict)
 """)

@@ -69,4 +69,6 @@ from messages.ClientAddContributorMessage import ClientAddContributorMessage
 from messages.AddContributorMessage import AddContributorMessage
 from messages.AddContributorSuccessMessage import AddContributorSuccessMessage
 from messages.RefreshMessageMessage import RefreshMessageMessage
+from messages.HostMoveRequestMessage import HostMoveRequestMessage
+from messages.HostMoveResponseMessage import HostMoveResponseMessage
 

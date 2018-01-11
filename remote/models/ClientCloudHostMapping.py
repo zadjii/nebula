@@ -12,7 +12,7 @@ class ClientCloudHostMapping(base):
     id = Column(Integer, primary_key=True)
     session_id = Column(ForeignKey('session.id'))
     cloud_id = Column(ForeignKey('cloud.id'))
-    host_id = Column(ForeignKey('host.id'))
+    host_id = Column(ForeignKey('mirror.id'))
 
     def __init__(self, session, cloud, host):
         self.session_id = session.id

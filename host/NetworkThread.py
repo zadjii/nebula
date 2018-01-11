@@ -1,7 +1,12 @@
 import socket
+# from socket import *
 import ssl
+
+from OpenSSL import SSL
+
 from common_util import *
 from connections.RawConnection import RawConnection
+from host.models.Remote import Remote
 from util import mylog
 from connections.WebSocketConnection import MyBigFuckingLieServerProtocol, \
     WebsocketConnection
@@ -16,7 +21,7 @@ from time import sleep
 
 class NetworkThread(object):
     def __init__(self, external_ip, internal_ip, host):
-        # type: (str, str, HostController) -> NetworkThread
+        # type: (str, str, HostController) -> None
         self._use_ipv6 = ':' in external_ip
         self.shutdown_requested = False
         self.server_sock = None  # This is the local socket for the TCP server
@@ -46,7 +51,6 @@ class NetworkThread(object):
 
         # This lock belongs to the Host that spawned us.
         self._host = host
-        mylog('[1]NetworkThread._host={}'.format(self._host))
 
         self.setup_socket()
 
@@ -67,7 +71,6 @@ class NetworkThread(object):
                 self.server_sock.bind(sock_addr)
                 succeeded = True
                 self._port = self.server_sock.getsockname()[1]
-                mylog('[2]NetworkThread._host={}'.format(self._host))
 
                 rd = self._host.get_net_controller().create_port_mapping(self._port)
                 if rd.success:
@@ -99,27 +102,49 @@ class NetworkThread(object):
             asyncio.set_event_loop(self.ws_event_loop)
             txaio.use_asyncio()
             txaio.start_logging()
-            factory = WebSocketServerFactory(
-                u"ws://[{}]:{}".format(self._external_ip, self._ws_port)
-            )
-            factory.protocol = MyBigFuckingLieServerProtocol
-            # fixme woah this seems terrible
-            # is this a class static value that's being set to this instance? yikes
-            MyBigFuckingLieServerProtocol.net_thread = self
 
             # Create a socket for the event loop to use:
             sock_type = socket.AF_INET6 if self._use_ipv6 else socket.AF_INET
             sock_addr = (self._internal_ip, self._ws_port, 0, 0) if self._use_ipv6 else (self._internal_ip, self._ws_port)
-            self._ws_sock = socket.socket(sock_type, socket.SOCK_STREAM)
+
+            # fixme isnt this JANKY
+            remote_model = host_instance.get_db().session.query(Remote).get(1)
+            with open(host_instance.cert_file, mode='w') as f:
+                f.write(remote_model.certificate)
+            with open(host_instance.key_file, mode='w') as f:
+                f.write(remote_model.key)
+
+            context = SSL.Context(SSL.TLSv1_2_METHOD)
+            context.use_privatekey_file(host_instance.key_file)
+            context.use_certificate_file(host_instance.cert_file)
+            context.use_certificate_chain_file(host_instance.cert_file)
+
+            s = socket.socket(sock_type, socket.SOCK_STREAM)
+            s = SSL.Connection(context, s)
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            # s.settimeout(2)
+
+            # s = ssl.wrap_socket(sock=s
+            #                     , keyfile=host_instance.key_file
+            #                     , certfile=host_instance.cert_file
+            #                     , server_side=True
+            #                     , ssl_version=ssl.PROTOCOL_SSLv23
+            #                     , do_handshake_on_connect=True)
+
+            self._ws_sock = s
+            # self._ws_sock = socket.socket(sock_type, socket.SOCK_STREAM)
+            # self._ws_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
             failure_count = 0
             succeeded = False
             while not succeeded:
                 try:
-                    self._ws_sock.setsockopt(socket.SOL_SOCKET,
-                                             socket.SO_REUSEADDR, 1)
                     self._ws_sock.bind(sock_addr)
+                    _log.debug('Bound ws socket')
                     succeeded = True
+
                     self._ws_port = self._ws_sock.getsockname()[1]
+
                     rd = self._host.get_net_controller().create_port_mapping(self._ws_port)
                     if rd.success:
                         self._external_ws_port = rd.data
@@ -136,16 +161,33 @@ class NetworkThread(object):
                         raise e
                     sleep(1)
 
-            # reuse address is needed so that we can swap networks relatively
-            # seamlessly. I'm not sure what side effect it may have, todo:19
 
-            sslcontext = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
-            sslcontext.load_cert_chain(host_instance.cert_file, host_instance.key_file)
+
+            # # reuse address is needed so that we can swap networks relatively
+            # # seamlessly. I'm not sure what side effect it may have, todo:19
+            # # sslcontext = ssl.create_default_context()
+            # sslcontext = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+            # sslcontext.load_cert_chain(host_instance.cert_file, host_instance.key_file)
+            # # ssl.wrap_socket(self._ws_sock, keyfile=host_instance.key_file, certfile=host_instance.cert_file)
+            # sslcontext.wrap_socket(self._ws_sock)
+            # # sslcontext.verify_mode = ssl.VERIFY_NONE
+            # # ssl_context_factory = DefaultOpenSSLContextFactory('keys/server.key',
+            # #                                                   'keys/server.crt')
+
+
+            # ws_url = u"wss://[{}]:{}".format(self._external_ip, self._ws_port)
+            ws_url = u"wss://[{}]:{}".format(self._external_ip, self._external_ws_port)
+            _log.debug('Bound ws to {}'.format(ws_url))
+            factory = WebSocketServerFactory(ws_url)
+            factory.protocol = MyBigFuckingLieServerProtocol
+            # fixme woah this seems terrible
+            # is this a class static value that's being set to this instance? yikes
+            MyBigFuckingLieServerProtocol.net_thread = self
 
             self.ws_coro = self.ws_event_loop.create_server(factory
                                                             , host=None, port=None
                                                             , sock=self._ws_sock
-                                                            , ssl=sslcontext
+                                                            # , ssl=sslcontext
                                                             , reuse_address=True)
 
             mylog('Bound websocket to (ip, port)=({},{})'
@@ -224,12 +266,16 @@ class NetworkThread(object):
 
         mylog('ws work thread - 0')
 
-        server = self.ws_event_loop.run_until_complete(self.ws_coro)
-        mylog('[36] - ws work thread started', '36')
-
+        server = None
         try:
+            # Both of these are important to call. It apparently won't work
+            #   without both of them. Doesn't make sense, but whatever
+            server = self.ws_event_loop.run_until_complete(self.ws_coro)
+            mylog('[36] - ws work thread started', '36')
+
             mylog('ws - before run_forever')
             self.ws_event_loop.run_forever()
+
             mylog('ws run forever exited, ws server stopping')
         except KeyboardInterrupt:
             pass
@@ -238,7 +284,8 @@ class NetworkThread(object):
             mylog('THIS IS (not so) BAD', '35')
             mylog('THIS IS (not so) BAD', '34')
             mylog('THIS IS (not so) BAD', '33')
-            server.close()
+            if server:
+                server.close()
             self.ws_event_loop.close()
 
     def shutdown(self):

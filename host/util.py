@@ -3,6 +3,10 @@ import ssl
 import os
 from netifaces import interfaces, ifaddresses, AF_INET6
 # from host import Cloud
+from OpenSSL import crypto
+
+from common.SimpleDB import SimpleDB
+from host.models import FileNode
 from host.models.Client import Client
 from host.models.Cloud import Cloud
 from messages import HostVerifyClientRequestMessage
@@ -142,19 +146,44 @@ def validate_or_get_client_session(db, uuid, cloud_uname, cloud_cname):
     return rd
 
 
-def setup_remote_socket(host, port):
+def setup_ssl_socket_for_address(addr, port):
+    # type: (str, int) -> ResultAndData
+    _log = get_mylog()
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect((host, port))
-    # ipv6: 
-    # s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-    # s.connect((host, port, 0, 0))
-    # s.create_connection((host, port))
-    # TODO May want to use:
-    # socket.create_connection(address[, timeout[, source_address]])
-    # cont  instead, where address is a (host,port) tuple. It'll try and
-    # cont  auto-resolve? which would be dope.
-    sslSocket = ssl.wrap_socket(s)
-    return sslSocket
+    try:
+        s.connect((addr, port))
+        # ipv6:
+        # s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+        # s.connect((host, port, 0, 0))
+        # s.create_connection((host, port))
+        # TODO May want to use:
+        # socket.create_connection(address[, timeout[, source_address]])
+        # cont  instead, where address is a (host,port) tuple. It'll try and
+        # cont  auto-resolve? which would be dope.
+    except Exception, e:
+        err = 'Generic error establising connection to {},{}:{}'.format(addr, port, e.message)
+        _log.error(err)
+        return Error(err)
+
+    try:
+        sslSocket = ssl.wrap_socket(s)
+        return Success(sslSocket)
+    except Exception, e:
+        err = 'Error initiating SSL whewn establising connection to {},{}:{}'.format(addr, port, e.message)
+        _log.error(err)
+        return Error(err)
+
+
+def setup_remote_socket(cloud):
+    # type: (Cloud) -> ResultAndData
+    _log = get_mylog()
+    remote = cloud.remote
+    if remote is not None:
+        return remote.setup_socket()
+    err = 'Cloud [] does not have a Remote associated with it. That shouldn\'t be possible.'
+    _log.error(err)
+    return Error(err)
+
 
 def permissions_are_sufficient(permissions, requested):
     return (permissions & requested) == requested
@@ -239,3 +268,73 @@ def find_deletable_children(root, full_path, timestamp):
 
     return children
 
+
+def lookup_remote(db, remote_address, remote_port):
+    # type: (SimpleDB, str, int) -> ResultAndData
+    # type: (SimpleDB, str, int) -> ResultAndData(True, Optional[Remote])
+    # type: (SimpleDB, str, int) -> ResultAndData(False, str)
+    _log = get_mylog()
+    rd = Error()
+    from host.models.Remote import Remote
+    remotes = db.session.query(Remote)
+
+    _log.debug('All remotes:')
+    for remote in remotes.all():
+        _log.debug(remote.debug_str())
+
+    remotes = remotes.filter_by(remote_address=remote_address, remote_port=remote_port)
+    _log.debug('Matching remotes:')
+    for remote in remotes.all():
+        _log.debug(remote.debug_str())
+    print()
+
+    if remotes.count() > 1:
+        msg = 'Found more than one remote entry matching {}:{}'.format(remote_address, remote_port)
+        rd = Error(msg)
+    elif remotes.count() == 0:
+        rd = Success(None)
+    else:
+        remote = remotes.first()
+        rd = Success(remote)
+    return rd
+
+
+def create_key_pair(type, bits):
+    # type: (int, int) -> crypto.PKey
+    """
+    Create a public/private key pair.
+    Arguments: type - Key type, must be one of TYPE_RSA and TYPE_DSA
+               bits - Number of bits to use in the key
+    Returns:   The public/private key pair in a PKey object
+    """
+    pkey = crypto.PKey()
+    pkey.generate_key(type, bits)
+    return pkey
+
+
+def create_cert_request(pkey, digest="sha256", **name):
+    # type: (crypto.PKey, str, dict) -> crypto.X509Req
+    """
+    Create a certificate request.
+    Arguments: pkey   - The key to associate with the request
+               digest - Digestion method to use for signing, default is md5
+               **name - The name of the subject of the request, possible
+                        arguments are:
+                          C     - Country name
+                          ST    - State or province name
+                          L     - Locality name
+                          O     - Organization name
+                          OU    - Organizational unit name
+                          CN    - Common name
+                          emailAddress - E-mail address
+    Returns:   The certificate request in an X509Req object
+    """
+    req = crypto.X509Req()
+    subj = req.get_subject()
+
+    for (key, value) in name.items():
+        setattr(subj, key, value)
+
+    req.set_pubkey(pkey)
+    req.sign(pkey, digest)
+    return req

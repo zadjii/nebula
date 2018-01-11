@@ -16,10 +16,17 @@ __author__ = 'Mike'
 
 
 def send_updates(host_obj, db, cloud, updates):
-    mylog('[{}] has updates {}'.format(cloud.my_id_from_remote, updates))
+    _log = get_mylog()
+    _log.info('[{}] has updates {}'.format(cloud.my_id_from_remote, updates))
     # connect to remote
-    ssl_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
-    raw_connection = RawConnection(ssl_sock)
+
+    rd = setup_remote_socket(cloud)
+    if not rd.success:
+        msg = 'Failed to connect to remote: {}'.format(rd.data)
+        _log.error(msg)
+        return
+    remote_sock = rd.data
+    raw_connection = RawConnection(remote_sock)
     # get hosts list
     msg = GetActiveHostsRequestMessage(cloud.my_id_from_remote, cloud.uname(), cloud.cname())
     raw_connection.send_obj(msg)
@@ -32,7 +39,7 @@ def send_updates(host_obj, db, cloud, updates):
             continue
         update_peer(host_obj, db, cloud, host, updates)
         updated_peers += 1
-    mylog('[{}] updated {} peers'.format(cloud.my_id_from_remote, updated_peers))
+    _log.info('[{}] updated {} peers'.format(cloud.my_id_from_remote, updated_peers))
 
 
 def update_peer(host_obj, db, cloud, host, updates):

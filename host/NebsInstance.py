@@ -32,8 +32,8 @@ class NebsInstance(Instance):
 
         # todo: This is a bit of a hack. Each instance should probably
         #   auto-generate a key/cert, but for now just use the default ones
-        self.key_file = os.path.join(NEBULA_ROOT, './host/host.key')
-        self.cert_file = os.path.join(NEBULA_ROOT, './host/host.crt')
+        self.key_file = os.path.join(working_dir, './host.key')
+        self.cert_file = os.path.join(working_dir, './host.crt')
 
         self.local_debug = False
 
@@ -60,7 +60,7 @@ class NebsInstance(Instance):
             self.host_ws_port = get_from_conf(config, 'WS_PORT', self.host_ws_port)
             self.host_internal_port = get_from_conf(config, 'INTERNAL_PORT', self.host_internal_port)
             self.local_debug = get_from_conf(config, 'LOCAL_DEBUG', self.local_debug)
-            
+
             self.key_file = get_from_conf(config, 'HOST_KEY', self.key_file)
             self.cert_file = get_from_conf(config, 'HOST_CERT', self.cert_file)
 

@@ -41,11 +41,13 @@ class WebsocketConnection(AbstractConnection):
 
     def _really_bad_get_size(self):
         _log = get_mylog()
+        _log.debug('top of _really_bad_get_size')
         data = '0'
         length = 0
         while data[-1] != '{':
             length += 1
             data = self._socket.recv(length, socket.MSG_PEEK)
+            _log.debug('bad_get_size data:"{}"'.format(data))
             # print '\t\t\t bad get data length {}'.format(data)
             if length > 64:
                 _log.error('BAD_PACKET:{}'.format(self._socket.recv(64)))
@@ -123,8 +125,9 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
     def onClose(self, wasClean, code, reason):
         _log = get_mylog()
         _log.debug("WebSocket closed: (wasClean, code, reason) = ({},{},{})".format(wasClean, code, reason))
-        self._internal_client_socket.send('\0')
-        self._internal_client_socket.close()
+        if self._internal_client_socket:
+            self._internal_client_socket.send('\0')
+            self._internal_client_socket.close()
         # if self._child_thread is not None:
         #     self._child_thread.exit()
 

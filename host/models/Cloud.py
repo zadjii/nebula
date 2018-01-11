@@ -20,9 +20,11 @@ class Cloud(base):
         mirror of a cloud on a host.
     """
     id = Column(Integer, primary_key=True)
-    my_id_from_remote = Column(Integer)
+    remote_id = Column(ForeignKey('remote.id'))
+
     name = Column(String)  # cloudname
     username = Column(String)  # uname
+    my_id_from_remote = Column(Integer)
     created_on = Column(DateTime)
     mirrored_on = Column(DateTime)
 
@@ -31,9 +33,6 @@ class Cloud(base):
 
     root_directory = Column(String)
     children = relationship('FileNode', backref='cloud', lazy='dynamic')
-    # root_node = relationship('FileNode', uselist=False, backref='cloud')
-    remote_host = Column(String)
-    remote_port = Column(Integer)
     incoming_hosts = relationship('IncomingHostEntry', backref='cloud', lazy='dynamic')
     completed_mirroring = Column(Boolean, default=False)
 
@@ -55,9 +54,12 @@ class Cloud(base):
 
         rd = ResultAndData(False, None)
         try:
-            ssl_sock = setup_remote_socket(self.remote_host, self.remote_port)
-            conn = RawConnection(ssl_sock)
-            rd = ResultAndData(True, conn)
+            rd = setup_remote_socket(self)
+            if rd.success:
+                conn = RawConnection(rd.data)
+                rd = ResultAndData(True, conn)
+            else:
+                return rd
         except Exception, e:
             rd = ResultAndData(False, e)
         return rd
@@ -147,14 +149,17 @@ class Cloud(base):
             remaining_space = get_free_space_bytes('/')
         else:
             remaining_space = self.max_size - used_space
-        # mylog(platform.uname())
+
+        host_id = self.remote.my_id_from_remote
+        mirror_id = self.my_id_from_remote
+        hostname = platform.uname()[1]
         msg = HostHandshakeMessage(
-            self.my_id_from_remote,
+            mirror_id,
             ip,
             port,
             ws_port,
             0,  # todo update number/timestamp? it's in my notes
-            platform.uname()[1],  # hostname
+            hostname,  # hostname
             used_space,
             remaining_space
         )
