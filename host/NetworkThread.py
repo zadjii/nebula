@@ -3,6 +3,8 @@ import socket
 import ssl
 
 from OpenSSL import SSL
+from autobahn.twisted.resource import WebSocketResource
+from twisted.internet.ssl import ContextFactory
 
 from common_util import *
 from connections.RawConnection import RawConnection
@@ -11,12 +13,84 @@ from util import mylog
 from connections.WebSocketConnection import MyBigFuckingLieServerProtocol, \
     WebsocketConnection
 import txaio
-try:
-    import asyncio
-except ImportError:  # Trollius >= 0.3 was renamed
-    import trollius as asyncio
-from autobahn.asyncio.websocket import WebSocketServerFactory
+
+# try:
+#     import asyncio
+# except ImportError:  # Trollius >= 0.3 was renamed
+#     import trollius as asyncio
+# from autobahn.asyncio.websocket import WebSocketServerFactory
+
+from twisted.internet import reactor, ssl
+
+from autobahn.twisted.websocket import WebSocketServerFactory, WebSocketServerProtocol, listenWS
+from twisted.web.server import Site
+from twisted.web.static import File
+
 from time import sleep
+
+
+class EchoServerProtocol(WebSocketServerProtocol):
+    def __init__(self):
+        _log = get_mylog()
+        _log.debug('EchoServerProtocol.__init__')
+        super(EchoServerProtocol, self).__init__()
+
+    def onMessage(self, payload, isBinary):
+        self.sendMessage(payload, isBinary)
+
+
+class OpenSSLCertChainContextFactory(ContextFactory):
+    """
+    L{DefaultOpenSSLContextFactory} is a factory for server-side SSL context
+    objects.  These objects define certain parameters related to SSL
+    handshakes and the subsequent connection.
+
+    @ivar _contextFactory: A callable which will be used to create new
+        context objects.  This is typically L{OpenSSL.SSL.Context}.
+    """
+    _context = None
+
+    def __init__(self, privateKeyFileName, certificateChainFileName,
+                 sslmethod=SSL.SSLv23_METHOD, _contextFactory=SSL.Context):
+        """
+        @param privateKeyFileName: Name of a file containing a private key
+        @param certificateFileName: Name of a file containing a certificate
+        @param sslmethod: The SSL method to use
+        """
+        self.privateKeyFileName = privateKeyFileName
+        self.certificateChainFileName = certificateChainFileName
+        self.sslmethod = sslmethod
+        self._contextFactory = _contextFactory
+
+        # Create a context object right now.  This is to force validation of
+        # the given parameters so that errors are detected earlier rather
+        # than later.
+        self.cacheContext()
+
+    def cacheContext(self):
+        if self._context is None:
+            ctx = self._contextFactory(self.sslmethod)
+            # Disallow SSLv2!  It's insecure!  SSLv3 has been around since
+            # 1996.  It's time to move on.
+            ctx.set_options(SSL.OP_NO_SSLv2)
+            ctx.use_certificate_chain_file(self.certificateChainFileName)
+            # ctx.use_certificate_file(self.certificateFileName)
+            ctx.use_privatekey_file(self.privateKeyFileName)
+            self._context = ctx
+
+    def __getstate__(self):
+        d = self.__dict__.copy()
+        del d['_context']
+        return d
+
+    def __setstate__(self, state):
+        self.__dict__ = state
+
+    def getContext(self):
+        """
+        Return an SSL context.
+        """
+        return self._context
 
 
 class NetworkThread(object):
@@ -91,7 +165,7 @@ class NetworkThread(object):
                 sleep(1)
         mylog('Bound to ip address={}'.format(self._internal_ip))
 
-    def setup_web_socket(self):
+    def __LEGACY_setup_web_socket(self):
         # type: (str) -> ResultAndData
         _log = get_mylog()
         _log.debug('top of ws thread')
@@ -114,26 +188,7 @@ class NetworkThread(object):
             with open(host_instance.key_file, mode='w') as f:
                 f.write(remote_model.key)
 
-            context = SSL.Context(SSL.TLSv1_2_METHOD)
-            context.use_privatekey_file(host_instance.key_file)
-            context.use_certificate_file(host_instance.cert_file)
-            context.use_certificate_chain_file(host_instance.cert_file)
-
-            s = socket.socket(sock_type, socket.SOCK_STREAM)
-            s = SSL.Connection(context, s)
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            # s.settimeout(2)
-
-            # s = ssl.wrap_socket(sock=s
-            #                     , keyfile=host_instance.key_file
-            #                     , certfile=host_instance.cert_file
-            #                     , server_side=True
-            #                     , ssl_version=ssl.PROTOCOL_SSLv23
-            #                     , do_handshake_on_connect=True)
-
             self._ws_sock = s
-            # self._ws_sock = socket.socket(sock_type, socket.SOCK_STREAM)
-            # self._ws_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
             failure_count = 0
             succeeded = False
@@ -161,20 +216,6 @@ class NetworkThread(object):
                         raise e
                     sleep(1)
 
-
-
-            # # reuse address is needed so that we can swap networks relatively
-            # # seamlessly. I'm not sure what side effect it may have, todo:19
-            # # sslcontext = ssl.create_default_context()
-            # sslcontext = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
-            # sslcontext.load_cert_chain(host_instance.cert_file, host_instance.key_file)
-            # # ssl.wrap_socket(self._ws_sock, keyfile=host_instance.key_file, certfile=host_instance.cert_file)
-            # sslcontext.wrap_socket(self._ws_sock)
-            # # sslcontext.verify_mode = ssl.VERIFY_NONE
-            # # ssl_context_factory = DefaultOpenSSLContextFactory('keys/server.key',
-            # #                                                   'keys/server.crt')
-
-
             # ws_url = u"wss://[{}]:{}".format(self._external_ip, self._ws_port)
             ws_url = u"wss://[{}]:{}".format(self._external_ip, self._external_ws_port)
             _log.debug('Bound ws to {}'.format(ws_url))
@@ -192,6 +233,80 @@ class NetworkThread(object):
 
             mylog('Bound websocket to (ip, port)=({},{})'
                   .format(self._internal_ip, self._ws_port))
+
+        if not rd.success:
+            mylog('Failed to create a websocket.')
+
+        return rd
+
+    def setup_web_socket(self):
+        # type: (str) -> ResultAndData
+        _log = get_mylog()
+        _log.debug('top of ws thread')
+        host_instance = self._host.get_instance()
+        rd = self._make_internal_socket()
+        if rd.success:
+            txaio.start_logging(level='debug')
+
+            # fixme isnt this JANKY
+            remote_model = host_instance.get_db().session.query(Remote).get(1)
+            with open(host_instance.cert_file, mode='w') as f:
+                f.write(remote_model.certificate)
+            with open(host_instance.key_file, mode='w') as f:
+                f.write(remote_model.key)
+
+            self._ws_port = 0
+
+            ws_url = u"wss://[{}]:{}".format(self._external_ip, self._ws_port)
+            # ws_url = u"wss://localhost:{}".format(self._ws_port)
+
+            factory = WebSocketServerFactory(ws_url)
+            factory.protocol = MyBigFuckingLieServerProtocol
+            # factory.protocol = EchoServerProtocol
+
+            # fixme woah this seems terrible
+            # is this a class static value that's being set to this instance? yikes
+            MyBigFuckingLieServerProtocol.net_thread = self
+
+            # SSL server context: load server key and certificate
+            # We use this for both WS and Web!
+            # real_cert_path = host_instance.cert_file
+            # real_cert_path = host_instance.cert_file + '.single.crt'
+            real_cert_path = host_instance.cert_file + '.chain.crt'
+
+            _log.debug('Using {} as the host certificate'.format(real_cert_path))
+            # contextFactory = ssl.DefaultOpenSSLContextFactory(host_instance.key_file
+            contextFactory = OpenSSLCertChainContextFactory(host_instance.key_file
+                                                              # , certificateFileName=host_instance.cert_file
+                                                              , certificateChainFileName=real_cert_path
+                                                              , sslmethod=SSL.TLSv1_2_METHOD)
+            # if we just use the host cert (not the chain),
+            # Chrome complains with NET::ERR_CERT_AUTHORITY_INVALID
+
+            # ssl.DefaultOpenSSLContextFactory()
+            _log.debug('before listenWS({})'.format(ws_url))
+
+            # This is important:
+            # https://github.com/crossbario/crossbar/issues/975
+            # interface='::' is the only way to get ipv6 to work
+            listener = listenWS(factory, contextFactory, interface='::')
+            # listener = listenWS(factory, contextFactory)
+
+            self._ws_port = listener.getHost().port
+
+            # from twisted.internet.endpoints import TCP6ServerEndpoint
+            # foo = TCP6ServerEndpoint()
+
+            _log.debug('New websocket port is {}'.format(self._ws_port))
+
+            rd = self._host.get_net_controller().create_port_mapping(self._ws_port)
+            if rd.success:
+                self._external_ws_port = rd.data
+            else:
+                raise Exception(rd.data)
+            external_url = 'wss://[{}]:{}'.format(self._external_ip, self._external_ws_port)
+            _log.debug('New external WS url is "{}"'.format(external_url))
+
 
         if not rd.success:
             mylog('Failed to create a websocket.')
@@ -252,6 +367,10 @@ class NetworkThread(object):
             self.server_sock.shutdown(socket.SHUT_RDWR)
 
     def ws_work_thread(self):
+
+        _log = get_mylog()
+        _log.debug('ws_work_thread')
+        host_instance = self._host.get_instance()
         try:
             rd = self.setup_web_socket()
         except Exception, e:
@@ -265,28 +384,34 @@ class NetworkThread(object):
         self.ws_internal_server_socket.listen(5)
 
         mylog('ws work thread - 0')
+        # _log.debug(reactor.__dict__)
 
-        server = None
-        try:
-            # Both of these are important to call. It apparently won't work
-            #   without both of them. Doesn't make sense, but whatever
-            server = self.ws_event_loop.run_until_complete(self.ws_coro)
-            mylog('[36] - ws work thread started', '36')
-
-            mylog('ws - before run_forever')
-            self.ws_event_loop.run_forever()
-
-            mylog('ws run forever exited, ws server stopping')
-        except KeyboardInterrupt:
-            pass
-        finally:
-            mylog('THIS IS (not so) BAD', '36')
-            mylog('THIS IS (not so) BAD', '35')
-            mylog('THIS IS (not so) BAD', '34')
-            mylog('THIS IS (not so) BAD', '33')
-            if server:
-                server.close()
-            self.ws_event_loop.close()
+        _log.debug('before reactor.run')
+        reactor.run(installSignalHandlers=0)
+        _log.debug('after reactor.run')
+        # reactor.run(installSignalHandlers=0)
+        # _log.debug('after reactor.run')
+        # server = None
+        # try:
+        #     # Both of these are important to call. It apparently won't work
+        #     #   without both of them. Doesn't make sense, but whatever
+        #     server = self.ws_event_loop.run_until_complete(self.ws_coro)
+        #     mylog('[36] - ws work thread started', '36')
+        #
+        #     mylog('ws - before run_forever')
+        #     self.ws_event_loop.run_forever()
+        #
+        #     mylog('ws run forever exited, ws server stopping')
+        # except KeyboardInterrupt:
+        #     pass
+        # finally:
+        #     mylog('THIS IS (not so) BAD', '36')
+        #     mylog('THIS IS (not so) BAD', '35')
+        #     mylog('THIS IS (not so) BAD', '34')
+        #     mylog('THIS IS (not so) BAD', '33')
+        #     if server:
+        #         server.close()
+        #     self.ws_event_loop.close()
 
     def shutdown(self):
         self.shutdown_requested = True

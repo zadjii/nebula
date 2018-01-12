@@ -23,6 +23,7 @@
 - `NetworkThread::ws_work_thread`
     - `NetworkThread::setup_web_socket`
         - `NetworkThread::_make_internal_socket`
+            - create the localhost socket for the internal side of the WS
         - `ws_event_loop = asyncio.new_event_loop`
         - `asyncio.set_event_loop(self.ws_event_loop)`
         - Bind the socket for the websocket

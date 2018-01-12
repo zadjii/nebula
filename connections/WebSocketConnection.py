@@ -8,8 +8,8 @@ from connections.AbstractConnection import AbstractConnection
 from common_util import *
 from messages.util import get_msg_size, decode_msg_size
 from messages.MessageDeserializer import MessageDeserializer
-from autobahn.asyncio.websocket import WebSocketServerProtocol
-# from autobahn.twisted.websocket import WebSocketServerProtocol
+# from autobahn.asyncio.websocket import WebSocketServerProtocol
+from autobahn.twisted.websocket import WebSocketServerProtocol
 
 __author__ = 'Mike'
 

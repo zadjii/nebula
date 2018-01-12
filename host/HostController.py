@@ -6,6 +6,8 @@ import sys
 from _socket import gaierror
 from threading import Thread, Event, Lock
 
+from twisted.internet import reactor
+
 from common_util import *
 from connections.AbstractConnection import AbstractConnection
 from connections.RawConnection import RawConnection
@@ -105,6 +107,7 @@ class HostController:
             sys.exit()
 
     def do_local_updates(self):
+        _log = get_mylog()
         signal.signal(signal.SIGINT, self.shutdown)
         signal.signal(signal.SIGTERM, self.shutdown)
 
@@ -113,6 +116,9 @@ class HostController:
             target=new_main_thread, args=[self]
         )
         self._local_update_thread.start()
+        # _log.debug('before reactor.run')
+        # reactor.run()
+        # _log.debug('after reactor.run')
         self._local_update_thread.join()
 
     def spawn_net_thread(self):
@@ -136,6 +142,12 @@ class HostController:
             target=self.active_network_obj.ws_work_thread, args=[]
         )
         self.active_ws_thread.start()
+
+        # _log.debug('before active_network_obj.ws_work_thread()')
+        # self.active_network_obj.ws_work_thread()
+        # _log.debug('before reactor.run')
+        # reactor.run(installSignalHandlers=0)
+        # _log.debug('after reactor.run')
 
     def active_ipv6(self):
         if self.active_network_obj is not None:
