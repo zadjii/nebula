@@ -6,6 +6,8 @@ from OpenSSL import SSL
 from autobahn.twisted.resource import WebSocketResource
 from twisted.internet.ssl import ContextFactory
 
+from common.OpenSSLCertChainContextFactory import OpenSSLCertChainContextFactory
+from common.RemoteSSLContextFactory import RemoteSSLContextFactory
 from common_util import *
 from connections.RawConnection import RawConnection
 from host.models.Remote import Remote
@@ -14,89 +16,17 @@ from connections.WebSocketConnection import MyBigFuckingLieServerProtocol, \
     WebsocketConnection
 import txaio
 
-# try:
-#     import asyncio
-# except ImportError:  # Trollius >= 0.3 was renamed
-#     import trollius as asyncio
-# from autobahn.asyncio.websocket import WebSocketServerFactory
-
 from twisted.internet import reactor, ssl
 
 from autobahn.twisted.websocket import WebSocketServerFactory, WebSocketServerProtocol, listenWS
-from twisted.web.server import Site
-from twisted.web.static import File
 
 from time import sleep
-
-
-class EchoServerProtocol(WebSocketServerProtocol):
-    def __init__(self):
-        _log = get_mylog()
-        _log.debug('EchoServerProtocol.__init__')
-        super(EchoServerProtocol, self).__init__()
-
-    def onMessage(self, payload, isBinary):
-        self.sendMessage(payload, isBinary)
-
-
-class OpenSSLCertChainContextFactory(ContextFactory):
-    """
-    L{DefaultOpenSSLContextFactory} is a factory for server-side SSL context
-    objects.  These objects define certain parameters related to SSL
-    handshakes and the subsequent connection.
-
-    @ivar _contextFactory: A callable which will be used to create new
-        context objects.  This is typically L{OpenSSL.SSL.Context}.
-    """
-    _context = None
-
-    def __init__(self, privateKeyFileName, certificateChainFileName,
-                 sslmethod=SSL.SSLv23_METHOD, _contextFactory=SSL.Context):
-        """
-        @param privateKeyFileName: Name of a file containing a private key
-        @param certificateFileName: Name of a file containing a certificate
-        @param sslmethod: The SSL method to use
-        """
-        self.privateKeyFileName = privateKeyFileName
-        self.certificateChainFileName = certificateChainFileName
-        self.sslmethod = sslmethod
-        self._contextFactory = _contextFactory
-
-        # Create a context object right now.  This is to force validation of
-        # the given parameters so that errors are detected earlier rather
-        # than later.
-        self.cacheContext()
-
-    def cacheContext(self):
-        if self._context is None:
-            ctx = self._contextFactory(self.sslmethod)
-            # Disallow SSLv2!  It's insecure!  SSLv3 has been around since
-            # 1996.  It's time to move on.
-            ctx.set_options(SSL.OP_NO_SSLv2)
-            ctx.use_certificate_chain_file(self.certificateChainFileName)
-            # ctx.use_certificate_file(self.certificateFileName)
-            ctx.use_privatekey_file(self.privateKeyFileName)
-            self._context = ctx
-
-    def __getstate__(self):
-        d = self.__dict__.copy()
-        del d['_context']
-        return d
-
-    def __setstate__(self, state):
-        self.__dict__ = state
-
-    def getContext(self):
-        """
-        Return an SSL context.
-        """
-        return self._context
 
 
 class NetworkThread(object):
     def __init__(self, external_ip, internal_ip, host):
         # type: (str, str, HostController) -> None
-        self._use_ipv6 = ':' in external_ip
+        self._use_ipv6 = is_address_ipv6(external_ip)
         self.shutdown_requested = False
         self.server_sock = None  # This is the local socket for the TCP server
         self._ws_sock = None  # This is the local socket for the WS server
@@ -125,6 +55,10 @@ class NetworkThread(object):
 
         # This lock belongs to the Host that spawned us.
         self._host = host
+
+        self._ws_listener = None
+        # self.ssl_context_factory = RemoteSSLContextFactory(remote=host.get_instance().get_db().session.query(Remote).get(1))
+        self.ssl_context_factory = RemoteSSLContextFactory(host_instance=host.get_instance())
 
         self.setup_socket()
 
@@ -165,80 +99,6 @@ class NetworkThread(object):
                 sleep(1)
         mylog('Bound to ip address={}'.format(self._internal_ip))
 
-    def __LEGACY_setup_web_socket(self):
-        # type: (str) -> ResultAndData
-        _log = get_mylog()
-        _log.debug('top of ws thread')
-        host_instance = self._host.get_instance()
-        rd = self._make_internal_socket()
-        if rd.success:
-            self.ws_event_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(self.ws_event_loop)
-            txaio.use_asyncio()
-            txaio.start_logging()
-
-            # Create a socket for the event loop to use:
-            sock_type = socket.AF_INET6 if self._use_ipv6 else socket.AF_INET
-            sock_addr = (self._internal_ip, self._ws_port, 0, 0) if self._use_ipv6 else (self._internal_ip, self._ws_port)
-
-            # fixme isnt this JANKY
-            remote_model = host_instance.get_db().session.query(Remote).get(1)
-            with open(host_instance.cert_file, mode='w') as f:
-                f.write(remote_model.certificate)
-            with open(host_instance.key_file, mode='w') as f:
-                f.write(remote_model.key)
-
-            self._ws_sock = s
-
-            failure_count = 0
-            succeeded = False
-            while not succeeded:
-                try:
-                    self._ws_sock.bind(sock_addr)
-                    _log.debug('Bound ws socket')
-                    succeeded = True
-
-                    self._ws_port = self._ws_sock.getsockname()[1]
-
-                    rd = self._host.get_net_controller().create_port_mapping(self._ws_port)
-                    if rd.success:
-                        self._external_ws_port = rd.data
-                    else:
-                        raise Exception(rd.data)
-                    break
-                except socket.error, e:
-                    failure_count += 1
-                    mylog('Failed {} time(s) to bind to {}'.format(
-                        failure_count, sock_addr), '34')
-                    mylog(e.message)
-                    if failure_count > 4:
-                        self.shutdown()
-                        raise e
-                    sleep(1)
-
-            # ws_url = u"wss://[{}]:{}".format(self._external_ip, self._ws_port)
-            ws_url = u"wss://[{}]:{}".format(self._external_ip, self._external_ws_port)
-            _log.debug('Bound ws to {}'.format(ws_url))
-            factory = WebSocketServerFactory(ws_url)
-            factory.protocol = MyBigFuckingLieServerProtocol
-            # fixme woah this seems terrible
-            # is this a class static value that's being set to this instance? yikes
-            MyBigFuckingLieServerProtocol.net_thread = self
-
-            self.ws_coro = self.ws_event_loop.create_server(factory
-                                                            , host=None, port=None
-                                                            , sock=self._ws_sock
-                                                            # , ssl=sslcontext
-                                                            , reuse_address=True)
-
-            mylog('Bound websocket to (ip, port)=({},{})'
-                  .format(self._internal_ip, self._ws_port))
-
-        if not rd.success:
-            mylog('Failed to create a websocket.')
-
-        return rd
-
     def setup_web_socket(self):
         # type: (str) -> ResultAndData
         _log = get_mylog()
@@ -248,16 +108,16 @@ class NetworkThread(object):
         if rd.success:
             txaio.start_logging(level='debug')
 
-            # fixme isnt this JANKY
-            remote_model = host_instance.get_db().session.query(Remote).get(1)
-            with open(host_instance.cert_file, mode='w') as f:
-                f.write(remote_model.certificate)
-            with open(host_instance.key_file, mode='w') as f:
-                f.write(remote_model.key)
+            # # fixme isnt this JANKY
+            # remote_model = host_instance.get_db().session.query(Remote).get(1)
+            # with open(host_instance.cert_file, mode='w') as f:
+            #     f.write(remote_model.certificate)
+            # with open(host_instance.key_file, mode='w') as f:
+            #     f.write(remote_model.key)
 
             self._ws_port = 0
 
-            ws_url = u"wss://[{}]:{}".format(self._external_ip, self._ws_port)
+            ws_url = u"wss://{}".format(format_full_address(self._external_ip, self._ws_port, self.is_ipv6()))
             # ws_url = u"wss://localhost:{}".format(self._ws_port)
 
             factory = WebSocketServerFactory(ws_url)
@@ -269,30 +129,21 @@ class NetworkThread(object):
             MyBigFuckingLieServerProtocol.net_thread = self
 
             # SSL server context: load server key and certificate
-            # We use this for both WS and Web!
-            # real_cert_path = host_instance.cert_file
-            # real_cert_path = host_instance.cert_file + '.single.crt'
-            real_cert_path = host_instance.cert_file + '.chain.crt'
+            # contextFactory = OpenSSLCertChainContextFactory(host_instance.key_file
+            #                                                 , certificateChainFileName=host_instance.cert_file
+            #                                                 , sslmethod=SSL.TLSv1_2_METHOD)
 
-            _log.debug('Using {} as the host certificate'.format(real_cert_path))
-            # contextFactory = ssl.DefaultOpenSSLContextFactory(host_instance.key_file
-            contextFactory = OpenSSLCertChainContextFactory(host_instance.key_file
-                                                              # , certificateFileName=host_instance.cert_file
-                                                              , certificateChainFileName=real_cert_path
-                                                              , sslmethod=SSL.TLSv1_2_METHOD)
-            # if we just use the host cert (not the chain),
-            # Chrome complains with NET::ERR_CERT_AUTHORITY_INVALID
-
-            # ssl.DefaultOpenSSLContextFactory()
             _log.debug('before listenWS({})'.format(ws_url))
 
             # This is important:
             # https://github.com/crossbario/crossbar/issues/975
             # interface='::' is the only way to get ipv6 to work
-            listener = listenWS(factory, contextFactory, interface='::')
-            # listener = listenWS(factory, contextFactory)
+            if self.is_ipv6():
+                self._ws_listener = listenWS(factory, self.ssl_context_factory, interface='::')
+            else:
+                self._ws_listener = listenWS(factory, self.ssl_context_factory)
 
-            self._ws_port = listener.getHost().port
+            self._ws_port = self._ws_listener.getHost().port
 
             # from twisted.internet.endpoints import TCP6ServerEndpoint
             # foo = TCP6ServerEndpoint()
@@ -386,9 +237,10 @@ class NetworkThread(object):
         mylog('ws work thread - 0')
         # _log.debug(reactor.__dict__)
 
-        _log.debug('before reactor.run')
-        reactor.run(installSignalHandlers=0)
-        _log.debug('after reactor.run')
+        # _log.debug('before reactor.run')
+        # reactor.run(installSignalHandlers=0)
+        # _log.debug('after reactor.run')
+
         # reactor.run(installSignalHandlers=0)
         # _log.debug('after reactor.run')
         # server = None
@@ -415,8 +267,10 @@ class NetworkThread(object):
 
     def shutdown(self):
         self.shutdown_requested = True
-        if self.ws_event_loop is not None:
-            self.ws_event_loop.stop()
+        # if self.ws_event_loop is not None:
+        #     self.ws_event_loop.stop()
+        if self._ws_listener is not None:
+            self._ws_listener.stopListening()
         if self.ws_internal_server_socket is not None:
             self.ws_internal_server_socket.close()
         if self.server_sock is not None:

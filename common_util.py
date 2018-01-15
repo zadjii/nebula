@@ -198,3 +198,13 @@ def validate_cloudname(cloudname_string):
         if len(uname) > 0 and len(cname) > 0:
             rd = Success((parts[0], parts[1]))
     return rd
+
+
+def is_address_ipv6(address):
+    return ':' in address
+
+
+def format_full_address(address='127.0.0.1', port=0, is_ipv6=None):
+    if is_ipv6 is None:
+        is_ipv6 = is_address_ipv6(address)
+    return ('[{}]:{}' if is_ipv6 else '{}:{}').format(address, port)

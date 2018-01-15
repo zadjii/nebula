@@ -26,6 +26,9 @@ class Remote(base):
     crt_address = Column(String)
     last_cert_timestamp = Column(DateTime)
 
+    #  probably todo: should make the remote handshakes independent
+    # last_handshake = Column(DateTime)
+
     clouds = relationship('Cloud', backref='remote', lazy='dynamic')
 
     def __init__(self):

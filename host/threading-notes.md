@@ -1,5 +1,11 @@
 # Threading Breakdown
 
+This is what the threading model looked like prior to the early Janurary 2018
+  refactoring. It used asyncio to power the websocket. That for some reason
+  didn't work well with ssl, so I switched it to Twisted.
+
+- zadjii, 15 jan 2018
+
 ## Thread (0) - Main Thread
 - `HostController::start()`
     - `NetworkController::__init__()`

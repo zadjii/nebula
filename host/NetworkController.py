@@ -67,7 +67,8 @@ class NetworkController(object):
         if not rd.success:
             # try to fallback to local
             if self._host_instance.local_debug:
-                _log.debug('Falling back to local debug mode')
+                if self._using_upnp:
+                    _log.debug('Falling back to local debug mode')
                 self._using_upnp = False
                 rd = self._legacy_refresh_ip()
             else:
@@ -76,7 +77,7 @@ class NetworkController(object):
                 # and hope that we come back.
                 # TODO - Also prevent us from trying to make new outgoing connections. <---- BIG
                 rd = Error('Failed to connect to a upnp device. We should handle this gracefully.')
-        _log.debug('refresh_external_ip->RD({},{})'.format(rd.success, rd.data))
+        _log.debug('refresh_external_ip->(succeeded, changed)=({},{})'.format(rd.success, rd.data))
         return rd
 
     def _upnp_refresh_external_ip(self):
@@ -144,6 +145,9 @@ class NetworkController(object):
         try:
             external_port = bound_port
             # find a free port for the redirection
+            # TODO: If we inconvienitently started near 65536, then we won't have many ports
+            #   to search through. We should try 65000 times, starting at
+            #   external_port and looping through all of them.
             r = self._miniupnp.getspecificportmapping(external_port, 'TCP')
             while r is not None and external_port < 65536:
                 external_port += 1
