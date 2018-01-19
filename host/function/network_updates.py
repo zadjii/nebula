@@ -143,7 +143,7 @@ def handle_remove_file(host_obj, msg_obj, mirror, connection, db):
 
 
 def do_remove_file(host_obj, mirror, relative_path, db):
-    # type: (Host, Cloud, str, SimpleDB) -> ResultAndData
+    # type: (HostController, Cloud, str, SimpleDB) -> ResultAndData
     rd = Error()
     timestamp = datetime.utcnow()
     # Things to do:

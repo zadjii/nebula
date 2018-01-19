@@ -32,4 +32,10 @@ class FileNode(base):
         else:
             return os.path.join('/', self.name)
 
+    def get_mirror(self):
+        # type: () -> Cloud
+        if self.cloud is not None:
+            return self.cloud
+        else:
+            return self.parent.get_mirror()
 

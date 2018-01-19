@@ -9,7 +9,6 @@ from connections.RawConnection import RawConnection
 from host.HostController import HostController
 from host.models.FileNode import FileNode
 from host.models.Cloud import Cloud
-from host.models.Cloud import Cloud
 from host.function.network_updates import handle_remove_file
 from host.function.send_files import send_file_to_other, complete_sending_files, send_file_to_local
 from common_util import *
@@ -120,23 +119,13 @@ def local_file_create(host_obj, directory_path, dir_node, filename, db):
     filenode.name = filename
     filenode.created_on = datetime.utcfromtimestamp( file_created )
     filenode.last_modified = datetime.utcfromtimestamp( file_modified )
-    # z 17 jan 2018: Why did I comment out these lines? I think we need these...
-    # Only reason I can think of was removing the cloud attr in favor of a
-    #   method that did the lookup recursively instead of storing it per-node.
 
-    # The reason I had this commented out is because only the dildren of the
-    #   root should have this set. Otherwise, the root will think ALL nodes are
-    #   it's children. The Cloud(mirror) model only has one children
-    #   relationship, whose backref is cloud, so if you set a filenode's cloud,
-    #   then the cloud will think that filenode is a child of the root.
-    ########################
-    # if dir_node.is_root():
-    #     filenode.cloud = dir_node
-    # try:
-    #     filenode.cloud = dir_node.cloud
-    # except AttributeError:
-    #     filenode.cloud = dir_node
-    ########################
+    # DO NOT try and set the new node's `cloud` setting. If that's set, then
+    #       we'll treat that node as a child of the cloud itself - as a child of
+    #       the host.models.Cloud. That's not what we want.
+    # Appending the new filenode to the dir_node WILL work, because that will
+    #       append it to either the Cloud (if this is a child of the root)
+    #       or the FileNode correctly.
     dir_node.children.append(filenode)
     db.session.commit()
 
@@ -297,21 +286,17 @@ def recursive_local_modifications_check(host_obj, directory_path, dir_node, db):
     files = sorted(os.listdir(directory_path), key=lambda filename: filename, reverse=False)
     nodes = dir_node.children.all()
     nodes = sorted(nodes, key=lambda node: node.name, reverse=False)
-    # is_root = dir_node.is_root()
-    # mirror = None
-    # if is_root:
-    #     mirror = dir_node
-    # else:
-    #     mirror = dir_node.cloud
-    # mirror_id = mirror.my_id_from_remote
+
     i = j = 0
     num_files = len(files)
     num_nodes = len(nodes) if nodes is not None else 0
     original_total_nodes = db.session.query(FileNode).count()
     updates = []
+
     # mylog('[{}] curr children: <{}>, ({})'.format(mirror_id, files, [node.name for node in nodes]))
     # mylog('[{}] curr children parents: <{}>, ({})'.format(mirror_id, files, [node.parent.name if node.parent is not None else 'None' for node in nodes]))
-    _log.debug('Iterating over children of {}'.format(directory_path))
+    # _log.debug('Iterating over children of {}'.format(directory_path))
+
     while (i < num_files) and (j < num_nodes):
         # mylog('[{}]Iterating on <{}>, ({})'.format(mirror_id, files[i], nodes[j].name))
         if files[i] == nodes[j].name:
@@ -328,12 +313,12 @@ def recursive_local_modifications_check(host_obj, directory_path, dir_node, db):
             updates.extend(delete_updates)
             j += 1
     while i < num_files:  # create the rest of the files
-        # print 'finishing', (num_files-i), 'files'
         create_updates = local_file_create(host_obj, directory_path, dir_node, files[i], db)
         updates.extend(create_updates)
         i += 1
     # todo handle j < num_nodes, bulk end deletes
     new_num_nodes = db.session.query(FileNode).count()
+
     # if not new_num_nodes == original_total_nodes:
     #     mylog('RLM:total file nodes:{}'.format(new_num_nodes))
 
@@ -359,9 +344,7 @@ def new_main_thread(host_obj):
     mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
     num_clouds_mirrored = 0  # mirrored_clouds.count()
 
-    # current_ipv6 = host_obj.active_ipv6()
     host_obj.handshake_remotes()
-    # host_obj.handshake_clouds(mirrored_clouds.all())
 
     host_obj.acquire_lock()
     host_obj.watchdog_worker.watch_all_clouds(mirrored_clouds.all())
@@ -383,7 +366,7 @@ def new_main_thread(host_obj):
 
         mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
         all_mirrored_clouds = mirrored_clouds.all()
-        
+
         rd = host_obj.update_network_status()
         if rd.success:
             # todo: what if one of the remotes fails to handshake?

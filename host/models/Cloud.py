@@ -32,6 +32,14 @@ class Cloud(base):
     max_size = Column(Integer)  # Cloud size in bytes
 
     root_directory = Column(String)
+
+    # If you find yourself setting the cloud value of a FileNode, you're
+    #   probably doing something wrong.
+    # The only nodes that should have cloud set are ones that are children of
+    #   the root node. Otherwise, the root will think ALL nodes are
+    #   it's children. The Cloud(mirror) model only has one children
+    #   relationship, whose backref is cloud, so if you set a filenode's cloud,
+    #   then the cloud will think that filenode is a child of the root.
     children = relationship('FileNode', backref='cloud', lazy='dynamic')
     incoming_hosts = relationship('IncomingHostEntry', backref='cloud', lazy='dynamic')
     completed_mirroring = Column(Boolean, default=False)
@@ -127,6 +135,8 @@ class Cloud(base):
                 # This is a match to the current path elem. Continue on it's children.
                 pass
             else:
+                # We did not fnd a match to the current path element. The
+                #   relative path does not exist in this cloud.
                 break
 
         # curr_child is either self, or a FileNode
