@@ -9,6 +9,9 @@ class RemoteSSLContextFactory(ContextFactory):
     """
     A factory for creating SSL contexts based on information in a
     host.models.Remote object.
+
+    TODO: Use a remote object, instead of querying the host_instance's db and
+        looking up where the host instance wants to keep it's crt and key.
     """
     _context = None
 
@@ -28,12 +31,21 @@ class RemoteSSLContextFactory(ContextFactory):
         self.cacheContext()
 
     def cacheContext(self):
+        """
+        Updates the SSL context associated with this factory. The cached context
+            is reloaded with a new one using the cert and key in the first
+            remote model.
+
+        TODO: This needs to use a temporary file (or no file at all) to create
+            the SSL context.
+        :return:
+        """
         ctx = self._contextFactory(self.sslmethod)
         # Disallow SSLv2!  It's insecure!  SSLv3 has been around since
         # 1996.  It's time to move on.
         ctx.set_options(SSL.OP_NO_SSLv2)
 
-        # fixme isnt this JANKY
+        # fixme this is all sorts of TERRIBLE.
         remote_model = self.host_instance.get_db().session.query(Remote).get(1)
         with open(self.host_instance.cert_file, mode='w') as f:
             f.write(remote_model.certificate)

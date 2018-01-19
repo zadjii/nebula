@@ -18,7 +18,6 @@ from host.NetworkController import NetworkController
 from host.NetworkThread import NetworkThread
 from host.PrivateData import PrivateData, NO_ACCESS, READ_ACCESS
 from host.WatchdogThread import WatchdogWorker
-from host.function.local_updates import new_main_thread
 from host.function.network.client import list_files_handler, \
     handle_recv_file_from_client, handle_read_file_request, \
     handle_client_add_owner, handle_client_add_contributor
@@ -90,14 +89,19 @@ class HostController:
                 sys.exit(-1)
 
         if rd.success:
-            rd = self._network_controller.refresh_external_ip()
-            if rd.success:
-                connected = rd.data
-                if connected:
-                    self.spawn_net_thread()
-            else:
-                err_msg = rd.data
-                _log.error(err_msg)
+            self.update_network_status()
+            # rd = self._network_controller.refresh_external_ip()
+            # if rd.success:
+            #     connected = rd.data
+            #     if connected:
+            #         self.spawn_net_thread()
+            #         break here
+            #         # FIXME:
+            #         # The host needs to tell all the remotes that it's online here
+            #
+            # else:
+            #     err_msg = rd.data
+            #     _log.error(err_msg)
 
             try:
                 self.do_local_updates()
@@ -112,6 +116,7 @@ class HostController:
         _log = get_mylog()
         signal.signal(signal.SIGINT, self.shutdown)
         signal.signal(signal.SIGTERM, self.shutdown)
+        from host.function.local_updates import new_main_thread
 
         self._local_update_thread = Thread(
             target=new_main_thread, args=[self]
@@ -177,6 +182,7 @@ class HostController:
         :return:
         """
         db = self._nebs_instance.get_db()
+        _log = get_mylog()
         # New
         rd = self._network_controller.refresh_external_ip()
         if rd.success:
@@ -184,19 +190,19 @@ class HostController:
             if changed:
                 rd = self.change_ip()
                 if rd.success:
+                    # TODO: Right now I'm just kinda ignoring the RD's here...
+
                     # handshake remotes will send all of them our new IP/port/wsport
                     rd = self.handshake_remotes()
 
                     # Part 2:
                     # Handshake each remote once for this host.
-                    all_remotes = db.session.query(Remote).all()
-                    for remote in all_remotes:
-                        self.send_host_move(remote)
-                    self.active_net_thread_obj.ssl_context_factory.cacheContext()
+                    self.refresh_remotes()
                     if rd.success:
                         rd = Success(changed)
-                        rd.data = changed
-
+        else:
+            err_msg = rd.data
+            _log.error(err_msg)
         return rd
 
         # If these fail, we probably don't have a network anymore.
@@ -256,6 +262,21 @@ class HostController:
         for cloud in all_mirrored_clouds:
             self.send_remote_handshake(cloud)
         # map(self.send_remote_handshake, all_mirrored_clouds)
+
+        return Success()
+
+    def refresh_remotes(self):
+        """
+        Sends HostMove messages to each remote we have.
+        Also forces the ssl context(s) to refresh with the new certs we receive, if any.
+        :return:
+        """
+        db = self._nebs_instance.get_db()
+        all_remotes = db.session.query(Remote).all()
+        for remote in all_remotes:
+            self.send_host_move(remote)
+
+        self.active_net_thread_obj.ssl_context_factory.cacheContext()
 
         return Success()
 

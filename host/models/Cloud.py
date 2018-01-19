@@ -165,7 +165,8 @@ class Cloud(base):
         )
         return msg
 
-
+    def get_my_id_from_remote(self):
+        return self.my_id_from_remote
 
 
 

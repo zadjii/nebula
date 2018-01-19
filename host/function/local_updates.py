@@ -3,8 +3,13 @@ import os
 import socket
 from stat import S_ISDIR
 import time
+
+from common.SimpleDB import SimpleDB
 from connections.RawConnection import RawConnection
-from host import FileNode, Cloud
+from host.HostController import HostController
+from host.models.FileNode import FileNode
+from host.models.Cloud import Cloud
+from host.models.Cloud import Cloud
 from host.function.network_updates import handle_remove_file
 from host.function.send_files import send_file_to_other, complete_sending_files, send_file_to_local
 from common_util import *
@@ -99,6 +104,10 @@ def update_peer(host_obj, db, cloud, host, updates):
 
 
 def local_file_create(host_obj, directory_path, dir_node, filename, db):
+    # type: (HostController, str, FileNode, str, FileNode, SimpleDB) -> [(int, str)]
+    #   where (int, str): (FILE_CREATE, full_path)
+    _log = get_mylog()
+    _log.debug('Adding {} to filenode for the directory node {}'.format(filename, dir_node.name))
     # print '\t\tAdding',filename,'to filenode for',dir_node.name
     file_pathname = os.path.join(directory_path, filename)
     file_stat = os.stat(file_pathname)
@@ -111,12 +120,23 @@ def local_file_create(host_obj, directory_path, dir_node, filename, db):
     filenode.name = filename
     filenode.created_on = datetime.utcfromtimestamp( file_created )
     filenode.last_modified = datetime.utcfromtimestamp( file_modified )
+    # z 17 jan 2018: Why did I comment out these lines? I think we need these...
+    # Only reason I can think of was removing the cloud attr in favor of a
+    #   method that did the lookup recursively instead of storing it per-node.
+
+    # The reason I had this commented out is because only the dildren of the
+    #   root should have this set. Otherwise, the root will think ALL nodes are
+    #   it's children. The Cloud(mirror) model only has one children
+    #   relationship, whose backref is cloud, so if you set a filenode's cloud,
+    #   then the cloud will think that filenode is a child of the root.
+    ########################
     # if dir_node.is_root():
     #     filenode.cloud = dir_node
     # try:
     #     filenode.cloud = dir_node.cloud
     # except AttributeError:
     #     filenode.cloud = dir_node
+    ########################
     dir_node.children.append(filenode)
     db.session.commit()
 
@@ -141,6 +161,8 @@ def local_file_create(host_obj, directory_path, dir_node, filename, db):
 
 
 def local_file_update(host_obj, directory_path, dir_node, filename, filenode, db):
+    # type: (HostController, str, FileNode, str, FileNode, SimpleDB) -> [(int, str)]
+    #   where (int, str): (FILE_UPDATE, full_path)
     file_pathname = os.path.join(directory_path, filename)
     file_stat = os.stat(file_pathname)
     file_modified = datetime.utcfromtimestamp( file_stat.st_mtime)
@@ -172,8 +194,10 @@ def local_file_update(host_obj, directory_path, dir_node, filename, filenode, db
 
 
 def local_file_delete(host_obj, directory_path, dir_node, filename, filenode, db):
-    # type: (Host, str, FileNode, str, FileNode, SimpleDB) -> [(int, str)]
+    # type: (HostController, str, FileNode, str, FileNode, SimpleDB) -> [(int, str)]
     #   where (int, str): (FILE_DELETE, full_path)
+    _log = get_mylog()
+    _log.debug('Deleting {} from the directory node {}'.format(filename, dir_node.name))
     # file_pathname = os.path.join(directory_path, filename)
     file_pathname = os.path.join(directory_path, filenode.name)
     # note: filenode is always a filenode. If at all, the dir_node might
@@ -200,6 +224,7 @@ def local_file_delete(host_obj, directory_path, dir_node, filename, filenode, db
     # deletables should be in reverse BFS order, so as they are deleted they
     #   should have no children
     for full_child_path, node in deletables:
+        _log.debug('Deleting child of {} - {}()'.format(dir_node.name, node.name, full_child_path))
         db.session.delete(node)
     # This is safe even on the root filenode (Which is a Cloud object)
     # because the Cloud has children, and because we're not deleting
@@ -207,6 +232,7 @@ def local_file_delete(host_obj, directory_path, dir_node, filename, filenode, db
     # recursive_child_delete(db, filenode)
 
     # fortunately, filenode isn't ever the root of the cloud, so delete it too.
+    _log.debug('Deleting file node {} ({})'.format(filenode.name, filenode.full_path()))
     db.session.delete(filenode)
 
     # The .nebs also needs to be updated.
@@ -258,16 +284,26 @@ FILE_DELETE = 2
 
 
 def recursive_local_modifications_check(host_obj, directory_path, dir_node, db):
+    # type: (HostController, str, FileNode, SimpleDB) -> [(int, str)]
+    """
+
+    :param host_obj:
+    :param directory_path: This is the FULL, real path to the file.
+    :param dir_node:
+    :param db:
+    :return:
+    """
+    _log = get_mylog()
     files = sorted(os.listdir(directory_path), key=lambda filename: filename, reverse=False)
     nodes = dir_node.children.all()
     nodes = sorted(nodes, key=lambda node: node.name, reverse=False)
-    is_root = dir_node.is_root()
-    mirror = None
-    if is_root:
-        mirror = dir_node
-    else:
-        mirror = dir_node.cloud
-    mirror_id = mirror.my_id_from_remote
+    # is_root = dir_node.is_root()
+    # mirror = None
+    # if is_root:
+    #     mirror = dir_node
+    # else:
+    #     mirror = dir_node.cloud
+    # mirror_id = mirror.my_id_from_remote
     i = j = 0
     num_files = len(files)
     num_nodes = len(nodes) if nodes is not None else 0
@@ -275,6 +311,7 @@ def recursive_local_modifications_check(host_obj, directory_path, dir_node, db):
     updates = []
     # mylog('[{}] curr children: <{}>, ({})'.format(mirror_id, files, [node.name for node in nodes]))
     # mylog('[{}] curr children parents: <{}>, ({})'.format(mirror_id, files, [node.parent.name if node.parent is not None else 'None' for node in nodes]))
+    _log.debug('Iterating over children of {}'.format(directory_path))
     while (i < num_files) and (j < num_nodes):
         # mylog('[{}]Iterating on <{}>, ({})'.format(mirror_id, files[i], nodes[j].name))
         if files[i] == nodes[j].name:
@@ -287,8 +324,6 @@ def recursive_local_modifications_check(host_obj, directory_path, dir_node, db):
             updates.extend(create_updates)
             i += 1
         elif files[i] > nodes[j].name:  # redundant if clause, there for clarity
-            # todo handle file deletes, moves.
-            # updates.append((FILE_DELETE, nodes[j])) -> this is a problemo
             delete_updates = local_file_delete(host_obj, directory_path, dir_node, files[i], nodes[j], db)
             updates.extend(delete_updates)
             j += 1
@@ -306,6 +341,7 @@ def recursive_local_modifications_check(host_obj, directory_path, dir_node, db):
 
 
 def check_local_modifications(host_obj, cloud, db):
+    # type: (HostController, Cloud, SimpleDB) -> None
     root = cloud.root_directory
     updates = recursive_local_modifications_check(host_obj, root, cloud, db)
     if len(updates) > 0:
@@ -313,7 +349,7 @@ def check_local_modifications(host_obj, cloud, db):
 
 
 def new_main_thread(host_obj):
-    # type: (HostController) -> object
+    # type: (HostController) -> None
 
     db = host_obj.get_instance().make_db_session()
 
