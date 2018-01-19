@@ -202,31 +202,6 @@ class HostController:
         # If these fail, we probably don't have a network anymore.
         # If they're fatal, they'll have thrown an exception (hopefully)
 
-    # def check_network_change(self):
-    #     """
-    #     Checks to see if the state of the network has changed.
-    #     If it has, it tries to reconnect to the remote using the new information.
-    #     """
-    #     # OLD
-    #     rd = Success()
-    #     mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
-    #     all_mirrored_clouds = mirrored_clouds.all()
-    #     # check if out ip has changed since last update
-    #     ip_changed, new_ip = False, None
-    #     if self.is_ipv6():
-    #         ip_changed, new_ip = check_ipv6_changed(self.active_ipv6())
-    #     # mylog('Done checking IP change')
-    #     # if the ip is different, move our server over
-    #     if ip_changed:
-    #         rd = self.change_ip(new_ip, all_mirrored_clouds)
-    #         # todo: what if one of the remotes fails to handshake?
-    #         # should store the last handshake per remote
-    #         # if rd.success:
-    #         #     last_handshake = datetime.utcnow()
-    #         #     current_ipv6 = new_ip
-    #
-    #     return rd
-
     def is_shutdown_requested(self):
         return self._shutdown_requested
 

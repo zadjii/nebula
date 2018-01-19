@@ -1,25 +1,13 @@
 import socket
-# from socket import *
-import ssl
-
-from OpenSSL import SSL
-from autobahn.twisted.resource import WebSocketResource
-from twisted.internet.ssl import ContextFactory
-
-from common.OpenSSLCertChainContextFactory import OpenSSLCertChainContextFactory
 from common.RemoteSSLContextFactory import RemoteSSLContextFactory
 from common_util import *
 from connections.RawConnection import RawConnection
-from host.models.Remote import Remote
 from util import mylog
 from connections.WebSocketConnection import MyBigFuckingLieServerProtocol, \
     WebsocketConnection
 import txaio
 
-from twisted.internet import reactor, ssl
-
-from autobahn.twisted.websocket import WebSocketServerFactory, WebSocketServerProtocol, listenWS
-
+from autobahn.twisted.websocket import WebSocketServerFactory, listenWS
 from time import sleep
 
 
@@ -48,8 +36,6 @@ class NetworkThread(object):
 
         self.connection_queue = []
 
-        self.ws_event_loop = None
-        self.ws_coro = None
         self.ws_server_protocol_instance = None
         self.ws_internal_server_socket = None
 
@@ -103,35 +89,20 @@ class NetworkThread(object):
         # type: (str) -> ResultAndData
         _log = get_mylog()
         _log.debug('top of ws thread')
-        host_instance = self._host.get_instance()
         rd = self._make_internal_socket()
         if rd.success:
             txaio.start_logging(level='debug')
 
-            # # fixme isnt this JANKY
-            # remote_model = host_instance.get_db().session.query(Remote).get(1)
-            # with open(host_instance.cert_file, mode='w') as f:
-            #     f.write(remote_model.certificate)
-            # with open(host_instance.key_file, mode='w') as f:
-            #     f.write(remote_model.key)
-
             self._ws_port = 0
 
             ws_url = u"wss://{}".format(format_full_address(self._external_ip, self._ws_port, self.is_ipv6()))
-            # ws_url = u"wss://localhost:{}".format(self._ws_port)
 
             factory = WebSocketServerFactory(ws_url)
             factory.protocol = MyBigFuckingLieServerProtocol
-            # factory.protocol = EchoServerProtocol
 
             # fixme woah this seems terrible
-            # is this a class static value that's being set to this instance? yikes
+            #   is this a class static value that's being set to this instance?
             MyBigFuckingLieServerProtocol.net_thread = self
-
-            # SSL server context: load server key and certificate
-            # contextFactory = OpenSSLCertChainContextFactory(host_instance.key_file
-            #                                                 , certificateChainFileName=host_instance.cert_file
-            #                                                 , sslmethod=SSL.TLSv1_2_METHOD)
 
             _log.debug('before listenWS({})'.format(ws_url))
 
@@ -144,9 +115,6 @@ class NetworkThread(object):
                 self._ws_listener = listenWS(factory, self.ssl_context_factory)
 
             self._ws_port = self._ws_listener.getHost().port
-
-            # from twisted.internet.endpoints import TCP6ServerEndpoint
-            # foo = TCP6ServerEndpoint()
 
             _log.debug('New websocket port is {}'.format(self._ws_port))
 
@@ -218,7 +186,6 @@ class NetworkThread(object):
             self.server_sock.shutdown(socket.SHUT_RDWR)
 
     def ws_work_thread(self):
-
         _log = get_mylog()
         _log.debug('ws_work_thread')
         host_instance = self._host.get_instance()
@@ -235,40 +202,9 @@ class NetworkThread(object):
         self.ws_internal_server_socket.listen(5)
 
         mylog('ws work thread - 0')
-        # _log.debug(reactor.__dict__)
-
-        # _log.debug('before reactor.run')
-        # reactor.run(installSignalHandlers=0)
-        # _log.debug('after reactor.run')
-
-        # reactor.run(installSignalHandlers=0)
-        # _log.debug('after reactor.run')
-        # server = None
-        # try:
-        #     # Both of these are important to call. It apparently won't work
-        #     #   without both of them. Doesn't make sense, but whatever
-        #     server = self.ws_event_loop.run_until_complete(self.ws_coro)
-        #     mylog('[36] - ws work thread started', '36')
-        #
-        #     mylog('ws - before run_forever')
-        #     self.ws_event_loop.run_forever()
-        #
-        #     mylog('ws run forever exited, ws server stopping')
-        # except KeyboardInterrupt:
-        #     pass
-        # finally:
-        #     mylog('THIS IS (not so) BAD', '36')
-        #     mylog('THIS IS (not so) BAD', '35')
-        #     mylog('THIS IS (not so) BAD', '34')
-        #     mylog('THIS IS (not so) BAD', '33')
-        #     if server:
-        #         server.close()
-        #     self.ws_event_loop.close()
 
     def shutdown(self):
         self.shutdown_requested = True
-        # if self.ws_event_loop is not None:
-        #     self.ws_event_loop.stop()
         if self._ws_listener is not None:
             self._ws_listener.stopListening()
         if self.ws_internal_server_socket is not None:

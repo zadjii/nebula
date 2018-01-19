@@ -201,10 +201,12 @@ def validate_cloudname(cloudname_string):
 
 
 def is_address_ipv6(address):
+    # type: (str) -> bool
     return ':' in address
 
 
 def format_full_address(address='127.0.0.1', port=0, is_ipv6=None):
+    # type: (str, int, bool) -> str
     if is_ipv6 is None:
         is_ipv6 = is_address_ipv6(address)
     return ('[{}]:{}' if is_ipv6 else '{}:{}').format(address, port)
