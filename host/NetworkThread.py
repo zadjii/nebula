@@ -100,6 +100,8 @@ class NetworkThread(object):
             factory = WebSocketServerFactory(ws_url)
             factory.protocol = MyBigFuckingLieServerProtocol
 
+            factory.openHandshakeTimeout = 15
+            factory.closeHandshakeTimeout = 15
             # fixme woah this seems terrible
             #   is this a class static value that's being set to this instance?
             MyBigFuckingLieServerProtocol.net_thread = self

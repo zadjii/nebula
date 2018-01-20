@@ -60,6 +60,8 @@ class WebsocketConnection(AbstractConnection):
         msg_json = message_obj.serialize()
         msg_size = get_msg_size(msg_json)  # don't send length over WS
         self._ws_server_protocol.sendMessage(msg_json)
+        self._ws_server_protocol.sendPing()
+
         _log.debug('bottom of ws send_obj')
 
     def recv_next_data(self, length):
