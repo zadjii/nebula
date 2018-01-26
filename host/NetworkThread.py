@@ -12,8 +12,8 @@ from time import sleep
 
 
 class NetworkThread(object):
-    def __init__(self, external_ip, internal_ip, host):
-        # type: (str, str, HostController) -> None
+    def __init__(self, external_ip, internal_ip, host, use_ssl=False):
+        # type: (str, str, HostController, bool) -> None
         self._use_ipv6 = is_address_ipv6(external_ip)
         self.shutdown_requested = False
         self.server_sock = None  # This is the local socket for the TCP server
@@ -44,8 +44,8 @@ class NetworkThread(object):
 
         self._ws_listener = None
         # self.ssl_context_factory = RemoteSSLContextFactory(remote=host.get_instance().get_db().session.query(Remote).get(1))
-        self.ssl_context_factory = RemoteSSLContextFactory(host_instance=host.get_instance())
-
+        self._use_ssl = use_ssl
+        self.ssl_context_factory = RemoteSSLContextFactory(host_instance=host.get_instance()) if use_ssl else None
         self.setup_socket()
 
         # This V is done when the ws_work_thread is started,
@@ -95,7 +95,8 @@ class NetworkThread(object):
 
             self._ws_port = 0
 
-            ws_url = u"wss://{}".format(format_full_address(self._external_ip, self._ws_port, self.is_ipv6()))
+            ws_url = u"{}://{}".format('wss' if self._use_ssl else 'ws'
+                                       , format_full_address(self._external_ip, self._ws_port, self.is_ipv6()))
 
             factory = WebSocketServerFactory(ws_url)
             factory.protocol = MyBigFuckingLieServerProtocol
@@ -125,9 +126,9 @@ class NetworkThread(object):
                 self._external_ws_port = rd.data
             else:
                 raise Exception(rd.data)
-            external_url = 'wss://[{}]:{}'.format(self._external_ip, self._external_ws_port)
+            external_url = '{}://{}'.format(('wss' if self._use_ssl else 'ws')
+                                            , format_full_address(self._external_ip, self._ws_port, self.is_ipv6()))
             _log.debug('New external WS url is "{}"'.format(external_url))
-
 
         if not rd.success:
             mylog('Failed to create a websocket.')
@@ -243,3 +244,7 @@ class NetworkThread(object):
 
     def get_external_ws_port(self):
         return self._external_ws_port
+
+    def refresh_context(self):
+        if self.ssl_context_factory:
+            self.ssl_context_factory.cacheContext()

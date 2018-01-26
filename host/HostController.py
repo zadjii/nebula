@@ -276,7 +276,8 @@ class HostController:
         for remote in all_remotes:
             self.send_host_move(remote)
 
-        self.active_net_thread_obj.ssl_context_factory.cacheContext()
+        # self.active_net_thread_obj.ssl_context_factory.cacheContext()
+        self.active_net_thread_obj.refresh_context()
 
         return Success()
 

@@ -20,4 +20,4 @@ autobahn>=0.10.9
 trollius>=2.1
 watchdog
 netifaces
-
+pynacl
