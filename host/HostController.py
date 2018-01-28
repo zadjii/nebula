@@ -12,6 +12,7 @@ from twisted.internet import reactor
 
 from common_util import *
 from connections.AbstractConnection import AbstractConnection
+from connections.AlphaEncryptionConnection import AlphaEncryptionConnection
 from connections.RawConnection import RawConnection
 from host.NebsInstance import NebsInstance
 from host.NetworkController import NetworkController
@@ -26,12 +27,12 @@ from host.models.Cloud import Cloud
 from host.models.Remote import Remote
 from host.util import set_mylog_name, mylog, get_ipv6_list, setup_remote_socket, \
     get_client_session, permissions_are_sufficient, create_key_pair, create_cert_request
-from messages.RefreshMessageMessage import RefreshMessageMessage
-from messages import InvalidPermissionsMessage, HostMoveRequestMessage
+from messages import *
 
 from msg_codes import HOST_HOST_FETCH, HOST_FILE_PUSH, \
     STAT_FILE_REQUEST, LIST_FILES_REQUEST, CLIENT_FILE_PUT, READ_FILE_REQUEST, \
-    CLIENT_ADD_OWNER, CLIENT_ADD_CONTRIBUTOR, REFRESH_MESSAGE, HOST_MOVE_RESPONSE
+    CLIENT_ADD_OWNER, CLIENT_ADD_CONTRIBUTOR, REFRESH_MESSAGE, \
+    HOST_MOVE_RESPONSE, CLIENT_UPGRADE_CONNECTION_REQUEST
 
 __author__ = 'Mike'
 
@@ -457,7 +458,9 @@ class HostController:
             elif msg_type == HOST_FILE_PUSH:
                 # This is for HOST_FILE_TRANSFER, REMOVE_FILE. They follow HFP
                 handle_file_change(self, connection, address, msg_obj)
-            # ----------------------- C->H Messages ----------------------- #
+            elif msg_type == REFRESH_MESSAGE:
+                connection.send_obj(RefreshMessageMessage())
+            # ------------------------ C->H Messages ------------------------ #
             elif msg_type == STAT_FILE_REQUEST:
                 # todo:2 REALLY? This still isnt here? I guess list files does it...
                 pass
@@ -471,15 +474,47 @@ class HostController:
                 handle_client_add_owner(self, connection, address, msg_obj)
             elif msg_type == CLIENT_ADD_CONTRIBUTOR:
                 handle_client_add_contributor(self, connection, address, msg_obj)
-            elif msg_type == REFRESH_MESSAGE:
-                connection.send_obj(RefreshMessageMessage())
-                pass  # for now, all we need to do is wake up on this message.
+            elif msg_type == CLIENT_UPGRADE_CONNECTION_REQUEST:
+                self.handle_connection_upgrade(connection, address, msg_obj)
+                mylog('Upgraded connection')
             else:
                 mylog('I don\'t know what to do with {},\n{}'.format(msg_obj, msg_obj.__dict__))
         except Exception, e:
             sys.stderr.write(e.message)
 
         connection.close()
+
+    def handle_connection_upgrade(self, connection, address, msg_obj):
+        # type: (AbstractConnection, str, ClientUpgradeConnectionRequestMessage) -> ResultAndData
+        _log = get_mylog()
+
+        msg_type = msg_obj.type
+        if msg_type != CLIENT_UPGRADE_CONNECTION_REQUEST:
+            return Error()
+
+        upgrade_type = msg_obj.upgrade_type
+        value = msg_obj.value
+        if upgrade_type == ENABLE_ALPHA_ENCRYPTION:
+            rd = self.do_alpha_encryption_upgrade(connection, value)
+        else:
+            rd = Error()
+
+        if rd.success:
+            _log.debug('Connection successfully upgraded')
+            new_conn = rd.data
+            self.filter_func(new_conn, address)
+
+    def do_alpha_encryption_upgrade(self, connection, client_public_key_hex_string):
+        # type: (AbstractConnection, str) -> ResultAndData
+        _log = get_mylog()
+        _log.debug('initiating alpha encryption upgrade')
+        upgraded_connection = AlphaEncryptionConnection(connection, client_public_key_hex_string)
+        _log.debug('sending setup response')
+        upgraded_connection.send_setup_response()
+        _log.debug('sent upgrade response')
+
+        return Success(upgraded_connection)
+
 
     def client_access_check_or_close(self, connection, client_sid, cloud, rel_path, required_access=READ_ACCESS):
         # type: (AbstractConnection, str, Cloud, str, int) -> ResultAndData

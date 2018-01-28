@@ -13,6 +13,11 @@ INSTANCES_ROOT = path.abspath(path.join(NEBULA_ROOT, './instances'))
 ###############################################################################
 INVALID_HOST_ID = -1
 ###############################################################################
+# ClientUpgradeConnection message types:
+# This has to be updated manually, which is kinda shitty.
+# If add anything here, update socket_common.js as well.
+ENABLE_ALPHA_ENCRYPTION = 1
+###############################################################################
 from collections import namedtuple
 ResultAndData = namedtuple('ResultAndData', 'success, data')
 def Error(data=None):

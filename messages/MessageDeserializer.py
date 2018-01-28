@@ -78,6 +78,8 @@ _decoder_table = {
     , REFRESH_MESSAGE: RefreshMessageMessage.deserialize # 52
     , HOST_MOVE_REQUEST: HostMoveRequestMessage.deserialize # 53
     , HOST_MOVE_RESPONSE: HostMoveResponseMessage.deserialize # 54
+    , CLIENT_UPGRADE_CONNECTION_REQUEST: ClientUpgradeConnectionRequestMessage.deserialize # 55
+    , ENABLE_ALPHA_ENCRYPTION_RESPONSE: EnableAlphaEncryptionResponseMessage.deserialize # 56
 
 }
 

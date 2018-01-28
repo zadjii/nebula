@@ -138,6 +138,9 @@
 # R->H
 54  , HOST_MOVE_RESPONSE, int:host_id, string:crt
 
+55  , CLIENT_UPGRADE_CONNECTION_REQUEST, int:upgrade_type, blob:value
+56  , ENABLE_ALPHA_ENCRYPTION_RESPONSE, string:host_public_key
+
 ################################################################################
 #manually updated ones:
 ################################################################################

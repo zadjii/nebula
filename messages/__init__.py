@@ -71,4 +71,7 @@ from messages.AddContributorSuccessMessage import AddContributorSuccessMessage
 from messages.RefreshMessageMessage import RefreshMessageMessage
 from messages.HostMoveRequestMessage import HostMoveRequestMessage
 from messages.HostMoveResponseMessage import HostMoveResponseMessage
+from messages.ClientUpgradeConnectionRequestMessage import ClientUpgradeConnectionRequestMessage
+from messages.EnableAlphaEncryptionResponseMessage import EnableAlphaEncryptionResponseMessage
+
 
