@@ -66,17 +66,17 @@ class AlphaEncryptionConnection(AbstractConnection):
         _log = get_mylog()
 
         msg_json = message_obj.serialize()
-        _log.debug('msg_json="{}"'.format(msg_json))
-        _log.debug('payload="{}"'.format(HexEncoder.encode(msg_json)))
+        # _log.debug('msg_json="{}"'.format(msg_json))
+        # _log.debug('payload="{}"'.format(HexEncoder.encode(msg_json)))
 
         encrypted_msg = self._box.encrypt(msg_json, None)
-        _log.debug('encrypted_msg="{}"'.format(encrypted_msg))
+        # _log.debug('encrypted_msg="{}"'.format(encrypted_msg))
 
         nonce = encrypted_msg[:self._box.NONCE_SIZE]
-        _log.debug('nonce?="{}"'.format(HexEncoder.encode(nonce)))
+        # _log.debug('nonce?="{}"'.format(HexEncoder.encode(nonce)))
 
         encoded_msg = HexEncoder.encode(encrypted_msg)
-        _log.debug('encoded_msg="{}"'.format(encoded_msg))
+        # _log.debug('encoded_msg="{}"'.format(encoded_msg))
 
         self._conn.send_next_data(encoded_msg)
         # self._socket.send(get_msg_size(msg_json))
@@ -84,23 +84,23 @@ class AlphaEncryptionConnection(AbstractConnection):
 
     def recv_next_data(self, length):
         _log = get_mylog()
-        _log.debug('recv_next_data({})'.format(length))
+        # _log.debug('recv_next_data({})'.format(length))
         data = self._conn.recv_next_data(16)
         encrypted_length = int(data, 16)
 
         encrypted_packet = self._conn.recv_next_data(encrypted_length)
-        _log.debug('encrypted_packet:{}'.format(encrypted_packet))
+        # _log.debug('encrypted_packet:{}'.format(encrypted_packet))
         hex_decoded = HexEncoder.decode(encrypted_packet)
-        _log.debug('decoded ecrypted:{}'.format(hex_decoded))
+        # _log.debug('decoded ecrypted:{}'.format(hex_decoded))
         nonce = hex_decoded[:self._box.NONCE_SIZE]
         payload = hex_decoded[self._box.NONCE_SIZE:]
-        _log.debug('nonce="{}"'.format(HexEncoder.encode(nonce)))
-        _log.debug('payload="{}"'.format(HexEncoder.encode(payload)))
+        # _log.debug('nonce="{}"'.format(HexEncoder.encode(nonce)))
+        # _log.debug('payload="{}"'.format(HexEncoder.encode(payload)))
 
         decrypted_text = self._box.decrypt(encrypted_packet, None, HexEncoder)
-        _log.debug('decrypted_text="{}"'.format(decrypted_text))
-        _log.debug('decrypted_text_len="{}"'.format(len(decrypted_text)))
-        _log.debug('length="{}"'.format(length))
+        # _log.debug('decrypted_text="{}"'.format(decrypted_text))
+        # _log.debug('decrypted_text_len="{}"'.format(len(decrypted_text)))
+        # _log.debug('length="{}"'.format(length))
 
         return decrypted_text
 

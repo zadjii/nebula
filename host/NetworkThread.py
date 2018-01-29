@@ -91,7 +91,7 @@ class NetworkThread(object):
         _log.debug('top of ws thread')
         rd = self._make_internal_socket()
         if rd.success:
-            txaio.start_logging(level='debug')
+            # txaio.start_logging(level='debug')
 
             self._ws_port = 0
 
