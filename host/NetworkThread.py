@@ -1,22 +1,20 @@
 import socket
-
+from common.RemoteSSLContextFactory import RemoteSSLContextFactory
 from common_util import *
 from connections.RawConnection import RawConnection
 from util import mylog
 from connections.WebSocketConnection import MyBigFuckingLieServerProtocol, \
     WebsocketConnection
 import txaio
-try:
-    import asyncio
-except ImportError:  # Trollius >= 0.3 was renamed
-    import trollius as asyncio
-from autobahn.asyncio.websocket import WebSocketServerFactory
+
+from autobahn.twisted.websocket import WebSocketServerFactory, listenWS
 from time import sleep
 
 
 class NetworkThread(object):
-    def __init__(self, external_ip, internal_ip, host):
-        self._use_ipv6 = ':' in external_ip
+    def __init__(self, external_ip, internal_ip, host, use_ssl=False):
+        # type: (str, str, HostController, bool) -> None
+        self._use_ipv6 = is_address_ipv6(external_ip)
         self.shutdown_requested = False
         self.server_sock = None  # This is the local socket for the TCP server
         self._ws_sock = None  # This is the local socket for the WS server
@@ -38,15 +36,16 @@ class NetworkThread(object):
 
         self.connection_queue = []
 
-        self.ws_event_loop = None
-        self.ws_coro = None
         self.ws_server_protocol_instance = None
         self.ws_internal_server_socket = None
 
         # This lock belongs to the Host that spawned us.
         self._host = host
-        mylog('[1]NetworkThread._host={}'.format(self._host))
 
+        self._ws_listener = None
+        # self.ssl_context_factory = RemoteSSLContextFactory(remote=host.get_instance().get_db().session.query(Remote).get(1))
+        self._use_ssl = use_ssl
+        self.ssl_context_factory = RemoteSSLContextFactory(host_instance=host.get_instance()) if use_ssl else None
         self.setup_socket()
 
         # This V is done when the ws_work_thread is started,
@@ -66,7 +65,6 @@ class NetworkThread(object):
                 self.server_sock.bind(sock_addr)
                 succeeded = True
                 self._port = self.server_sock.getsockname()[1]
-                mylog('[2]NetworkThread._host={}'.format(self._host))
 
                 rd = self._host.get_net_controller().create_port_mapping(self._port)
                 if rd.success:
@@ -89,63 +87,48 @@ class NetworkThread(object):
 
     def setup_web_socket(self):
         # type: (str) -> ResultAndData
-        mylog('top of ws thread')
+        _log = get_mylog()
+        _log.debug('top of ws thread')
         rd = self._make_internal_socket()
         if rd.success:
-            self.ws_event_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(self.ws_event_loop)
-            txaio.use_asyncio()
-            txaio.start_logging()
-            factory = WebSocketServerFactory(
-                u"ws://[{}]:{}".format(self._external_ip, self._ws_port)
-            )
+            # txaio.start_logging(level='debug')
+
+            self._ws_port = 0
+
+            ws_url = u"{}://{}".format('wss' if self._use_ssl else 'ws'
+                                       , format_full_address(self._external_ip, self._ws_port, self.is_ipv6()))
+
+            factory = WebSocketServerFactory(ws_url)
             factory.protocol = MyBigFuckingLieServerProtocol
+
+            factory.openHandshakeTimeout = 15
+            factory.closeHandshakeTimeout = 15
             # fixme woah this seems terrible
-            # is this a class static value that's being set to this instance? yikes
+            #   is this a class static value that's being set to this instance?
             MyBigFuckingLieServerProtocol.net_thread = self
 
-            # Create a socket for the event loop to use:
-            sock_type = socket.AF_INET6 if self._use_ipv6 else socket.AF_INET
-            sock_addr = (self._internal_ip, self._ws_port, 0, 0) if self._use_ipv6 else (self._internal_ip, self._ws_port)
-            self._ws_sock = socket.socket(sock_type, socket.SOCK_STREAM)
-            failure_count = 0
-            succeeded = False
-            while not succeeded:
-                try:
-                    self._ws_sock.setsockopt(socket.SOL_SOCKET,
-                                             socket.SO_REUSEADDR, 1)
-                    self._ws_sock.bind(sock_addr)
-                    succeeded = True
-                    self._ws_port = self._ws_sock.getsockname()[1]
-                    rd = self._host.get_net_controller().create_port_mapping(self._ws_port)
-                    if rd.success:
-                        self._external_ws_port = rd.data
-                    else:
-                        raise Exception(rd.data)
-                    break
-                except socket.error, e:
-                    failure_count += 1
-                    mylog('Failed {} time(s) to bind to {}'.format(
-                        failure_count, sock_addr), '34')
-                    mylog(e.message)
-                    if failure_count > 4:
-                        self.shutdown()
-                        raise e
-                    sleep(1)
+            _log.debug('before listenWS({})'.format(ws_url))
 
-            # reuse address is needed so that we can swap networks relatively
-            # seamlessly. I'm not sure what side effect it may have, todo:19
-            # self.ws_coro = self.ws_event_loop.create_server(factory
-            #                                                 , ip_address
-            #                                                 , self.ws_port
-            #                                                 , reuse_address=True)
-            self.ws_coro = self.ws_event_loop.create_server(factory
-                                                            , host=None, port=None
-                                                            , sock=self._ws_sock
-                                                            , reuse_address=True)
+            # This is important:
+            # https://github.com/crossbario/crossbar/issues/975
+            # interface='::' is the only way to get ipv6 to work
+            if self.is_ipv6():
+                self._ws_listener = listenWS(factory, self.ssl_context_factory, interface='::')
+            else:
+                self._ws_listener = listenWS(factory, self.ssl_context_factory)
 
-            mylog('Bound websocket to (ip, port)=({},{})'
-                  .format(self._internal_ip, self._ws_port))
+            self._ws_port = self._ws_listener.getHost().port
+
+            _log.debug('New websocket port is {}'.format(self._ws_port))
+
+            rd = self._host.get_net_controller().create_port_mapping(self._ws_port)
+            if rd.success:
+                self._external_ws_port = rd.data
+            else:
+                raise Exception(rd.data)
+            external_url = '{}://{}'.format(('wss' if self._use_ssl else 'ws')
+                                            , format_full_address(self._external_ip, self._ws_port, self.is_ipv6()))
+            _log.debug('New external WS url is "{}"'.format(external_url))
 
         if not rd.success:
             mylog('Failed to create a websocket.')
@@ -206,6 +189,9 @@ class NetworkThread(object):
             self.server_sock.shutdown(socket.SHUT_RDWR)
 
     def ws_work_thread(self):
+        _log = get_mylog()
+        _log.debug('ws_work_thread')
+        host_instance = self._host.get_instance()
         try:
             rd = self.setup_web_socket()
         except Exception, e:
@@ -220,27 +206,10 @@ class NetworkThread(object):
 
         mylog('ws work thread - 0')
 
-        server = self.ws_event_loop.run_until_complete(self.ws_coro)
-        mylog('[36] - ws work thread started', '36')
-
-        try:
-            mylog('ws - before run_forever')
-            self.ws_event_loop.run_forever()
-            mylog('ws run forever exited, ws server stopping')
-        except KeyboardInterrupt:
-            pass
-        finally:
-            mylog('THIS IS (not so) BAD', '36')
-            mylog('THIS IS (not so) BAD', '35')
-            mylog('THIS IS (not so) BAD', '34')
-            mylog('THIS IS (not so) BAD', '33')
-            server.close()
-            self.ws_event_loop.close()
-
     def shutdown(self):
         self.shutdown_requested = True
-        if self.ws_event_loop is not None:
-            self.ws_event_loop.stop()
+        if self._ws_listener is not None:
+            self._ws_listener.stopListening()
         if self.ws_internal_server_socket is not None:
             self.ws_internal_server_socket.close()
         if self.server_sock is not None:
@@ -275,3 +244,7 @@ class NetworkThread(object):
 
     def get_external_ws_port(self):
         return self._external_ws_port
+
+    def refresh_context(self):
+        if self.ssl_context_factory:
+            self.ssl_context_factory.cacheContext()

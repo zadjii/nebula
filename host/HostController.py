@@ -3,38 +3,45 @@ import logging
 import os
 import signal
 import sys
+
+from OpenSSL import crypto
 from _socket import gaierror
 from threading import Thread, Event, Lock
 
+from twisted.internet import reactor
+
 from common_util import *
+from connections.AbstractConnection import AbstractConnection
+from connections.AlphaEncryptionConnection import AlphaEncryptionConnection
 from connections.RawConnection import RawConnection
+from host.NebsInstance import NebsInstance
 from host.NetworkController import NetworkController
 from host.NetworkThread import NetworkThread
 from host.PrivateData import PrivateData, NO_ACCESS, READ_ACCESS
 from host.WatchdogThread import WatchdogWorker
-from host.function.local_updates import new_main_thread
 from host.function.network.client import list_files_handler, \
     handle_recv_file_from_client, handle_read_file_request, \
     handle_client_add_owner, handle_client_add_contributor
 from host.function.network_updates import handle_fetch, handle_file_change
 from host.models.Cloud import Cloud
+from host.models.Remote import Remote
 from host.util import set_mylog_name, mylog, get_ipv6_list, setup_remote_socket, \
-    get_client_session, permissions_are_sufficient
-from messages.RefreshMessageMessage import RefreshMessageMessage
-from messages import InvalidPermissionsMessage
+    get_client_session, permissions_are_sufficient, create_key_pair, create_cert_request
+from messages import *
 
 from msg_codes import HOST_HOST_FETCH, HOST_FILE_PUSH, \
     STAT_FILE_REQUEST, LIST_FILES_REQUEST, CLIENT_FILE_PUT, READ_FILE_REQUEST, \
-    CLIENT_ADD_OWNER, CLIENT_ADD_CONTRIBUTOR, REFRESH_MESSAGE
+    CLIENT_ADD_OWNER, CLIENT_ADD_CONTRIBUTOR, REFRESH_MESSAGE, \
+    HOST_MOVE_RESPONSE, CLIENT_UPGRADE_CONNECTION_REQUEST
 
 __author__ = 'Mike'
 
 
 class HostController:
     def __init__(self, nebs_instance):
-        # type: (NebsInstance) -> HostController
+        # type: (NebsInstance) -> None
 
-        self.active_network_obj = None
+        self.active_net_thread_obj = None
         self.active_network_thread = None
         self.active_ws_thread = None
         self.network_queue = []  # all the queued connections to handle.
@@ -75,7 +82,7 @@ class HostController:
 
         if rd.success:
             try:
-                self._network_controller = NetworkController(self)
+                self._network_controller = NetworkController(self.get_instance())
             except Exception, e:
                 _log.error('Failed to instantiate NetworkController')
                 mylog(e.message, '31')
@@ -83,14 +90,19 @@ class HostController:
                 sys.exit(-1)
 
         if rd.success:
-            rd = self._network_controller.refresh_external_ip()
-            if rd.success:
-                connected = rd.data
-                if connected:
-                    self.spawn_net_thread()
-            else:
-                err_msg = rd.data
-                _log.error(err_msg)
+            self.update_network_status()
+            # rd = self._network_controller.refresh_external_ip()
+            # if rd.success:
+            #     connected = rd.data
+            #     if connected:
+            #         self.spawn_net_thread()
+            #         break here
+            #         # FIXME:
+            #         # The host needs to tell all the remotes that it's online here
+            #
+            # else:
+            #     err_msg = rd.data
+            #     _log.error(err_msg)
 
             try:
                 self.do_local_updates()
@@ -102,41 +114,45 @@ class HostController:
             sys.exit()
 
     def do_local_updates(self):
+        _log = get_mylog()
         signal.signal(signal.SIGINT, self.shutdown)
         signal.signal(signal.SIGTERM, self.shutdown)
+        from host.function.local_updates import new_main_thread
 
-        # local_update_thread(self)
         self._local_update_thread = Thread(
             target=new_main_thread, args=[self]
         )
         self._local_update_thread.start()
+        _log.debug('Before reactor.run')
+        reactor.run(installSignalHandlers=0)
+        _log.debug('After reactor.run')
         self._local_update_thread.join()
 
     def spawn_net_thread(self):
         _log = get_mylog()
-        if self.active_network_obj is not None:
+        if self.active_net_thread_obj is not None:
             # todo make sure connections from the old thread get dequeue'd
-            self.active_network_obj.shutdown()
+            self.active_net_thread_obj.shutdown()
             self._do_network_shutdown()
 
         # mylog('Spawning new server thread on {}'.format(ipv6_address))
         external_ip, internal_ip = self._network_controller.get_external_ip(), self._network_controller.get_local_ip()
         _log.info('Spawning new server thread on mapping [{}->{}]'.format(external_ip, internal_ip))
-        self.active_network_obj = NetworkThread(external_ip, internal_ip, self)
+        self.active_net_thread_obj = NetworkThread(external_ip, internal_ip, self)
 
         self.active_network_thread = Thread(
-            target=self.active_network_obj.work_thread, args=[]
+            target=self.active_net_thread_obj.work_thread, args=[]
         )
         self.active_network_thread.start()
 
         self.active_ws_thread = Thread(
-            target=self.active_network_obj.ws_work_thread, args=[]
+            target=self.active_net_thread_obj.ws_work_thread, args=[]
         )
         self.active_ws_thread.start()
 
     def active_ipv6(self):
-        if self.active_network_obj is not None:
-            return self.active_network_obj.ipv6_address
+        if self.active_net_thread_obj is not None:
+            return self.active_net_thread_obj.ipv6_address
         else:
             return None
 
@@ -157,44 +173,41 @@ class HostController:
             return True, new_addr
 
     def update_network_status(self):
+        """
+        Check the status of the network. If the network controller indicates
+          that the network status has changed (our IP is different now), then
+          we're going to send a handshake to each of the remotes.
+        Called by:
+        `new_main_thread`, near the top of the loop, before checking for local
+          updates.
+        :return:
+        """
+        db = self._nebs_instance.get_db()
+        _log = get_mylog()
         # New
         rd = self._network_controller.refresh_external_ip()
         if rd.success:
             changed = rd.data
             if changed:
                 rd = self.change_ip()
-        if rd.success:
-            # handshake remotes will send all of them our new IP/port/wsport
-            rd = self.handshake_remotes()
-        # If these fail, we probably don't have a network anymore.
-        # If they're fatal, they'll have thrown an exception (hopefully)
+                if rd.success:
+                    # TODO: Right now I'm just kinda ignoring the RD's here...
 
+                    # handshake remotes will send all of them our new IP/port/wsport
+                    rd = self.handshake_remotes()
+
+                    # Part 2:
+                    # Handshake each remote once for this host.
+                    self.refresh_remotes()
+                    if rd.success:
+                        rd = Success(changed)
+        else:
+            err_msg = rd.data
+            _log.error(err_msg)
         return rd
 
-    # def check_network_change(self):
-    #     """
-    #     Checks to see if the state of the network has changed.
-    #     If it has, it tries to reconnect to the remote using the new information.
-    #     """
-    #     # OLD
-    #     rd = Success()
-    #     mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
-    #     all_mirrored_clouds = mirrored_clouds.all()
-    #     # check if out ip has changed since last update
-    #     ip_changed, new_ip = False, None
-    #     if self.is_ipv6():
-    #         ip_changed, new_ip = check_ipv6_changed(self.active_ipv6())
-    #     # mylog('Done checking IP change')
-    #     # if the ip is different, move our server over
-    #     if ip_changed:
-    #         rd = self.change_ip(new_ip, all_mirrored_clouds)
-    #         # todo: what if one of the remotes fails to handshake?
-    #         # should store the last handshake per remote
-    #         # if rd.success:
-    #         #     last_handshake = datetime.utcnow()
-    #         #     current_ipv6 = new_ip
-    #
-    #     return rd
+        # If these fail, we probably don't have a network anymore.
+        # If they're fatal, they'll have thrown an exception (hopefully)
 
     def is_shutdown_requested(self):
         return self._shutdown_requested
@@ -214,8 +227,8 @@ class HostController:
             self._nebs_instance.shutdown()
 
     def _do_network_shutdown(self):
-        if self.active_network_obj is not None:
-            self.active_network_obj.shutdown()
+        if self.active_net_thread_obj is not None:
+            self.active_net_thread_obj.shutdown()
         # TODO make sure to kill these threads too.
         if self.active_network_thread is not None:
             pass
@@ -223,36 +236,73 @@ class HostController:
             pass
 
     def change_ip(self):
-        if self.active_network_obj is not None:
-            self.active_network_obj.shutdown()
+        if self.active_net_thread_obj is not None:
+            self.active_net_thread_obj.shutdown()
         self.spawn_net_thread()
         return Success()
 
     def handshake_remotes(self):
+        """
+        Sends HostHandshakeMessages to the remote for each mirror on this host.
+        Called by:
+        `HostController::update_network_status`, if our IP changed we handshake all remotes.
+        `new_new_main_thread`, if the number of mirrors has changed
+        `new_new_main_thread`, if it's been 30s since the last handshake
+        :return:
+        """
         db = self._nebs_instance.get_db()
 
+        # Part 1: Legacy
+        # Handshake the remote for each mirror on this host.
+        # This does not update our cert, or really our IP.
+        # todo: In the future, have one Remote object in the host DB for each remote
+        #   and handshake that remote once.
+        # todo: And then update that Remote's handshake
         mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
         all_mirrored_clouds = mirrored_clouds.all()
-        # todo: In the future, have one Remote object in the host DB for each remote
-        # and handshake that remote once.
-        # todo: And then update that Remote's handshake
         for cloud in all_mirrored_clouds:
             self.send_remote_handshake(cloud)
         # map(self.send_remote_handshake, all_mirrored_clouds)
+
+        return Success()
+
+    def refresh_remotes(self):
+        """
+        Sends HostMove messages to each remote we have.
+        Also forces the ssl context(s) to refresh with the new certs we receive, if any.
+        :return:
+        """
+        db = self._nebs_instance.get_db()
+        all_remotes = db.session.query(Remote).all()
+        for remote in all_remotes:
+            self.send_host_move(remote)
+
+        # self.active_net_thread_obj.ssl_context_factory.cacheContext()
+        self.active_net_thread_obj.refresh_context()
+
         return Success()
 
     def send_remote_handshake(self, cloud):
+        """
+        Sends a single HostHandshake message to a remote for the given Mirror on this host.
+        Called by `handshake_remotes`
+        :param cloud:
+        :return:
+        """
         # mylog('Telling {}\'s remote that [{}]\'s at {}'.format(
         #     cloud.name, cloud.my_id_from_remote, self.active_ipv6())
         # )
         remote_conn = None
         try:
-            remote_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
+            rd = setup_remote_socket(cloud)
+            if not rd.success:
+                raise Exception(rd.data)
+            remote_sock = rd.data
             remote_conn = RawConnection(remote_sock)
             msg = cloud.generate_handshake(
-                self.active_network_obj.get_external_ip()
-                , self.active_network_obj.get_external_port()
-                , self.active_network_obj.get_external_ws_port()
+                self.active_net_thread_obj.get_external_ip()
+                , self.active_net_thread_obj.get_external_port()
+                , self.active_net_thread_obj.get_external_ws_port()
             )
 
             remote_conn.send_obj(msg)
@@ -274,10 +324,40 @@ class HostController:
             if remote_conn is not None:
                 remote_conn.close()
 
+    def send_host_move(self, remote):
+        # type: (Remote) -> ResultAndData
+        _log = get_mylog()
+        db = self._nebs_instance.get_db()
+
+        new_key = create_key_pair(crypto.TYPE_RSA, 2048)
+        ip = self._network_controller.get_external_ip()
+        req = create_cert_request(new_key, CN=ip)
+        certificate_request_string = crypto.dump_certificate_request(crypto.FILETYPE_PEM, req)
+        message = HostMoveRequestMessage(remote.my_id_from_remote, ip, certificate_request_string)
+        rd = remote.setup_socket()
+        if rd.success:
+            ssl_socket = rd.data
+            raw_conn = RawConnection(ssl_socket)
+            _log.info('Host [{}] is moving to new address "{}"'.format(remote.my_id_from_remote, ip))
+            raw_conn.send_obj(message)
+            resp_obj = raw_conn.recv_obj()
+            if resp_obj.type == HOST_MOVE_RESPONSE:
+                remote.set_certificate(ip, resp_obj.crt)
+                remote.my_id_from_remote = resp_obj.host_id
+                remote.key = crypto.dump_privatekey(crypto.FILETYPE_PEM, new_key)
+                db.session.add(remote)
+                rd = Success(remote)
+            else:
+                msg = 'Failed to move the host on the remote - got bad response.'
+                _log.error(msg)
+                _log.error('response was "{}"'.format(resp_obj.serialize()))
+                rd = Error(msg)
+        return rd
+
     def process_connections(self):
-        num_conns = len(self.active_network_obj.connection_queue)
+        num_conns = len(self.active_net_thread_obj.connection_queue)
         while num_conns > 0:
-            (conn, addr) = self.active_network_obj.connection_queue.pop(0)
+            (conn, addr) = self.active_net_thread_obj.connection_queue.pop(0)
             # for (conn, addr) in self.active_network_obj.connection_queue[:]:
             try:
                 self.filter_func(conn, addr)
@@ -288,7 +368,7 @@ class HostController:
             mylog('processed {} from {}'.format(conn.__class__, addr))
 
     def is_ipv6(self):
-        return self.active_network_obj.is_ipv6()
+        return self.active_net_thread_obj.is_ipv6()
 
     def has_private_data(self, cloud):
         return cloud.my_id_from_remote in self._private_data
@@ -378,7 +458,9 @@ class HostController:
             elif msg_type == HOST_FILE_PUSH:
                 # This is for HOST_FILE_TRANSFER, REMOVE_FILE. They follow HFP
                 handle_file_change(self, connection, address, msg_obj)
-            # ----------------------- C->H Messages ----------------------- #
+            elif msg_type == REFRESH_MESSAGE:
+                connection.send_obj(RefreshMessageMessage())
+            # ------------------------ C->H Messages ------------------------ #
             elif msg_type == STAT_FILE_REQUEST:
                 # todo:2 REALLY? This still isnt here? I guess list files does it...
                 pass
@@ -392,15 +474,55 @@ class HostController:
                 handle_client_add_owner(self, connection, address, msg_obj)
             elif msg_type == CLIENT_ADD_CONTRIBUTOR:
                 handle_client_add_contributor(self, connection, address, msg_obj)
-            elif msg_type == REFRESH_MESSAGE:
-                connection.send_obj(RefreshMessageMessage())
-                pass  # for now, all we need to do is wake up on this message.
+            elif msg_type == CLIENT_UPGRADE_CONNECTION_REQUEST:
+                self.handle_connection_upgrade(connection, address, msg_obj)
+                mylog('Upgraded connection')
             else:
                 mylog('I don\'t know what to do with {},\n{}'.format(msg_obj, msg_obj.__dict__))
         except Exception, e:
             sys.stderr.write(e.message)
 
         connection.close()
+
+    def handle_connection_upgrade(self, connection, address, msg_obj):
+        # type: (AbstractConnection, str, ClientUpgradeConnectionRequestMessage) -> ResultAndData
+        """
+        Process a ClientUpgradeConnectionRequestMessage. These are messages that
+            cause a change in how data is processed from the connection. Another
+            message will be handled with the upgraded connection.
+        :param connection:
+        :param address:
+        :param msg_obj:
+        :return:
+        """
+        _log = get_mylog()
+
+        msg_type = msg_obj.type
+        if msg_type != CLIENT_UPGRADE_CONNECTION_REQUEST:
+            return Error('handle_connection_upgrade without CLIENT_UPGRADE_CONNECTION_REQUEST')
+
+        upgrade_type = msg_obj.upgrade_type
+        value = msg_obj.value
+        if upgrade_type == ENABLE_ALPHA_ENCRYPTION:
+            rd = self.do_alpha_encryption_upgrade(connection, value)
+        else:
+            rd = Error('Unknown upgrade type {}'.format(upgrade_type))
+
+        if rd.success:
+            _log.debug('Connection successfully upgraded')
+            new_conn = rd.data
+            self.filter_func(new_conn, address)
+
+    def do_alpha_encryption_upgrade(self, connection, client_public_key_hex_string):
+        # type: (AbstractConnection, str) -> ResultAndData
+        _log = get_mylog()
+        _log.debug('initiating alpha encryption upgrade')
+        upgraded_connection = AlphaEncryptionConnection(connection, client_public_key_hex_string)
+        upgraded_connection.send_setup_response()
+        _log.debug('sent upgrade response')
+
+        return Success(upgraded_connection)
+
 
     def client_access_check_or_close(self, connection, client_sid, cloud, rel_path, required_access=READ_ACCESS):
         # type: (AbstractConnection, str, Cloud, str, int) -> ResultAndData

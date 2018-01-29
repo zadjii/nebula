@@ -3,10 +3,13 @@ import logging
 import socket
 from datetime import datetime
 
-from OpenSSL import SSL
+from OpenSSL import SSL, crypto
+from OpenSSL.crypto import X509Extension
 from werkzeug.security import generate_password_hash
 
+from common.SimpleDB import SimpleDB
 from common_util import *
+from connections.AbstractConnection import AbstractConnection
 from connections.RawConnection import RawConnection
 from messages import *
 from msg_codes import *
@@ -18,6 +21,7 @@ from remote.function.client_session_setup import setup_client_session,\
 from remote.function.get_hosts import get_hosts_response
 from remote.function.mirror import mirror_complete, host_request_cloud, \
     client_mirror, host_verify_host
+from remote.models.Mirror import Mirror
 from remote.util import get_user_from_session, validate_session_id, \
     get_cloud_by_name
 
@@ -38,7 +42,9 @@ def host_handshake(remote_obj, connection, address, msg_obj):
     _log = get_mylog()
     db = remote_obj.get_db()
     ipv6 = msg_obj.ipv6
-    host = db.session.query(Host).get(msg_obj.id)
+    # host = db.session.query(Host).get(msg_obj.id)
+    mirror = db.session.query(Mirror).get(msg_obj.id)
+    host = mirror.host
     if host is not None:
         if not host.ipv6 == ipv6:
             # mylog('Host [{}] moved from "{}" to "{}"'.format(host.id, host.ipv6, ipv6))
@@ -49,7 +55,7 @@ def host_handshake(remote_obj, connection, address, msg_obj):
         host.remaining_size = msg_obj.remaining_space
         host.curr_size = msg_obj.used_space
         host.hostname = msg_obj.hostname
-        host.last_handshake = datetime.utcnow()
+        mirror.last_handshake = datetime.utcnow()
         db.session.commit()
 
 
@@ -136,7 +142,7 @@ def new_host_handler(remote_obj, connection, address, msg_obj):
     db = remote_obj.get_db()
     mylog('Handling new host')
     host = Host()
-    host.ipv4 = address[0]
+    # host.ipv4 = address[0]
     host.ipv6 = msg_obj.ipv6
     host.port = msg_obj.port
     db.session.add(host)
@@ -196,6 +202,59 @@ def client_add_owner(remote_obj, connection, address, msg_obj):
     connection.close()
 
 
+def do_host_move(remote_obj, host, ip, csr):
+    # type: (RemoteController, Host, str, crypto.X509Req) -> ResultAndData
+    new_cert = remote_obj.sign_host_csr(csr, ip)
+    host.last_certificate = crypto.dump_certificate(crypto.FILETYPE_PEM, new_cert)
+    return Success(host)
+
+
+def host_move(remote_obj, connection, address, msg_obj):
+    # type: (RemoteController, AbstractConnection, object, HostMoveRequestMessage) -> None
+    _log = get_mylog()
+    if not msg_obj.type == HOST_MOVE_REQUEST:
+        msg = 'Somehow tried to host_move without HOST_MOVE_REQUEST'
+        err = InvalidStateMessage(msg)
+        _log.debug(msg)
+        send_error_and_close(err, connection)
+        return
+    db = remote_obj.get_db()
+
+    host_id = msg_obj.my_id
+    ip = msg_obj.ip
+    csr = msg_obj.csr
+
+    if host_id == INVALID_HOST_ID:
+        host = Host()
+        db.session.add(host)
+        db.session.commit()
+        msg = 'Created new host entry [{}] for ip "{}"'.format(host.id, host.ip())
+        _log.debug(msg)
+    else:
+        host = db.session.query(Host).get(host_id)
+    if host is None:
+        msg = 'Could not find a host matching id {} during host_move'.format(host_id)
+        err = InvalidStateMessage(msg)
+        _log.debug(msg)
+        send_error_and_close(err, connection)
+
+    certificate_request = crypto.load_certificate_request(crypto.FILETYPE_PEM, csr)
+    rd = do_host_move(remote_obj, host, ip, certificate_request)
+    if rd.success:
+        host = rd.data
+        new_host_id = host.id
+        new_host_crt = host.last_certificate + open(remote_obj.nebr_instance.get_cert_file(), 'rt').read()
+        response = HostMoveResponseMessage(new_host_id, new_host_crt)
+        connection.send_obj(response)
+    else:
+        msg = rd.data if rd.data is not None else 'Unknown error while moving host'
+        err = InvalidStateMessage(msg)
+        _log.debug(msg)
+        send_error_and_close(err, connection)
+
+    pass
+
+
 def host_add_contributor(remote_obj, connection, address, msg_obj):
     # type: (RemoteController, AbstractConnection, object, AddContributorMessage) -> None
     if not msg_obj.type == ADD_CONTRIBUTOR:
@@ -239,7 +298,7 @@ def host_add_contributor(remote_obj, connection, address, msg_obj):
 
 class RemoteController(object):
     def __init__(self, nebr_instance):
-        # type: (NebrInstance) -> RemoteController
+        # type: (NebrInstance) -> None
         self.nebr_instance = nebr_instance
 
     def get_db(self):
@@ -256,8 +315,20 @@ class RemoteController(object):
 
     def start(self, argv):
         set_mylog_name('nebr')
+        _log = get_mylog()
         enable_vt_support()
-        # address = (HOST, PORT, 0, 0) # ipv6
+
+        if not os.path.exists(self.nebr_instance.get_key_file()):
+            msg = 'SSL Key file "{}" does not exist'.format(self.nebr_instance.get_key_file())
+            _log.error(msg)
+            return Error(msg)
+        if not os.path.exists(self.nebr_instance.get_cert_file()):
+            msg = 'SSL Certificate file "{}" does not exist'.format(self.nebr_instance.get_cert_file())
+            _log.error(msg)
+            return Error(msg)
+
+        _log.info('Loaded SSL key and cert')
+
         # register the shutdown callback
         atexit.register(self.shutdown)
 
@@ -275,8 +346,8 @@ class RemoteController(object):
         mylog(self.nebr_instance.get_cert_file())
         context.use_privatekey_file(self.nebr_instance.get_key_file())
         context.use_certificate_file(self.nebr_instance.get_cert_file())
+
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         s = SSL.Connection(context, s)
         address = (HOST, PORT)  # ipv4
         s.bind(address)
@@ -288,25 +359,17 @@ class RemoteController(object):
             (connection, address) = s.accept()
             raw_connection = RawConnection(connection)
             _log.debug('Connected by {}'.format(address))
-            # This is kinda really dumb.
-            # I guess the thread just catches any exceptions and prevents the main
-            #   from crashing, otherwise it has no purpose.
-            # spawn a new thread to handle this connection
 
-            # thread = Thread(target=self.filter_func, args=[raw_connection, address])
-            # thread.start()
-            # thread.join()
             try:
                 self.filter_func(raw_connection, address)
             except Exception, e:
-                print 'just in case'
                 _log.error('Error handling connection')
                 _log.error(e.message)
 
             # echo_func(connection, address)
             # todo: possible that we might want to thread.join here.
             # cont  Make it so that each req gets handled before blindly continuing
-        _log.error('Fell out the bottom og the while(true)')
+        _log.error('Fell out the bottom of the while(true) in RemoteController.network_updates')
 
     def filter_func(self, connection, address):
         msg_obj = connection.recv_obj()
@@ -344,6 +407,8 @@ class RemoteController(object):
             host_add_contributor(self, connection, address, msg_obj)
         elif msg_type == CLIENT_SESSION_REFRESH:
             client_session_refresh(self, connection, address, msg_obj)
+        elif msg_type == HOST_MOVE_REQUEST:
+            host_move(self, connection, address, msg_obj)
         else:
             print 'I don\'t know what to do with', msg_obj
         connection.close()
@@ -353,3 +418,27 @@ class RemoteController(object):
         if self.nebr_instance is not None:
             self.nebr_instance.shutdown()
 
+    def sign_host_csr(self, certificate_request, ip):
+        # type: (crypto.X509Req, str) -> crypto.X509
+        my_key = crypto.load_privatekey(crypto.FILETYPE_PEM, open(self.nebr_instance.get_key_file(), 'rt').read())
+        my_crt = crypto.load_certificate(crypto.FILETYPE_PEM, open(self.nebr_instance.get_cert_file(), 'rt').read())
+
+        not_after = 60 * 60 * 24 * 365 * 1  # one year, totally arbitrary
+
+        cert = crypto.X509()
+        cert.set_version(2)
+        epoch = datetime.utcfromtimestamp(0)
+        now = datetime.utcnow()
+        total_seconds = int((now - epoch).total_seconds())
+        cert.set_serial_number(total_seconds)  # todo: Add  some method for actually tracking serial numbers
+        cert.gmtime_adj_notBefore(0)  # these values are seconds from the moment of signing
+        cert.gmtime_adj_notAfter(not_after)  # these values are seconds from the moment of signing
+        cert.set_issuer(my_crt.get_subject())
+        cert.set_subject(certificate_request.get_subject())
+        cert.set_pubkey(certificate_request.get_pubkey())
+
+        basic = X509Extension(b'basicConstraints', False, b'CA:false')
+        alt = X509Extension(b'subjectAltName', False, b'IP.1:{}'.format(ip))
+        cert.add_extensions([basic, alt])
+        cert.sign(my_key, 'sha256')
+        return cert

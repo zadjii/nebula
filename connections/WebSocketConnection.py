@@ -8,8 +8,8 @@ from connections.AbstractConnection import AbstractConnection
 from common_util import *
 from messages.util import get_msg_size, decode_msg_size
 from messages.MessageDeserializer import MessageDeserializer
-from autobahn.asyncio.websocket import WebSocketServerProtocol
-# from autobahn.twisted.websocket import WebSocketServerProtocol
+# from autobahn.asyncio.websocket import WebSocketServerProtocol
+from autobahn.twisted.websocket import WebSocketServerProtocol
 
 __author__ = 'Mike'
 
@@ -41,11 +41,13 @@ class WebsocketConnection(AbstractConnection):
 
     def _really_bad_get_size(self):
         _log = get_mylog()
+        # _log.debug('top of _really_bad_get_size')
         data = '0'
         length = 0
         while data[-1] != '{':
             length += 1
             data = self._socket.recv(length, socket.MSG_PEEK)
+            # _log.debug('bad_get_size data:"{}"'.format(data))
             # print '\t\t\t bad get data length {}'.format(data)
             if length > 64:
                 _log.error('BAD_PACKET:{}'.format(self._socket.recv(64)))
@@ -58,6 +60,8 @@ class WebsocketConnection(AbstractConnection):
         msg_json = message_obj.serialize()
         msg_size = get_msg_size(msg_json)  # don't send length over WS
         self._ws_server_protocol.sendMessage(msg_json)
+        self._ws_server_protocol.sendPing()
+
         _log.debug('bottom of ws send_obj')
 
     def recv_next_data(self, length):
@@ -66,16 +70,10 @@ class WebsocketConnection(AbstractConnection):
     def send_next_data(self, data):
         """Returns the number of bytes sent.
         TODO: determine if the ws actually sent all of len()"""
-        # data = data.encode('utf8')
         length = len(data)
 
-        # self._ws_server_protocol.beginMessage(isBinary=True)
-        # self._ws_server_protocol.beginMessageFrame(length)
-        # self._ws_server_protocol.sendMessageFrameData(data)
         self._ws_server_protocol.sendMessage(data, isBinary=True)
         self._ws_server_protocol.sendPing()
-        # mylog('bottom of ws send_next_data, "{}"[{}]'.format(data, length))
-        # mylog('bottom of ws send_next_data')
         return length
 
     def close(self):
@@ -110,10 +108,10 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
 
     def onMessage(self, payload, isBinary):
         _log = get_mylog()
-        if isBinary:
-            _log.debug("Binary message received: {0} bytes".format(len(payload)))
-        else:
-            _log.debug("Text message received: {0}".format(payload.decode('utf8')))
+        # if isBinary:
+        #     _log.debug("Binary message received: {0} bytes".format(len(payload)))
+        # else:
+        #     _log.debug("Text message received: {0}".format(payload.decode('utf8')))
         self._internal_client_socket.send(payload)
         MyBigFuckingLieServerProtocol.net_thread.signal_host()
 
@@ -123,8 +121,9 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
     def onClose(self, wasClean, code, reason):
         _log = get_mylog()
         _log.debug("WebSocket closed: (wasClean, code, reason) = ({},{},{})".format(wasClean, code, reason))
-        self._internal_client_socket.send('\0')
-        self._internal_client_socket.close()
+        if self._internal_client_socket:
+            self._internal_client_socket.send('\0')
+            self._internal_client_socket.close()
         # if self._child_thread is not None:
         #     self._child_thread.exit()
 

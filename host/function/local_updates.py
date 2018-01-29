@@ -3,8 +3,12 @@ import os
 import socket
 from stat import S_ISDIR
 import time
+
+from common.SimpleDB import SimpleDB
 from connections.RawConnection import RawConnection
-from host import FileNode, Cloud
+from host.HostController import HostController
+from host.models.FileNode import FileNode
+from host.models.Cloud import Cloud
 from host.function.network_updates import handle_remove_file
 from host.function.send_files import send_file_to_other, complete_sending_files, send_file_to_local
 from common_util import *
@@ -16,10 +20,17 @@ __author__ = 'Mike'
 
 
 def send_updates(host_obj, db, cloud, updates):
-    mylog('[{}] has updates {}'.format(cloud.my_id_from_remote, updates))
+    _log = get_mylog()
+    _log.info('[{}] has updates {}'.format(cloud.my_id_from_remote, updates))
     # connect to remote
-    ssl_sock = setup_remote_socket(cloud.remote_host, cloud.remote_port)
-    raw_connection = RawConnection(ssl_sock)
+
+    rd = setup_remote_socket(cloud)
+    if not rd.success:
+        msg = 'Failed to connect to remote: {}'.format(rd.data)
+        _log.error(msg)
+        return
+    remote_sock = rd.data
+    raw_connection = RawConnection(remote_sock)
     # get hosts list
     msg = GetActiveHostsRequestMessage(cloud.my_id_from_remote, cloud.uname(), cloud.cname())
     raw_connection.send_obj(msg)
@@ -32,7 +43,7 @@ def send_updates(host_obj, db, cloud, updates):
             continue
         update_peer(host_obj, db, cloud, host, updates)
         updated_peers += 1
-    mylog('[{}] updated {} peers'.format(cloud.my_id_from_remote, updated_peers))
+    _log.info('[{}] updated {} peers'.format(cloud.my_id_from_remote, updated_peers))
 
 
 def update_peer(host_obj, db, cloud, host, updates):
@@ -92,6 +103,10 @@ def update_peer(host_obj, db, cloud, host, updates):
 
 
 def local_file_create(host_obj, directory_path, dir_node, filename, db):
+    # type: (HostController, str, FileNode, str, FileNode, SimpleDB) -> [(int, str)]
+    #   where (int, str): (FILE_CREATE, full_path)
+    _log = get_mylog()
+    _log.debug('Adding {} to filenode for the directory node {}'.format(filename, dir_node.name))
     # print '\t\tAdding',filename,'to filenode for',dir_node.name
     file_pathname = os.path.join(directory_path, filename)
     file_stat = os.stat(file_pathname)
@@ -104,12 +119,13 @@ def local_file_create(host_obj, directory_path, dir_node, filename, db):
     filenode.name = filename
     filenode.created_on = datetime.utcfromtimestamp( file_created )
     filenode.last_modified = datetime.utcfromtimestamp( file_modified )
-    # if dir_node.is_root():
-    #     filenode.cloud = dir_node
-    # try:
-    #     filenode.cloud = dir_node.cloud
-    # except AttributeError:
-    #     filenode.cloud = dir_node
+
+    # DO NOT try and set the new node's `cloud` setting. If that's set, then
+    #       we'll treat that node as a child of the cloud itself - as a child of
+    #       the host.models.Cloud. That's not what we want.
+    # Appending the new filenode to the dir_node WILL work, because that will
+    #       append it to either the Cloud (if this is a child of the root)
+    #       or the FileNode correctly.
     dir_node.children.append(filenode)
     db.session.commit()
 
@@ -134,6 +150,8 @@ def local_file_create(host_obj, directory_path, dir_node, filename, db):
 
 
 def local_file_update(host_obj, directory_path, dir_node, filename, filenode, db):
+    # type: (HostController, str, FileNode, str, FileNode, SimpleDB) -> [(int, str)]
+    #   where (int, str): (FILE_UPDATE, full_path)
     file_pathname = os.path.join(directory_path, filename)
     file_stat = os.stat(file_pathname)
     file_modified = datetime.utcfromtimestamp( file_stat.st_mtime)
@@ -165,8 +183,10 @@ def local_file_update(host_obj, directory_path, dir_node, filename, filenode, db
 
 
 def local_file_delete(host_obj, directory_path, dir_node, filename, filenode, db):
-    # type: (Host, str, FileNode, str, FileNode, SimpleDB) -> [(int, str)]
+    # type: (HostController, str, FileNode, str, FileNode, SimpleDB) -> [(int, str)]
     #   where (int, str): (FILE_DELETE, full_path)
+    _log = get_mylog()
+    _log.debug('Deleting {} from the directory node {}'.format(filename, dir_node.name))
     # file_pathname = os.path.join(directory_path, filename)
     file_pathname = os.path.join(directory_path, filenode.name)
     # note: filenode is always a filenode. If at all, the dir_node might
@@ -193,6 +213,7 @@ def local_file_delete(host_obj, directory_path, dir_node, filename, filenode, db
     # deletables should be in reverse BFS order, so as they are deleted they
     #   should have no children
     for full_child_path, node in deletables:
+        _log.debug('Deleting child of {} - {}()'.format(dir_node.name, node.name, full_child_path))
         db.session.delete(node)
     # This is safe even on the root filenode (Which is a Cloud object)
     # because the Cloud has children, and because we're not deleting
@@ -200,6 +221,7 @@ def local_file_delete(host_obj, directory_path, dir_node, filename, filenode, db
     # recursive_child_delete(db, filenode)
 
     # fortunately, filenode isn't ever the root of the cloud, so delete it too.
+    _log.debug('Deleting file node {} ({})'.format(filenode.name, filenode.full_path()))
     db.session.delete(filenode)
 
     # The .nebs also needs to be updated.
@@ -251,23 +273,30 @@ FILE_DELETE = 2
 
 
 def recursive_local_modifications_check(host_obj, directory_path, dir_node, db):
+    # type: (HostController, str, FileNode, SimpleDB) -> [(int, str)]
+    """
+
+    :param host_obj:
+    :param directory_path: This is the FULL, real path to the file.
+    :param dir_node:
+    :param db:
+    :return:
+    """
+    _log = get_mylog()
     files = sorted(os.listdir(directory_path), key=lambda filename: filename, reverse=False)
     nodes = dir_node.children.all()
     nodes = sorted(nodes, key=lambda node: node.name, reverse=False)
-    is_root = dir_node.is_root()
-    mirror = None
-    if is_root:
-        mirror = dir_node
-    else:
-        mirror = dir_node.cloud
-    mirror_id = mirror.my_id_from_remote
+
     i = j = 0
     num_files = len(files)
     num_nodes = len(nodes) if nodes is not None else 0
     original_total_nodes = db.session.query(FileNode).count()
     updates = []
+
     # mylog('[{}] curr children: <{}>, ({})'.format(mirror_id, files, [node.name for node in nodes]))
     # mylog('[{}] curr children parents: <{}>, ({})'.format(mirror_id, files, [node.parent.name if node.parent is not None else 'None' for node in nodes]))
+    # _log.debug('Iterating over children of {}'.format(directory_path))
+
     while (i < num_files) and (j < num_nodes):
         # mylog('[{}]Iterating on <{}>, ({})'.format(mirror_id, files[i], nodes[j].name))
         if files[i] == nodes[j].name:
@@ -280,18 +309,16 @@ def recursive_local_modifications_check(host_obj, directory_path, dir_node, db):
             updates.extend(create_updates)
             i += 1
         elif files[i] > nodes[j].name:  # redundant if clause, there for clarity
-            # todo handle file deletes, moves.
-            # updates.append((FILE_DELETE, nodes[j])) -> this is a problemo
             delete_updates = local_file_delete(host_obj, directory_path, dir_node, files[i], nodes[j], db)
             updates.extend(delete_updates)
             j += 1
     while i < num_files:  # create the rest of the files
-        # print 'finishing', (num_files-i), 'files'
         create_updates = local_file_create(host_obj, directory_path, dir_node, files[i], db)
         updates.extend(create_updates)
         i += 1
     # todo handle j < num_nodes, bulk end deletes
     new_num_nodes = db.session.query(FileNode).count()
+
     # if not new_num_nodes == original_total_nodes:
     #     mylog('RLM:total file nodes:{}'.format(new_num_nodes))
 
@@ -299,6 +326,7 @@ def recursive_local_modifications_check(host_obj, directory_path, dir_node, db):
 
 
 def check_local_modifications(host_obj, cloud, db):
+    # type: (HostController, Cloud, SimpleDB) -> None
     root = cloud.root_directory
     updates = recursive_local_modifications_check(host_obj, root, cloud, db)
     if len(updates) > 0:
@@ -306,7 +334,7 @@ def check_local_modifications(host_obj, cloud, db):
 
 
 def new_main_thread(host_obj):
-    # type: (HostController) -> object
+    # type: (HostController) -> None
 
     db = host_obj.get_instance().make_db_session()
 
@@ -316,9 +344,7 @@ def new_main_thread(host_obj):
     mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
     num_clouds_mirrored = 0  # mirrored_clouds.count()
 
-    # current_ipv6 = host_obj.active_ipv6()
     host_obj.handshake_remotes()
-    # host_obj.handshake_clouds(mirrored_clouds.all())
 
     host_obj.acquire_lock()
     host_obj.watchdog_worker.watch_all_clouds(mirrored_clouds.all())
@@ -333,23 +359,21 @@ def new_main_thread(host_obj):
     while not host_obj.is_shutdown_requested():
         # mylog('Top of Loop')
         timed_out = host_obj.network_signal.wait(30)
-        # timed_out = host_obj.network_signal.acquire()
         host_obj.network_signal.clear()
         host_obj.acquire_lock()
-        # mylog('Signal Status = {}'.format(timed_out))
-        # if not timed_out:
         host_obj.process_connections()
         # mylog('Done processing connections')
 
         mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
         all_mirrored_clouds = mirrored_clouds.all()
-        
-        # rd = host_obj.check_network_change()
+
         rd = host_obj.update_network_status()
         if rd.success:
             # todo: what if one of the remotes fails to handshake?
             # should store the last handshake per remote
-            last_handshake = datetime.utcnow()
+            changed = rd.data
+            if changed:
+                last_handshake = datetime.utcnow()
 
         # if the number of mirrors has changed...
         if num_clouds_mirrored < mirrored_clouds.count():
@@ -368,7 +392,6 @@ def new_main_thread(host_obj):
             for cloud in all_mirrored_clouds:
                 # load_private_data doesn't duplicate existing data
                 host_obj.load_private_data(cloud)
-                # host_obj.send_remote_handshake(cloud)
             host_obj.handshake_remotes()
 
             last_handshake = datetime.utcnow()
@@ -386,79 +409,8 @@ def new_main_thread(host_obj):
         # if more that 30s have passed since the last handshake, handshake
         delta = datetime.utcnow() - last_handshake
         if delta.seconds > 30:
-            # host_obj.handshake_clouds(all_mirrored_clouds)
             host_obj.handshake_remotes()
-            # for cloud in all_mirrored_clouds:
-            #     host_obj.send_remote_handshake(cloud)
             last_handshake = datetime.utcnow()
         db.session.close()
         host_obj.release_lock()
-        # mylog('Bottom of loop')
     _log.info('Leaving main loop')
-
-# This is deprecated
-# def local_update_thread(host_obj):
-#     db = host_obj.get_db()
-#     mylog('Beginning to watch for local modifications')
-#     mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
-#     num_clouds_mirrored = 0  # mirrored_clouds.count()
-#
-#     current_ipv6 = host_obj.active_ipv6()
-#     host_obj.handshake_clouds(mirrored_clouds.all())
-#     # for cloud in mirrored_clouds.all():
-#     #     host_obj.send_remote_handshake(cloud)
-#     last_handshake = datetime.utcnow()
-#     db.session.close()
-#     while not host_obj.is_shutdown_requested():
-#         # process all of the incoming requests first
-#         host_obj.process_connections()
-#
-#         db = host_obj.get_db()
-#         mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
-#         all_mirrored_clouds = mirrored_clouds.all()
-#
-#         # check if out ip has changed since last update
-#         ip_changed, new_ip = False, None
-#         if host_obj.is_ipv6():
-#             ip_changed, new_ip = check_ipv6_changed(current_ipv6)
-#
-#         # if the ip is different, move our server over
-#         if ip_changed:
-#             host_obj.change_ip(new_ip, all_mirrored_clouds)
-#             # todo: what if one of the remotes fails to handshake?
-#             # should store the last handshake per remote
-#             last_handshake = datetime.utcnow()
-#             current_ipv6 = new_ip
-#
-#         # if the number of mirrors has changed...
-#         if num_clouds_mirrored < mirrored_clouds.count():
-#             all_mirrored_clouds = mirrored_clouds.all()
-#             mylog('checking for updates on {}'.format(
-#                 [cloud.my_id_from_remote for cloud in all_mirrored_clouds]
-#             ))
-#             num_clouds_mirrored = mirrored_clouds.count()
-#             # if the number of clouds is different:
-#             # - handshake all of them
-#             # - Load the private data for any new ones into memory
-#             for cloud in all_mirrored_clouds:
-#                 # load_private_data doesn't duplicate existing data
-#                 host_obj.load_private_data(cloud)
-#                 host_obj.send_remote_handshake(cloud)
-#
-#             last_handshake = datetime.utcnow()
-#
-#         # scan the tree for updates
-#         for cloud in all_mirrored_clouds:
-#             check_local_modifications(host_obj, cloud, db)
-#
-#         # if more that 30s have passed since the last handshake, handshake
-#         delta = datetime.utcnow() - last_handshake
-#         if delta.seconds > 30:
-#             host_obj.handshake_clouds(all_mirrored_clouds)
-#             # for cloud in all_mirrored_clouds:
-#             #     host_obj.send_remote_handshake(cloud)
-#             last_handshake = datetime.utcnow()
-#         db.session.close()
-#         time.sleep(1)  # todo: This should be replaced with something
-#         # cont that actually alerts the process as opposed to just sleep/wake
-

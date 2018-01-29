@@ -20,9 +20,11 @@ class Cloud(base):
         mirror of a cloud on a host.
     """
     id = Column(Integer, primary_key=True)
-    my_id_from_remote = Column(Integer)
+    remote_id = Column(ForeignKey('remote.id'))
+
     name = Column(String)  # cloudname
     username = Column(String)  # uname
+    my_id_from_remote = Column(Integer)
     created_on = Column(DateTime)
     mirrored_on = Column(DateTime)
 
@@ -30,10 +32,15 @@ class Cloud(base):
     max_size = Column(Integer)  # Cloud size in bytes
 
     root_directory = Column(String)
+
+    # If you find yourself setting the cloud value of a FileNode, you're
+    #   probably doing something wrong.
+    # The only nodes that should have cloud set are ones that are children of
+    #   the root node. Otherwise, the root will think ALL nodes are
+    #   it's children. The Cloud(mirror) model only has one children
+    #   relationship, whose backref is cloud, so if you set a filenode's cloud,
+    #   then the cloud will think that filenode is a child of the root.
     children = relationship('FileNode', backref='cloud', lazy='dynamic')
-    # root_node = relationship('FileNode', uselist=False, backref='cloud')
-    remote_host = Column(String)
-    remote_port = Column(Integer)
     incoming_hosts = relationship('IncomingHostEntry', backref='cloud', lazy='dynamic')
     completed_mirroring = Column(Boolean, default=False)
 
@@ -55,9 +62,12 @@ class Cloud(base):
 
         rd = ResultAndData(False, None)
         try:
-            ssl_sock = setup_remote_socket(self.remote_host, self.remote_port)
-            conn = RawConnection(ssl_sock)
-            rd = ResultAndData(True, conn)
+            rd = setup_remote_socket(self)
+            if rd.success:
+                conn = RawConnection(rd.data)
+                rd = ResultAndData(True, conn)
+            else:
+                return rd
         except Exception, e:
             rd = ResultAndData(False, e)
         return rd
@@ -125,6 +135,8 @@ class Cloud(base):
                 # This is a match to the current path elem. Continue on it's children.
                 pass
             else:
+                # We did not fnd a match to the current path element. The
+                #   relative path does not exist in this cloud.
                 break
 
         # curr_child is either self, or a FileNode
@@ -147,20 +159,24 @@ class Cloud(base):
             remaining_space = get_free_space_bytes('/')
         else:
             remaining_space = self.max_size - used_space
-        # mylog(platform.uname())
+
+        host_id = self.remote.my_id_from_remote
+        mirror_id = self.my_id_from_remote
+        hostname = platform.uname()[1]
         msg = HostHandshakeMessage(
-            self.my_id_from_remote,
+            mirror_id,
             ip,
             port,
             ws_port,
             0,  # todo update number/timestamp? it's in my notes
-            platform.uname()[1],  # hostname
+            hostname,  # hostname
             used_space,
             remaining_space
         )
         return msg
 
-
+    def get_my_id_from_remote(self):
+        return self.my_id_from_remote
 
 
 

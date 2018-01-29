@@ -76,6 +76,10 @@ _decoder_table = {
     , ADD_CONTRIBUTOR: AddContributorMessage.deserialize # 50
     , ADD_CONTRIBUTOR_SUCCESS: AddContributorSuccessMessage.deserialize # 51
     , REFRESH_MESSAGE: RefreshMessageMessage.deserialize # 52
+    , HOST_MOVE_REQUEST: HostMoveRequestMessage.deserialize # 53
+    , HOST_MOVE_RESPONSE: HostMoveResponseMessage.deserialize # 54
+    , CLIENT_UPGRADE_CONNECTION_REQUEST: ClientUpgradeConnectionRequestMessage.deserialize # 55
+    , ENABLE_ALPHA_ENCRYPTION_RESPONSE: EnableAlphaEncryptionResponseMessage.deserialize # 56
 
 }
 
@@ -88,6 +92,6 @@ class MessageDeserializer(object):
             _log.debug('->decoding "{}"'.format(json_string))
         json_dict = json.loads(json_string)
         if 'type' not in json_dict.keys():
-            raise
+            raise Exception()
         msg_type = json_dict['type']
         return _decoder_table[msg_type](json_dict)

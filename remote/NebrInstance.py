@@ -11,20 +11,18 @@ from common_util import ResultAndData, Error, Success, INSTANCES_ROOT
 class NebrInstance(Instance):
     def __init__(self, working_dir=None):
         """
-        Creates a instance of nebs.
-        Attempts to use nebs.conf in the working dir to initialize
+        Creates a instance of nebr.
+        Attempts to use nebr.conf in the working dir to initialize
         :param working_dir: Working directory for this instance of nebula.
-                            Used to store configuration, nebs.db, etc.
+                            Used to store configuration, nebr.db, etc.
                             Can be relative, will be stored as absolute
         """
         if working_dir is None:
             working_dir = '{}/remote/default'.format(INSTANCES_ROOT)
         super(NebrInstance, self).__init__(working_dir)
 
-        # todo: This is a bit of a hack. Each instance should probably
-        #   auto-generate a key/cert, but for now just use the default ones
-        self.key_file = os.path.join(NEBULA_ROOT, './remote/remote.key')
-        self.cert_file = os.path.join(NEBULA_ROOT, './remote/remote.crt')
+        self.key_file = os.path.join(working_dir, './remote.ca.key')
+        self.cert_file = os.path.join(working_dir, './remote.ca.chain.crt')
         # self.host_ws_host = '127.0.0.1'
         # self.host_ws_port = 34567
 

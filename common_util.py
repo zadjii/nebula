@@ -10,13 +10,16 @@ import sys
 
 NEBULA_ROOT = path.abspath(path.dirname(__file__))
 INSTANCES_ROOT = path.abspath(path.join(NEBULA_ROOT, './instances'))
-
-
+###############################################################################
+INVALID_HOST_ID = -1
+###############################################################################
+# ClientUpgradeConnection message types:
+# This has to be updated manually, which is kinda shitty.
+# If add anything here, update socket_common.js as well.
+ENABLE_ALPHA_ENCRYPTION = 1
 ###############################################################################
 from collections import namedtuple
 ResultAndData = namedtuple('ResultAndData', 'success, data')
-
-
 def Error(data=None):
     return ResultAndData(False, data)
 def Success(data=None):
@@ -200,3 +203,15 @@ def validate_cloudname(cloudname_string):
         if len(uname) > 0 and len(cname) > 0:
             rd = Success((parts[0], parts[1]))
     return rd
+
+
+def is_address_ipv6(address):
+    # type: (str) -> bool
+    return ':' in address
+
+
+def format_full_address(address='127.0.0.1', port=0, is_ipv6=None):
+    # type: (str, int, bool) -> str
+    if is_ipv6 is None:
+        is_ipv6 = is_address_ipv6(address)
+    return ('[{}]:{}' if is_ipv6 else '{}:{}').format(address, port)

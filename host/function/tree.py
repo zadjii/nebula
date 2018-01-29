@@ -1,6 +1,9 @@
 import os
 from stat import S_ISDIR, S_ISREG
+
+from common_util import validate_cloudname
 from host import Cloud
+from host.util import get_clouds_by_name
 
 __author__ = 'Mike'
 
@@ -34,7 +37,6 @@ def db_tree(instance, argv):
         if arg == '-a':
             output_all = True
             args_eaten = 1
-            # raise Exception('tree -a not implemented yet.')
         else:
             cloudname = arg
             args_eaten = 1
@@ -45,9 +47,10 @@ def db_tree(instance, argv):
     if output_all:
         matches = db.session.query(Cloud).all()
     else:
-        matches = db.session.query(Cloud).filter_by(name=cloudname).all()
-    # match = db.session.query(Cloud).filter_by(name=cloudname).first()
-    # matches = db.session.query(Cloud).filter_by(name=cloudname).all()
+        rd = validate_cloudname(cloudname)
+        if rd.success:
+            uname, cname = rd.data
+            matches = get_clouds_by_name(db, uname, cname)
     if len(matches) == 0:
         print('No clouds on this host with name {}'.format(cloudname))
         return
@@ -85,17 +88,24 @@ def tree(instance, argv):
         if arg == '-a':
             output_all = True
             args_eaten = 1
-            raise Exception('tree -a not implemented yet.')
         else:
             cloudname = arg
             args_eaten = 1
         argv = argv[args_eaten:]
+
     if cloudname is None:
         raise Exception('Must specify a cloud name to mirror')
-    # match = db.session.query(Cloud).filter_by(name=cloudname).first()
-    matches = db.session.query(Cloud).filter_by(name=cloudname).all()
+    matches = []
+    if output_all:
+        matches = db.session.query(Cloud).all()
+    else:
+        rd = validate_cloudname(cloudname)
+        if rd.success:
+            uname, cname = rd.data
+            matches = get_clouds_by_name(db, uname, cname)
     if len(matches) == 0:
-        raise Exception('No clouds on this host with name', cloudname)
+        print('No clouds on this host with name {}'.format(cloudname))
+        return
 
     def print_filename(filename, depth):
         print ('--' * depth) + (filename)

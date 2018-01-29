@@ -129,6 +129,18 @@
 # M->H - This message is sent from a mirroring process to a host on the same machine (if one exists)
 #   so that the host can wake up and start hosting the new mirror as well, instead of waiting for the 30s timeout
 52  , REFRESH_MESSAGE
+
+# H->R
+# if my_id is -1, then assume it's a new host that's connecting.
+#todo: add more information to this message so that the remote can validate
+#   this is in fact the host that it gave that ID.
+53  , HOST_MOVE_REQUEST, int:my_id, string:ip, string:csr
+# R->H
+54  , HOST_MOVE_RESPONSE, int:host_id, string:crt
+
+55  , CLIENT_UPGRADE_CONNECTION_REQUEST, int:upgrade_type, blob:value
+56  , ENABLE_ALPHA_ENCRYPTION_RESPONSE, string:host_public_key
+
 ################################################################################
 #manually updated ones:
 ################################################################################
@@ -136,25 +148,17 @@
 ###############################
 # GHRp - yea just replace this ctor entirely:
 #    def __init__(self, cloud=None):
-#        super(GetHostsResponseMessage, self).__init__()
-#        self.type = GET_HOSTS_RESPONSE
+#        # type: (Cloud) -> None
+#        super(GetActiveHostsResponseMessage, self).__init__()
+#        self.type = GET_ACTIVE_HOSTS_RESPONSE
+#        self.cname = ''
+#        self.cloud_uname = ''
+#        self.hosts = []
 #        if cloud is not None:
-#           self.cname = cloud.name
-#            hosts = cloud.hosts
-#            host_jsons = []
-#            for host in hosts:
-#                host_obj = {
-#                    'ip': host.ipv6
-#                    , 'port': host.port
-#                    , 'wsport': host.ws_port
-#                    , 'id': host.id
-#                    , 'update': host.last_update
-#                    , 'hndshk': host.last_handshake.isoformat()
-#                    , 'hostname': host.hostname
-#                }
-#                host_jsons.append(host_obj)
-#            self.hosts = host_jsons
-16  , GET_HOSTS_RESPONSE    , string:cname  , todo:hosts
+#            self.cname = cloud.name
+#            self.cloud_uname = cloud.uname()
+#            self.hosts = cloud.get_get_hosts_dict(active_only=True)
+16  , GET_HOSTS_RESPONSE    , string:cname  , string:cloud_uname, todo:hosts
 
 ###############################
 # SFRp - manually add the following:
@@ -179,23 +183,14 @@
 #    def __init__(self, cloud=None):
 #        super(GetActiveHostsResponseMessage, self).__init__()
 #        self.type = GET_ACTIVE_HOSTS_RESPONSE
+#        self.cname = ''
+#        self.cloud_uname = ''
+#        self.hosts = []
 #        if cloud is not None:
-#           self.cname = cloud.name
-#            hosts = cloud.active_hosts()
-#            host_jsons = []
-#            for host in hosts:
-#                host_obj = {
-#                    'ip': host.ipv6
-#                    , 'port': host.port
-#                    , 'wsport': host.ws_port
-#                    , 'id': host.id
-#                    , 'update': host.last_update
-#                    , 'hndshk': host.last_handshake.isoformat()
-#                    , 'hostname': host.hostname
-#                }
-#                host_jsons.append(host_obj)
-#            self.hosts = host_jsons
-36  , GET_ACTIVE_HOSTS_RESPONSE    , string:cname  , todo:hosts
+#            self.cname = cloud.name
+#            self.cloud_uname = cloud.uname()
+#            self.hosts = cloud.get_get_hosts_dict(active_only=True)
+36  , GET_ACTIVE_HOSTS_RESPONSE    , string:cname  , string:cloud_uname, todo:hosts
 ################################################################################
 # Errors
 ################################################################################

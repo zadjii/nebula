@@ -6,13 +6,16 @@ from netifaces import interfaces, ifaddresses, AF_INET6
 import sys
 
 from common_util import *
+from host.NebsInstance import NebsInstance
 
 
 class NetworkController(object):
     """docstring for NetworkController"""
-    def __init__(self, host_controller):
+    def __init__(self, host_instance):
+        # type: (NebsInstance) -> None
         super(NetworkController, self).__init__()
-        self._host_controller = host_controller
+        # self._host_controller = host_controller
+        self._host_instance = host_instance
         self._last_external_ip = None
         self._last_local_ip = None
         self._miniupnp = None
@@ -33,8 +36,7 @@ class NetworkController(object):
             if is_windows:
                 sys.path.remove(dependencies_path)
         except Exception, e:
-            inst = self._host_controller.get_instance()
-            if not inst.local_debug:
+            if not self._host_instance.local_debug:
                 raise Exception('MiniUPnP is not available, and nebs is not configured for local debugging. Failing. '
                                 'You can manually override this check by setting `LOCAL_DEBUG=1` in your `nebs.conf`,'
                                 ' but note that this host will likely be unavailable outside your local network.')
@@ -64,9 +66,9 @@ class NetworkController(object):
                 self._using_upnp = True
         if not rd.success:
             # try to fallback to local
-            inst = self._host_controller.get_instance()
-            if inst.local_debug:
-                _log.debug('Falling back to local debug mode')
+            if self._host_instance.local_debug:
+                if self._using_upnp:
+                    _log.debug('Falling back to local debug mode')
                 self._using_upnp = False
                 rd = self._legacy_refresh_ip()
             else:
@@ -75,12 +77,13 @@ class NetworkController(object):
                 # and hope that we come back.
                 # TODO - Also prevent us from trying to make new outgoing connections. <---- BIG
                 rd = Error('Failed to connect to a upnp device. We should handle this gracefully.')
-        _log.debug('refresh_external_ip->RD({},{})'.format(rd.success, rd.data))
+        _log.debug('refresh_external_ip->(succeeded, changed)=({},{})'.format(rd.success, rd.data))
         return rd
 
     def _upnp_refresh_external_ip(self):
-        # () -> ResultAndData(True, bool:changed)
-        # () -> ResultAndData(False, str:message)
+        # type: () -> ResultAndData
+        # type: () -> ResultAndData(True, bool:changed)
+        # type: () -> ResultAndData(False, str:message)
         rd = Error()
         _log = get_mylog()
         old_ip = self._last_external_ip
@@ -105,6 +108,7 @@ class NetworkController(object):
         return rd
 
     def _legacy_refresh_ip(self):
+        # type: () -> ResultAndData
         rd = Error()
         old_ip = self._last_external_ip
         ipv6s = self._get_ipv6_list()
@@ -141,6 +145,9 @@ class NetworkController(object):
         try:
             external_port = bound_port
             # find a free port for the redirection
+            # TODO: If we inconvienitently started near 65536, then we won't have many ports
+            #   to search through. We should try 65000 times, starting at
+            #   external_port and looping through all of them.
             r = self._miniupnp.getspecificportmapping(external_port, 'TCP')
             while r is not None and external_port < 65536:
                 external_port += 1
