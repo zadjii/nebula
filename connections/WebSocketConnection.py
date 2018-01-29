@@ -70,16 +70,10 @@ class WebsocketConnection(AbstractConnection):
     def send_next_data(self, data):
         """Returns the number of bytes sent.
         TODO: determine if the ws actually sent all of len()"""
-        # data = data.encode('utf8')
         length = len(data)
 
-        # self._ws_server_protocol.beginMessage(isBinary=True)
-        # self._ws_server_protocol.beginMessageFrame(length)
-        # self._ws_server_protocol.sendMessageFrameData(data)
         self._ws_server_protocol.sendMessage(data, isBinary=True)
         self._ws_server_protocol.sendPing()
-        # mylog('bottom of ws send_next_data, "{}"[{}]'.format(data, length))
-        # mylog('bottom of ws send_next_data')
         return length
 
     def close(self):

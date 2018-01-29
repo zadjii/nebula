@@ -486,18 +486,27 @@ class HostController:
 
     def handle_connection_upgrade(self, connection, address, msg_obj):
         # type: (AbstractConnection, str, ClientUpgradeConnectionRequestMessage) -> ResultAndData
+        """
+        Process a ClientUpgradeConnectionRequestMessage. These are messages that
+            cause a change in how data is processed from the connection. Another
+            message will be handled with the upgraded connection.
+        :param connection:
+        :param address:
+        :param msg_obj:
+        :return:
+        """
         _log = get_mylog()
 
         msg_type = msg_obj.type
         if msg_type != CLIENT_UPGRADE_CONNECTION_REQUEST:
-            return Error()
+            return Error('handle_connection_upgrade without CLIENT_UPGRADE_CONNECTION_REQUEST')
 
         upgrade_type = msg_obj.upgrade_type
         value = msg_obj.value
         if upgrade_type == ENABLE_ALPHA_ENCRYPTION:
             rd = self.do_alpha_encryption_upgrade(connection, value)
         else:
-            rd = Error()
+            rd = Error('Unknown upgrade type {}'.format(upgrade_type))
 
         if rd.success:
             _log.debug('Connection successfully upgraded')
@@ -509,7 +518,6 @@ class HostController:
         _log = get_mylog()
         _log.debug('initiating alpha encryption upgrade')
         upgraded_connection = AlphaEncryptionConnection(connection, client_public_key_hex_string)
-        _log.debug('sending setup response')
         upgraded_connection.send_setup_response()
         _log.debug('sent upgrade response')
 
