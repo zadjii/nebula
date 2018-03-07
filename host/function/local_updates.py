@@ -28,6 +28,9 @@ def send_updates(host_obj, db, cloud, updates):
     if not rd.success:
         msg = 'Failed to connect to remote: {}'.format(rd.data)
         _log.error(msg)
+        # TODO: At this point, the local updates will not be reflected in the
+        #   nebula. This is a spot to come back to when we add support for
+        #   multiple hosts.
         return
     remote_sock = rd.data
     raw_connection = RawConnection(remote_sock)
@@ -58,17 +61,23 @@ def update_peer(host_obj, db, cloud, host, updates):
     host_sock = socket.socket(sock_type, socket.SOCK_STREAM)
     host_sock.connect(sock_addr)
 
-    # host_sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-    # host_sock.connect((host_ip, host_port, 0, 0))
+    # TODO If this connect fails, We're just gonna crash.
+    # File under the list of try/excepts around connecting.
+    # also todo: re multiple hosts. all kinda related here.
+    # Also, what if we're currently offline? We probably didn't even get this far...
+    # todo: hosts should encrypt to one another, yea?
+    # Todo: how do hosts validate each other's identity?
+
     raw_connection = RawConnection(host_sock)
 
-    # fixme: Change it to one FILE_PUSH per update.
-    # fixme: First check if the peer is local or not,
+    # fixme: Change it to one FILE_PUSH per update. (note have I already done this?)
+    # First check if the peer is local or not,
     #   then either send_updates_other or send_updates_local
     #   send_updates_other will open the connection and do the FilePush, HFT/RF
     #   send_updates_local will just make sure the state is the same on the local machine, EZ
 
-    msg = HostFilePushMessage(host_id, cloud.uname(), cloud.cname(), 'i-dont-give-a-fuck')  # the full path apparently doesn't matter
+    # the full path apparently doesn't matter
+    msg = HostFilePushMessage(host_id, cloud.uname(), cloud.cname(), 'i-dont-give-a-fuck')
     raw_connection.send_obj(msg)
 
     matching_local_mirror = db.session.query(Cloud).filter_by(my_id_from_remote=host_id).first()
@@ -103,7 +112,7 @@ def update_peer(host_obj, db, cloud, host, updates):
 
 
 def local_file_create(host_obj, directory_path, dir_node, filename, db):
-    # type: (HostController, str, FileNode, str, FileNode, SimpleDB) -> [(int, str)]
+    # type: (HostController, str, FileNode, str, SimpleDB) -> [(int, str)]
     #   where (int, str): (FILE_CREATE, full_path)
     _log = get_mylog()
     _log.debug('Adding {} to filenode for the directory node {}'.format(filename, dir_node.name))
@@ -294,7 +303,6 @@ def recursive_local_modifications_check(host_obj, directory_path, dir_node, db):
     updates = []
 
     # mylog('[{}] curr children: <{}>, ({})'.format(mirror_id, files, [node.name for node in nodes]))
-    # mylog('[{}] curr children parents: <{}>, ({})'.format(mirror_id, files, [node.parent.name if node.parent is not None else 'None' for node in nodes]))
     # _log.debug('Iterating over children of {}'.format(directory_path))
 
     while (i < num_files) and (j < num_nodes):
@@ -351,6 +359,7 @@ def new_main_thread(host_obj):
     host_obj.release_lock()
 
     last_handshake = datetime.utcnow()
+    # Why do I do this? Why do I close the session and create a new one?
     db.session.close()
 
     db = host_obj.get_instance().make_db_session()
@@ -367,6 +376,7 @@ def new_main_thread(host_obj):
         mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
         all_mirrored_clouds = mirrored_clouds.all()
 
+        # update network status will handshake the remotes if we've moved.
         rd = host_obj.update_network_status()
         if rd.success:
             # todo: what if one of the remotes fails to handshake?
@@ -384,7 +394,9 @@ def new_main_thread(host_obj):
             _log.info('number of clouds changed.')
 
             host_obj.watchdog_worker.watch_all_clouds(all_mirrored_clouds)
-            _log.info('checking for updates on {}'.format([cloud.my_id_from_remote for cloud in all_mirrored_clouds]))
+            _log.info('checking for updates on {}'.format(
+                [cloud.my_id_from_remote for cloud in all_mirrored_clouds]
+            ))
             num_clouds_mirrored = mirrored_clouds.count()
             # if the number of clouds is different:
             # - handshake all of them

@@ -55,6 +55,9 @@ class HostController:
         self.watchdog_worker = WatchdogWorker(self)
         self._nebs_instance = nebs_instance
         self._network_controller = None
+        # if we've failed to send to the network, then we'll set this to false.
+        #   Next time we've handshaken the remotes, we'll set this back to true.
+        self._is_online = True
 
     def start(self, argv):
         # type: ([str]) -> None
@@ -275,28 +278,24 @@ class HostController:
         db = self._nebs_instance.get_db()
         all_remotes = db.session.query(Remote).all()
         for remote in all_remotes:
+            # todo: Check the return value here
             self.send_host_move(remote)
+            # todo: Hey, now there's handshake_remotes and refresh_remotes.
+            #   These do different things, but _really_ they do the same thing.
+            #   Maybe we should do something about that.. like consolidate them.
 
         # self.active_net_thread_obj.ssl_context_factory.cacheContext()
         self.active_net_thread_obj.refresh_context()
 
         return Success()
 
-    def send_remote_handshake(self, cloud):
-        """
-        Sends a single HostHandshake message to a remote for the given Mirror on this host.
-        Called by `handshake_remotes`
-        :param cloud:
-        :return:
-        """
-        # mylog('Telling {}\'s remote that [{}]\'s at {}'.format(
-        #     cloud.name, cloud.my_id_from_remote, self.active_ipv6())
-        # )
+    def try_handshake(self, cloud):
+        # type: (Cloud) -> ResultAndData
         remote_conn = None
         try:
             rd = setup_remote_socket(cloud)
             if not rd.success:
-                raise Exception(rd.data)
+                return rd
             remote_sock = rd.data
             remote_conn = RawConnection(remote_sock)
             msg = cloud.generate_handshake(
@@ -313,16 +312,44 @@ class HostController:
             mylog('likely a network failure.')
             mylog('Even more likely, network disconnected.')
             mylog(e.message)
-            self.shutdown()
-            mylog('I\'m shutting it down, because I don\'t know how to recover quite yet.')
+            return Error(e.message)
+            # self.shutdown()
+            # mylog('I\'m shutting it down, because I don\'t know how to recover quite yet.')
         except Exception, e:
             mylog('some other error handshaking remote')
             mylog(e.message)
-            self.shutdown()
-            mylog('I\'m shutting it down, because I don\'t know how to recover quite yet.')
+            return Error(e.message)
+            # self.shutdown()
+            # mylog('I\'m shutting it down, because I don\'t know how to recover quite yet.')
         finally:
             if remote_conn is not None:
                 remote_conn.close()
+        return Success()
+
+    def send_remote_handshake(self, cloud):
+        """
+        Sends a single HostHandshake message to a remote for the given Mirror on this host.
+        Called by `handshake_remotes`
+        :param cloud:
+        :return:
+        """
+        _log = get_mylog()
+        # mylog('Telling {}\'s remote that [{}]\'s at {}'.format(
+        #     cloud.name, cloud.my_id_from_remote, self.active_ipv6())
+        # )
+        attempts = 0
+        succeeded = False
+        while attempts < 5:
+            rd = self.try_handshake(cloud)
+            succeeded = rd.success
+            if succeeded:
+                break
+            attempts += 1
+        if not succeeded:
+            _log.debug('Failed to handshake the remote. Moving to offline mode.')
+            self.set_offline()
+        else:
+            self.set_online()
 
     def send_host_move(self, remote):
         # type: (Remote) -> ResultAndData
@@ -583,3 +610,19 @@ class HostController:
     def get_net_controller(self):
         # type: () -> NetworkController
         return self._network_controller
+
+    def is_online(self):
+        # type: () -> bool
+        """
+        Returns true if the host is currently online and capable of sending
+        updates to the network.
+        :return:
+        """
+        return self._is_online
+
+    def set_offline(self):
+        self._is_online = False
+
+    def set_online(self):
+        self._is_online = True
+
