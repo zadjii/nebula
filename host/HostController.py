@@ -346,6 +346,8 @@ class HostController:
             if succeeded:
                 break
             attempts += 1
+            _log.debug('Attempted to handshake cloud, error was "{}"'.format(rd.data))
+
         if not succeeded:
             _log.debug('Failed to handshake the remote. Moving to offline mode.')
             self.set_offline()
@@ -375,6 +377,9 @@ class HostController:
                 _log.error(msg)
                 _log.error('response was "{}"'.format(resp_obj.serialize()))
                 rd = Error(msg)
+        else:
+            msg = 'Failed to connect to the remote for moving to a new address'
+            _log.error(msg)
         return rd
 
     def send_host_move(self, remote):
