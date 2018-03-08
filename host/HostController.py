@@ -289,7 +289,7 @@ class HostController:
 
         return Success()
 
-    def try_handshake(self, cloud):
+    def _try_handshake(self, cloud):
         # type: (Cloud) -> ResultAndData
         remote_conn = None
         try:
@@ -339,8 +339,9 @@ class HostController:
         # )
         attempts = 0
         succeeded = False
+        rd = Error()
         while attempts < 5:
-            rd = self.try_handshake(cloud)
+            rd = self._try_handshake(cloud)
             succeeded = rd.success
             if succeeded:
                 break
@@ -350,17 +351,12 @@ class HostController:
             self.set_offline()
         else:
             self.set_online()
+        return rd
 
-    def send_host_move(self, remote):
-        # type: (Remote) -> ResultAndData
+    def _try_move(self, remote, message, ip, new_key):
+        # type: (Remote, HostMoveRequestMessage, str, crypto.PKey) -> ResultAndData
         _log = get_mylog()
         db = self._nebs_instance.get_db()
-
-        new_key = create_key_pair(crypto.TYPE_RSA, 2048)
-        ip = self._network_controller.get_external_ip()
-        req = create_cert_request(new_key, CN=ip)
-        certificate_request_string = crypto.dump_certificate_request(crypto.FILETYPE_PEM, req)
-        message = HostMoveRequestMessage(remote.my_id_from_remote, ip, certificate_request_string)
         rd = remote.setup_socket()
         if rd.success:
             ssl_socket = rd.data
@@ -380,6 +376,53 @@ class HostController:
                 _log.error('response was "{}"'.format(resp_obj.serialize()))
                 rd = Error(msg)
         return rd
+
+    def send_host_move(self, remote):
+        # type: (Remote) -> ResultAndData
+        _log = get_mylog()
+        db = self._nebs_instance.get_db()
+
+        new_key = create_key_pair(crypto.TYPE_RSA, 2048)
+        ip = self._network_controller.get_external_ip()
+        req = create_cert_request(new_key, CN=ip)
+        certificate_request_string = crypto.dump_certificate_request(crypto.FILETYPE_PEM, req)
+        message = HostMoveRequestMessage(remote.my_id_from_remote, ip, certificate_request_string)
+
+        attempts = 0
+        succeeded = False
+        rd = Error()
+        while attempts < 5:
+            rd = self._try_move(remote, message, ip, new_key)
+            if rd.success:
+                succeeded = True
+                break
+            attempts += 1
+
+        if not succeeded:
+            _log.debug('Failed to host_move the remote. Moving to offline mode.')
+            self.set_offline()
+        else:
+            self.set_online()
+        return rd
+        # rd = remote.setup_socket()
+        # if rd.success:
+        #     ssl_socket = rd.data
+        #     raw_conn = RawConnection(ssl_socket)
+        #     _log.info('Host [{}] is moving to new address "{}"'.format(remote.my_id_from_remote, ip))
+        #     raw_conn.send_obj(message)
+        #     resp_obj = raw_conn.recv_obj()
+        #     if resp_obj.type == HOST_MOVE_RESPONSE:
+        #         remote.set_certificate(ip, resp_obj.crt)
+        #         remote.my_id_from_remote = resp_obj.host_id
+        #         remote.key = crypto.dump_privatekey(crypto.FILETYPE_PEM, new_key)
+        #         db.session.add(remote)
+        #         rd = Success(remote)
+        #     else:
+        #         msg = 'Failed to move the host on the remote - got bad response.'
+        #         _log.error(msg)
+        #         _log.error('response was "{}"'.format(resp_obj.serialize()))
+        #         rd = Error(msg)
+        # return rd
 
     def process_connections(self):
         num_conns = len(self.active_net_thread_obj.connection_queue)
