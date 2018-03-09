@@ -152,14 +152,6 @@ def setup_ssl_socket_for_address(addr, port):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         s.connect((addr, port))
-        # ipv6:
-        # s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-        # s.connect((host, port, 0, 0))
-        # s.create_connection((host, port))
-        # TODO May want to use:
-        # socket.create_connection(address[, timeout[, source_address]])
-        # cont  instead, where address is a (host,port) tuple. It'll try and
-        # cont  auto-resolve? which would be dope.
     except Exception, e:
         err = 'Generic error establising connection to {},{}:{}'.format(addr, port, e.message)
         _log.error(err)
@@ -169,7 +161,7 @@ def setup_ssl_socket_for_address(addr, port):
         sslSocket = ssl.wrap_socket(s)
         return Success(sslSocket)
     except Exception, e:
-        err = 'Error initiating SSL whewn establising connection to {},{}:{}'.format(addr, port, e.message)
+        err = 'Error initiating SSL when establising connection to {}:{}, {}'.format(addr, port, e.__dict__)
         _log.error(err)
         return Error(err)
 
