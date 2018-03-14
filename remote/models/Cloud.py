@@ -116,7 +116,7 @@ class Cloud(base):
 
     def uname(self):
         # type: () -> str
-        return self.creator.username
+        return self.creator.get_username()
 
     def cname(self):
         # type: () -> str

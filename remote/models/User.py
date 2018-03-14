@@ -21,3 +21,6 @@ class User(base):
 
     def check_password(self, provided_password):
         return check_password_hash(self.password, provided_password)
+
+    def get_username(self):
+        return self.username.lower()

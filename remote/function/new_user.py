@@ -2,6 +2,7 @@ from datetime import datetime
 import getpass
 from werkzeug.security import generate_password_hash
 from remote import User
+from remote.util import get_user_by_name
 # from remote import remote_db as db
 
 __author__ = 'zadjii'
@@ -20,7 +21,7 @@ def new_user(instance, argv):
         return
 
     username = raw_input('Enter a username for the new user: ').lower()
-    already_exists = db.session.query(User).filter_by(username=username).first()
+    already_exists = get_user_by_name(username)
     if already_exists:
         print 'A user already exists with that username.'
         return

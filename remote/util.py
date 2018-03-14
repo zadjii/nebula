@@ -1,6 +1,7 @@
 from models.Session import Session
 from common_util import *
 from remote.models.Cloud import Cloud
+from remote.models.User import User
 
 
 def get_user_from_session(db, session_id):
@@ -21,6 +22,9 @@ def get_user_from_session(db, session_id):
         rd = sess_obj.get_user()
     return rd
 
+def get_user_by_name(db, username):
+    # type: (SimpleDB, str) -> User
+    return db.session.query(User).filter(User.username.ilike(username)).first()
 
 def get_cloud_by_name(db, uname, cname):
     # type: (SimpleDB, str, str) -> Cloud

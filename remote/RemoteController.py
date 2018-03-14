@@ -23,7 +23,7 @@ from remote.function.mirror import mirror_complete, host_request_cloud, \
     client_mirror, host_verify_host
 from remote.models.Mirror import Mirror
 from remote.util import get_user_from_session, validate_session_id, \
-    get_cloud_by_name
+    get_cloud_by_name, get_user_by_name
 
 __author__ = 'Mike'
 
@@ -100,7 +100,7 @@ def do_add_user(db, username, password, email):
     if (username is None) or (password is None) or (email is None):
         return Error(InvalidStateMessage('Must provide username, password and email'))
 
-    user = db.session.query(User).filter_by(username=username).first()
+    user = get_user_by_name(username)
     if user is not None:
         return Error(InvalidStateMessage('Username already taken'))
     user = db.session.query(User).filter_by(email=email).first()

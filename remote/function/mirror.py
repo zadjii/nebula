@@ -7,7 +7,7 @@ from remote import Host, Cloud, Session
 from remote.models.Mirror import Mirror
 from remote.models.User import User
 from remote.models.HostHostFetchMapping import HostHostFetchMapping
-from remote.util import get_cloud_by_name
+from remote.util import get_cloud_by_name, get_user_by_name
 
 
 def mirror_complete(remote_obj, connection, address, msg_obj):
@@ -56,7 +56,7 @@ def host_request_cloud(remote_obj, connection, address, msg_obj):
         connection.close()
         return
 
-    creator = db.session.query(User).filter_by(username=cloud_uname).first()
+    creator = get_user_by_name(cloud_uname)
     if creator is None:
         msg = 'There was no cloud matching name {}/{}'.format(cloud_uname, cloudname)
         resp = InvalidStateMessage(msg)
@@ -111,7 +111,7 @@ def client_mirror(remote_obj, connection, address, msg_obj):
     # todo: It'll be easier on the DB to find the user first, then filter their
     #   owned clouds to find the match
 
-    creator = db.session.query(User).filter_by(username=cloud_uname).first()
+    creator = get_user_by_name(cloud_uname)
     if creator is None:
         msg = 'There was no cloud matching name {}/{}'.format(cloud_uname, cloudname)
         resp = InvalidStateMessage(msg)
