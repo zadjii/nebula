@@ -100,7 +100,7 @@ def do_add_user(db, username, password, email):
     if (username is None) or (password is None) or (email is None):
         return Error(InvalidStateMessage('Must provide username, password and email'))
 
-    user = get_user_by_name(username)
+    user = get_user_by_name(db, username)
     if user is not None:
         return Error(InvalidStateMessage('Username already taken'))
     user = db.session.query(User).filter_by(email=email).first()

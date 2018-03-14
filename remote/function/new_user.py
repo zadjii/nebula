@@ -21,7 +21,7 @@ def new_user(instance, argv):
         return
 
     username = raw_input('Enter a username for the new user: ').lower()
-    already_exists = get_user_by_name(username)
+    already_exists = get_user_by_name(db, username)
     if already_exists:
         print 'A user already exists with that username.'
         return

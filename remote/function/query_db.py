@@ -8,9 +8,9 @@ def list_users(instance, argv):
     # users = User.query.all()
     users = db.session.query(User).all()
     print 'There are ', len(users), 'users.'
-    print '[{}] {:16} {:16}'.format('id', 'name', 'email')
+    print '[{:4}] {:16} {:16} {:16}'.format('id', 'username', 'name', 'email')
     for user in users:
-        print '[{}] {:16} {:16}'.format(user.id, user.name, user.email)
+        print '[{:4}] {:16} {:16} {:16}'.format(user.id, user.username, user.name, user.email)
 
 
 def list_clouds(instance, argv):

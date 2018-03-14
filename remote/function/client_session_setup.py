@@ -37,7 +37,7 @@ def do_setup_client_session(db, username, password):
     rd = Error()
     _log = get_mylog()
 
-    user = get_user_by_name(username)
+    user = get_user_by_name(db, username)
     if user is None:
         msg = 'ERR: user was none'
         _log.debug(msg)
@@ -82,7 +82,7 @@ def do_client_get_cloud_host(db, cloud_uname, cloudname, session_id):
         mylog(msg)
         return Error(InvalidStateMessage(msg))
 
-    creator = get_user_by_name(cloud_uname)
+    creator = get_user_by_name(db, cloud_uname)
     if creator is None:
         err = 'No cloud matching {}/{}'.format(cloud_uname, cloudname)
         msg = InvalidStateMessage(err)

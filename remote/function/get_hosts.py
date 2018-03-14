@@ -41,7 +41,7 @@ def get_hosts_response(remote_obj, connection, address, msg_obj):
     #     send_generic_error_and_close(connection)
     #     raise Exception('There was no host with the ID[{}], wtf'.format(host_id))
 
-    creator = get_user_by_name(cloud_uname)
+    creator = get_user_by_name(db, cloud_uname)
     if creator is None:
         err = 'No cloud matching {}/{}'.format(cloud_uname, cloudname)
         msg = InvalidStateMessage(err)

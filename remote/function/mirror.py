@@ -56,7 +56,7 @@ def host_request_cloud(remote_obj, connection, address, msg_obj):
         connection.close()
         return
 
-    creator = get_user_by_name(cloud_uname)
+    creator = get_user_by_name(db, cloud_uname)
     if creator is None:
         msg = 'There was no cloud matching name {}/{}'.format(cloud_uname, cloudname)
         resp = InvalidStateMessage(msg)
@@ -111,7 +111,7 @@ def client_mirror(remote_obj, connection, address, msg_obj):
     # todo: It'll be easier on the DB to find the user first, then filter their
     #   owned clouds to find the match
 
-    creator = get_user_by_name(cloud_uname)
+    creator = get_user_by_name(db, cloud_uname)
     if creator is None:
         msg = 'There was no cloud matching name {}/{}'.format(cloud_uname, cloudname)
         resp = InvalidStateMessage(msg)
