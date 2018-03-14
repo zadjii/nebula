@@ -39,9 +39,12 @@ class Group(object):
 
     def has_user(self, user_id):
         # type: (int) -> bool
-        return user_id in self._user_ids
+        return user_id in self._user_ids if not self.is_public() else True
 
     def add_user(self, user_id):
+        # NOTE: If we try and add a user to the "public" group, then it will
+        #   stop being the public group
+        # however, we'll think they're already in the group, so this should work
         if not self.has_user(user_id):
             self._user_ids.append(user_id)
 
@@ -176,7 +179,7 @@ class PrivateData(object):
         self._version = (CURRENT_MAJOR_VERSION, CURRENT_MINOR_VERSION)
         self._links = []
         self._groups = [make_public_group(), make_owners_group(owner_ids)]
-        self._files = {}
+        self._files = {}  # { str -> FilePermissions }
         self._next_group_id = FIRST_GROUP_ID
         # try reading the .nebs from the cloud.
         # if it doesn't exist, then write out the defaults.
@@ -293,6 +296,42 @@ class PrivateData(object):
             perms |= file_permissions.get_user_permissions(user_id)
 
         return perms
+
+    @staticmethod
+    def add_path(found_permissions, new_path, new_permissions):
+        # type: ([(str, int)], str, int) -> [(str, int)]
+        found_permissions.append((new_path, new_permissions))
+        return found_permissions
+
+
+    def get_user_permissions(self, user_id):
+        # type: (int) -> [(str, int)]
+        """
+        Retrieves all of the paths that the user can access and the access they
+          have to each path.
+        :param user_id:
+        :return:
+        """
+        # todo:36
+        # When we add a path, if there is a parent with greater permisions,
+        #   we'll skip it (the file is already available via a parent)
+        # if there's a parent, but the parent has less permissions, DON'T skip it.
+
+        # first add all the paths that the public has access to
+        # then, for each group the user is a part of,
+        #   add each of the paths the group has access to.
+        # then enumerate all the files the user has access to,
+        #   and add them.
+
+        # I guess the public group is a group after all, so we can just enumerate all groups
+        found_permissions = []
+        for path in self._files.keys():
+            file_perms = self._files[path]
+            perms = file_perms.get_user_permissions(user_id)
+            if perms > NO_ACCESS:
+                found_permissions = PrivateData.add_path(found_permissions, path, perms)
+        return found_permissions
+
 
     def delete_paths(self, paths):
         result = False
