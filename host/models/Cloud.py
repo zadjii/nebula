@@ -76,6 +76,8 @@ class Cloud(base):
         # todo make sure all paths are actually relative paths.
         if rel_path == '/':
             return self.root_directory
+        if rel_path[0] == '/':
+            rel_path = '.' + rel_path
         full_path = os.path.join(self.root_directory, rel_path)
         return full_path
 

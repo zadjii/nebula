@@ -176,6 +176,13 @@ def client_add_owner(remote_obj, connection, address, msg_obj):
         sess_obj = rd.data
         user = sess_obj.user
 
+    if new_user_id == PUBLIC_USER_ID:
+        msg = 'The public can\'t be a owner of a cloud'
+        err = AddOwnerFailureMessage(msg)
+        mylog(err.message, '31')
+        send_error_and_close(err, connection)
+        return
+
     cloud = get_cloud_by_name(db, cloud_uname, cloudname)
     if cloud is None:
         msg = 'No matching cloud {}'.format((cloud_uname, cloudname))
@@ -257,6 +264,7 @@ def host_move(remote_obj, connection, address, msg_obj):
 
 def host_add_contributor(remote_obj, connection, address, msg_obj):
     # type: (RemoteController, AbstractConnection, object, AddContributorMessage) -> None
+    _log = get_mylog()
     if not msg_obj.type == ADD_CONTRIBUTOR:
         msg = 'Somehow tried to host_add_contributor without ADD_CONTRIBUTOR'
         err = InvalidStateMessage(msg)
@@ -281,14 +289,20 @@ def host_add_contributor(remote_obj, connection, address, msg_obj):
         err = AddContributorFailureMessage(msg)
         send_error_and_close(err, connection)
         return
-    new_owner = db.session.query(User).get(new_user_id)
-    if new_owner is None:
-        msg = 'No matching user {}'.format(new_user_id)
-        err = AddContributorFailureMessage(msg)
-        send_error_and_close(err, connection)
-        return
 
-    cloud.add_contributor(new_owner)
+    is_public = new_user_id == PUBLIC_USER_ID
+    if is_public:
+        # Make sure the cloud is a publicly available cloud
+        cloud.make_public()
+    else:
+        new_owner = db.session.query(User).get(new_user_id)
+        if new_owner is None:
+            msg = 'No matching user {}'.format(new_user_id)
+            err = AddContributorFailureMessage(msg)
+            send_error_and_close(err, connection)
+            return
+        cloud.add_contributor(new_owner)
+
     db.session.commit()
     response = AddContributorSuccessMessage(new_user_id, cloud_uname, cloudname)
     mylog('host_add_contributor success')

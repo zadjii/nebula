@@ -3,7 +3,7 @@ import os
 import time
 from stat import S_ISDIR
 
-from common_util import mylog, send_error_and_close, Success, Error
+from common_util import mylog, send_error_and_close, Success, Error, PUBLIC_USER_ID
 from host.PrivateData import READ_ACCESS, SHARE_ACCESS
 from host.function.recv_files import recv_file_tree
 from host.util import check_response, validate_or_get_client_session, \
@@ -51,7 +51,7 @@ def do_client_read_file(host_obj, connection, address, msg_obj, client):
         # todo: if they're requesting all, it's definitely a dir,
         # which is an error
     else:
-        filepath = os.path.join(cloud.root_directory, requested_file)
+        filepath = cloud.translate_relative_path(requested_file)
 
     # FIXME: Make sure paths are limited to children of the root
 
@@ -202,6 +202,12 @@ def do_client_add_owner(host_obj, connection, address, msg_obj, client):
         send_error_and_close(err, connection)
         return
 
+    if new_owner_id == PUBLIC_USER_ID:
+        msg = 'The public can\'t be a owner of a cloud'
+        err = AddOwnerFailureMessage(msg)
+        mylog(err.message, '31')
+        send_error_and_close(err, connection)
+        return
     if not private_data.has_owner(client.user_id):
         msg = 'User [{}] is not an owner of the cloud "{}"'.format(client.user_id, cloudname)
         err = AddOwnerFailureMessage(msg)
@@ -290,6 +296,7 @@ def do_client_add_contributor(host_obj, connection, address, msg_obj, client):
         mylog(err.message, '31')
         send_error_and_close(err, connection)
     else:
+        # PrivateData will be able to handle the public_user_id
         private_data.add_user_permission(new_user_id, fpath, new_permissions)
         private_data.commit()
         mylog('Added permission {} for user [{}] to file {}:{}'.format(

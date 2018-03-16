@@ -13,6 +13,8 @@ INSTANCES_ROOT = path.abspath(path.join(NEBULA_ROOT, './instances'))
 ###############################################################################
 INVALID_HOST_ID = -1
 ###############################################################################
+PUBLIC_USER_ID = -1
+###############################################################################
 # ClientUpgradeConnection message types:
 # This has to be updated manually, which is kinda shitty.
 # If add anything here, update socket_common.js as well.

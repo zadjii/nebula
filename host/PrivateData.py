@@ -6,7 +6,7 @@ This provides an abstraction layer on top of otherwise plain .json data
 import base64
 import uuid
 
-from common_util import mylog, ResultAndData, get_path_elements
+from common_util import mylog, ResultAndData, get_path_elements, PUBLIC_USER_ID
 import os
 import json
 
@@ -275,7 +275,12 @@ class PrivateData(object):
             mylog('Making new FilePermissions object')
             file_perms = FilePermissions(rel_path)
         mylog(file_perms.__dict__)
-        file_perms.add_user(new_user_id, new_perms)
+
+        if new_user_id == PUBLIC_USER_ID:
+            file_perms.add_group(PUBLIC_ID, new_perms)
+        else:
+            file_perms.add_user(new_user_id, new_perms)
+
         mylog(file_perms.__dict__)
         self._files[rel_path] = file_perms
         mylog('{}'.format(self._files))
