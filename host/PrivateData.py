@@ -4,9 +4,10 @@ PrivateData is the model that backs .nebs data.
 This provides an abstraction layer on top of otherwise plain .json data
 """
 import base64
+import posixpath
 import uuid
 
-from common_util import mylog, ResultAndData, get_path_elements, PUBLIC_USER_ID
+from common_util import mylog, ResultAndData, get_path_elements, PUBLIC_USER_ID, RelativePath
 import os
 import json
 
@@ -220,32 +221,42 @@ class PrivateData(object):
                 return g
         return None
 
-    def get_permissions(self, user_id, filepath):
+    def get_permissions(self, user_id, relative_path):
+        # type: (int, RelativePath) -> int
         """
         HEY DUMBASS. Make sure you normalize the path before here.
         Get rid of trailing slashes on dirs. Make sure it's actually in the
         cloud's tree. stuff like that.
         Don't pass in the full local path. Pass in the corrected, relative path.
         :param user_id:
-        :param filepath:
+        :param relative_path:
         :return:
         """
+        filepath = relative_path.to_string()
+        # filepath = os.path.normpath(relative_path.to_string())
         # break the path into elements, start from the root, work down
         path_elems = get_path_elements(filepath)
-        # make sure to always use the cloud root.
-        if path_elems[0] != '.':
-            path_elems.insert(0, '.')
-        i = 0
-        curr_path = '.' # self._cloud.root_directory
+        # # make sure to always use the cloud root.
+        # if path_elems[0] != '.':
+        #     path_elems.insert(0, '.')
+        curr_path = path_elems[0]  # NOT self._cloud.root_directory
         current_perms = NO_ACCESS
-        while i < len(path_elems) and current_perms < RDWR_ACCESS:
-            curr_path = os.path.join(curr_path, path_elems[i])
-            curr_path = os.path.normpath(curr_path)
-            mylog('checking {}\'s perms for {}'.format(user_id, curr_path))
-            if curr_path in self._files:
-                file_perms = self._files[curr_path]
+        i = 1
+        # I'm so sorry that this loop is structured weird
+        while i <= len(path_elems) and current_perms < RDWR_ACCESS:
+            # curr_path = posixpath.normpath(curr_path)
+            # curr_path = os.path.normpath(curr_path)
+            rp = RelativePath()
+            rp.from_relative(curr_path)
+            curr_corrected = rp.to_string()
+            mylog('checking {}\'s perms for {}'.format(user_id, curr_corrected))
+            if curr_corrected in self._files:
+                file_perms = self._files[curr_corrected]
                 new_perms = self._file_get_permissions(user_id, file_perms)
+                mylog('found new permission {} for {}'.format(new_perms, curr_corrected))
                 current_perms |= new_perms
+            if i < len(path_elems):
+                curr_path = os.path.join(curr_corrected, path_elems[i])
             i += 1
         return current_perms
 
@@ -266,14 +277,16 @@ class PrivateData(object):
                 mylog('There is no owners group for this cloud. This is likely a programming error', '31')
 
     def add_user_permission(self, new_user_id, rel_path, new_perms):
+        # type: (int, RelativePath, int) -> None
         mylog('add_user_permission')
         mylog('{}'.format(self._files))
-        if rel_path in self._files:
-            file_perms = self._files[rel_path]
+        rel_path_str = rel_path.to_string()
+        if rel_path_str in self._files:
+            file_perms = self._files[rel_path_str]
         else:
         # if file_perms is None:
             mylog('Making new FilePermissions object')
-            file_perms = FilePermissions(rel_path)
+            file_perms = FilePermissions(rel_path_str)
         mylog(file_perms.__dict__)
 
         if new_user_id == PUBLIC_USER_ID:
@@ -282,7 +295,7 @@ class PrivateData(object):
             file_perms.add_user(new_user_id, new_perms)
 
         mylog(file_perms.__dict__)
-        self._files[rel_path] = file_perms
+        self._files[rel_path_str] = file_perms
         mylog('{}'.format(self._files))
 
     def _file_get_permissions(self, user_id, file_permissions):
@@ -337,8 +350,8 @@ class PrivateData(object):
                 found_permissions = PrivateData.add_path(found_permissions, path, perms)
         return found_permissions
 
-
     def delete_paths(self, paths):
+        # type: ([RelativePath]) -> bool
         result = False
         for path in paths:
             if path in self._files.keys():

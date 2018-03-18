@@ -104,6 +104,8 @@ class Cloud(base):
     def can_access(self, user):
         if self.is_public():
             return True
+        elif user is None:
+            return False
         elif self.is_private():
             return self.has_owner(user) or self.has_contributor(user)
         else: # self.is_hidden():

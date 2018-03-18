@@ -495,6 +495,7 @@ class HostController:
         return os.path.join(cloud.root_directory, '.nebs') == full_path
 
     def get_client_permissions(self, client_sid, cloud, relative_path):
+        # type: (str, Cloud, RelativePath) -> int
         db = self.get_db()
         rd = get_client_session(db, client_sid, cloud.uname(), cloud.cname())
         # mylog('get_client_permissions [{}] {}'.format(0, rd))
@@ -502,10 +503,10 @@ class HostController:
             client = rd.data
             private_data = self.get_private_data(cloud)
             if private_data is not None:
-                mylog('Looking up [{}]\'s permission to access <{}>'.format(client.user_id, relative_path))
+                mylog('Looking up [{}]\'s permission to access <{}>'.format(client.user_id, relative_path.to_string()))
                 return private_data.get_permissions(client.user_id, relative_path)
             else:
-                mylog('There has no private data for {}'.format(cloud.name), '31')
+                mylog('There is no private data for {}'.format(cloud.name), '31')
         return NO_ACCESS
 
     def get_db(self):
@@ -598,9 +599,8 @@ class HostController:
 
         return Success(upgraded_connection)
 
-
     def client_access_check_or_close(self, connection, client_sid, cloud, rel_path, required_access=READ_ACCESS):
-        # type: (AbstractConnection, str, Cloud, str, int) -> ResultAndData
+        # type: (AbstractConnection, str, Cloud, RelativePath, int) -> ResultAndData
         """
 
         :param connection:
@@ -613,7 +613,7 @@ class HostController:
         permissions = self.get_client_permissions(client_sid, cloud, rel_path)
         rd = ResultAndData(True, permissions)
         if not permissions_are_sufficient(permissions, required_access):
-            err = 'Session does not have sufficient permission to access <{}>'.format(rel_path)
+            err = 'Session does not have sufficient permission to access <{}>'.format(rel_path.to_string())
             mylog(err, '31')
             response = InvalidPermissionsMessage(err)
             connection.send_obj(response)

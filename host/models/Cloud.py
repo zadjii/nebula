@@ -82,11 +82,11 @@ class Cloud(base):
         return full_path
 
     # we might end up needing the message
-    def create_or_update_node(self, full_path, db):
+    def create_or_update_node(self, relative_path, db):
         curr_children = self.children
         curr_parent_node = None
         # curr_path = '.'
-        dirs = os.path.normpath(full_path).split(os.sep)
+        dirs = os.path.normpath(relative_path).split(os.sep)
         # mylog('create or update dirs={}'.format(dirs))
         # print 'create/update for all of {}'.format(dirs)
         while len(dirs) > 0:

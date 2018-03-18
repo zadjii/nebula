@@ -1,11 +1,12 @@
 from datetime import datetime
 import os
 
-from common_util import ResultAndData
+from common_util import ResultAndData, RelativePath, get_mylog, send_error_and_close
 from host.PrivateData import WRITE_ACCESS
+from host.models import Cloud
 from host.util import mylog
 # from msg_codes import recv_msg
-from messages import InvalidPermissionsMessage, SystemFileWriteErrorMessage
+from messages import InvalidPermissionsMessage, SystemFileWriteErrorMessage, InvalidStateMessage
 from msg_codes import CLIENT_FILE_TRANSFER
 
 __author__ = 'Mike'
@@ -20,23 +21,31 @@ def recv_file_tree(host_obj, msg, cloud, socket_conn, db):
 
 
 def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
+    # type: (HostController, BaseMessage, Cloud, AbstractConnection, SimpleDB, bool) -> ResultAndData
+    _log = get_mylog()
     msg_file_isdir = msg.isdir
     msg_file_size = msg.fsize
     msg_rel_path = msg.fpath
     mylog('[{}] is recv\'ing <{}>'.format(cloud.my_id_from_remote, msg_rel_path))
 
+    rel_path = RelativePath()
+    rd = rel_path.from_relative(msg_rel_path)
+    if not rd.success:
+        msg = '{} is not a valid cloud path'.format(msg_rel_path)
+        err = InvalidStateMessage(msg)
+        _log.debug(err)
+        send_error_and_close(err, socket_conn)
+        return rd
+
     # if they are a client, make sure the host_obj verifies their permissions on
     # that file.
     if is_client:
-        # todo: move this below getting the normpath, then re-get the relative path.
-        rd = host_obj.  client_access_check_or_close(socket_conn, msg.sid, cloud,
-                                                   msg_rel_path, WRITE_ACCESS)
+        rd = host_obj.client_access_check_or_close(socket_conn, msg.sid, cloud,
+                                                   rel_path, WRITE_ACCESS)
         if not rd.success:
-            return
+            return rd
 
-    full_path = os.path.join(cloud.root_directory, msg_rel_path)
-    full_path = os.path.normpath(full_path)
-    # todo: verify that the full path is a child of clout.root_directory
+    full_path = rel_path.to_absolute(cloud.root_directory)
 
     # if it' the .nebs file:
     #   If they're a client, straight up reject the change.
@@ -100,7 +109,7 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
     #   We DO want to tell other mirrors about this change, so don't change the DB>
     #   The local thread will find the change and alert the other mirrors.
     if not is_client:
-        updated_node = cloud.create_or_update_node(msg_rel_path, db)
+        updated_node = cloud.create_or_update_node(rel_path.to_string(), db)
         if updated_node is not None:
             old_modified_on = updated_node.last_modified
             updated_node.last_modified = datetime.utcfromtimestamp(os.path.getmtime(full_path))

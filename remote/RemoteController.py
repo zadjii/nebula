@@ -355,6 +355,7 @@ class RemoteController(object):
             self.network_updates()
 
     def network_updates(self):
+        _log = get_mylog()
         # context = SSL.Context(SSL.SSLv23_METHOD)
         context = SSL.Context(SSL.TLSv1_2_METHOD)
         mylog(self.nebr_instance.get_key_file())
@@ -365,7 +366,19 @@ class RemoteController(object):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s = SSL.Connection(context, s)
         address = (HOST, PORT)  # ipv4
-        s.bind(address)
+        attempts = 0
+        succeeded = False
+        while attempts < 5 and not succeeded:
+            attempts += 1
+            try:
+                s.bind(address)
+                succeeded = True
+            except Exception, e:
+                _log.error('Failed to bind to address, {}'.format(e.message))
+        if not succeeded:
+            return Error('Failed to bind to network (is the socket already in use?)')
+
+
         _log = get_mylog()
         _log.info('Listening on {}'.format(address))
 

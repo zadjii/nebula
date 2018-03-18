@@ -1,6 +1,7 @@
 import ctypes
 import os
 import platform
+import posixpath
 from logging import *
 import logging.handlers
 from os import path
@@ -217,3 +218,47 @@ def format_full_address(address='127.0.0.1', port=0, is_ipv6=None):
     if is_ipv6 is None:
         is_ipv6 = is_address_ipv6(address)
     return ('[{}]:{}' if is_ipv6 else '{}:{}').format(address, port)
+
+
+class RelativePath(object):
+    # Stores a relative path as a non-delimited string. Ex:
+    # [0]   ./foo -> foo
+    # [1]   /bar -> bar
+    # [2]   who\goes\there -> who/goes/there
+    # [3]   foo/../../what -> what
+    # See RelativePathTests
+    def __init__(self):
+        self._path = None
+        pass
+
+    def from_relative(self, relative_path_string):
+        """
+        Use this to construct a RelativePath.
+        This way, user input will be validated
+        :param relative_path_string:
+        :return:
+        """
+        working = relative_path_string
+
+        if not os.path.isabs(working):
+            working = os.path.join('/', working)
+        try:
+            working = os.path.relpath(working, os.path.normpath('/'))
+        except ValueError, e:
+            return Error(e.message)
+        working = posixpath.normpath(working)
+
+        working_elems = working.split('\\')
+
+        working = '/'.join(working_elems)
+        working = posixpath.normpath(working)
+        self._path = working
+
+        is_child = working == '.' or os.path.abspath(working).startswith(os.path.abspath('.')+os.sep)
+        return ResultAndData(is_child, None)
+
+    def to_string(self):
+        return self._path
+
+    def to_absolute(self, root):
+        return os.path.join(root, self._path)

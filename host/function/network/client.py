@@ -3,7 +3,7 @@ import os
 import time
 from stat import S_ISDIR
 
-from common_util import mylog, send_error_and_close, Success, Error, PUBLIC_USER_ID
+from common_util import mylog, send_error_and_close, Success, Error, PUBLIC_USER_ID, RelativePath, get_mylog
 from host.PrivateData import READ_ACCESS, SHARE_ACCESS
 from host.function.recv_files import recv_file_tree
 from host.util import check_response, validate_or_get_client_session, \
@@ -38,10 +38,20 @@ def handle_read_file_request(host_obj, connection, address, msg_obj):
 
 def do_client_read_file(host_obj, connection, address, msg_obj, client):
     db = host_obj.get_db()
+    _log = get_mylog()
     cloud = client.cloud
 
     cloudname = cloud.name
     requested_file = msg_obj.fpath
+
+    rel_path = RelativePath()
+    rd = rel_path.from_relative(requested_file)
+    if not rd.success:
+        msg = '{} is not a valid cloud path'.format(requested_file)
+        err = InvalidStateMessage(msg)
+        _log.debug(err)
+        send_error_and_close(err, connection)
+        return
 
     requesting_all = requested_file == '/'
     filepath = None
@@ -51,11 +61,8 @@ def do_client_read_file(host_obj, connection, address, msg_obj, client):
         # todo: if they're requesting all, it's definitely a dir,
         # which is an error
     else:
-        filepath = cloud.translate_relative_path(requested_file)
+        filepath = rel_path.to_absolute(cloud.root_directory)
 
-    # FIXME: Make sure paths are limited to children of the root
-
-    req_file_stat = None
     try:
         req_file_stat = os.stat(filepath)
     except Exception:
@@ -64,10 +71,8 @@ def do_client_read_file(host_obj, connection, address, msg_obj, client):
         # connection.close()
         return
 
-    relative_pathname = os.path.relpath(filepath, cloud.root_directory)
-
     rd = host_obj.client_access_check_or_close(connection, client.uuid, cloud,
-                                               relative_pathname, READ_ACCESS)
+                                               rel_path, READ_ACCESS)
     if not rd.success:
         return
 
@@ -80,7 +85,7 @@ def do_client_read_file(host_obj, connection, address, msg_obj, client):
         # send RFP - ReadFileResponse
         req_file_size = req_file_stat.st_size
         requested_file = open(filepath, 'rb')
-        response = ReadFileResponseMessage(client.uuid, relative_pathname,
+        response = ReadFileResponseMessage(client.uuid, rel_path.to_string(),
                                            req_file_size)
         connection.send_obj(response)
         mylog(
@@ -156,24 +161,34 @@ def client_message_wrapper(host_obj, connection, address, msg_obj, callback):
 
 
 def do_client_list_files(host_obj, connection, address, msg_obj, client):
-    mylog('do_client_list_files')
+    _log = get_mylog()
+    _log.debug('do_client_list_files')
     cloud = client.cloud
     cloudname = cloud.name
-    rel_path = msg_obj.fpath
+    # rel_path = msg_obj.fpath
     session_id = client.uuid
-    full_path = cloud.translate_relative_path(rel_path)
+    # full_path = cloud.translate_relative_path(rel_path)
 
     # todo: I believe this should be more complicated.
     # Say a person has permission to read some children of the directory,
     # but not the directory itself. ls returns ACCESS_ERROR currently.
     # Perhaps it should return the children it can access?
     # though, is this process recursive? What if I ls "/", but only have access to "/foo/bar/..."?
-    
+
+    rel_path = RelativePath()
+    rd = rel_path.from_relative(msg_obj.fpath)
+    if not rd.success:
+        msg = '{} is not a valid cloud path'.format(msg_obj.fpath)
+        err = InvalidStateMessage(msg)
+        _log.debug(err)
+        send_error_and_close(err, connection)
+        return
 
     rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
                                                rel_path, READ_ACCESS)
     if rd.success:
         mylog('Responding successfully to ClientListFiles')
+        full_path = rel_path.to_absolute(cloud.root_directory)
         resp = ListFilesResponseMessage(cloudname, session_id, rel_path,
                                         full_path)
         connection.send_obj(resp)
@@ -246,6 +261,7 @@ def handle_client_add_contributor(host_obj, connection, address, msg_obj):
 
 
 def do_client_add_contributor(host_obj, connection, address, msg_obj, client):
+    _log = get_mylog()
     cloud = client.cloud
     cloudname = cloud.name
     session_id = client.uuid
@@ -253,9 +269,14 @@ def do_client_add_contributor(host_obj, connection, address, msg_obj, client):
     fpath = msg_obj.fpath
     new_permissions = msg_obj.permissions
 
-    # TODO: make sure the path is a relative path to the cloud
-
-    # TODO: Normalize the path
+    rel_path = RelativePath()
+    rd = rel_path.from_relative(fpath)
+    if not rd.success:
+        msg = '{} is not a valid cloud path'.format(fpath)
+        err = InvalidStateMessage(msg)
+        _log.debug(err)
+        send_error_and_close(err, connection)
+        return
 
     private_data = host_obj.get_private_data(cloud)
     if private_data is None:
@@ -265,7 +286,7 @@ def do_client_add_contributor(host_obj, connection, address, msg_obj, client):
         send_error_and_close(err, connection)
         return
     rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
-                                               fpath, SHARE_ACCESS)
+                                               rel_path, SHARE_ACCESS)
     if not rd.success:
         # conn was closed by client_access_check_or_close
         return
@@ -297,7 +318,7 @@ def do_client_add_contributor(host_obj, connection, address, msg_obj, client):
         send_error_and_close(err, connection)
     else:
         # PrivateData will be able to handle the public_user_id
-        private_data.add_user_permission(new_user_id, fpath, new_permissions)
+        private_data.add_user_permission(new_user_id, rel_path, new_permissions)
         private_data.commit()
         mylog('Added permission {} for user [{}] to file {}:{}'.format(
             new_permissions, new_user_id, cloudname, fpath
