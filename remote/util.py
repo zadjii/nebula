@@ -37,7 +37,7 @@ def get_cloud_by_name(db, uname, cname):
     # return db.session.query(Cloud).filter_by(name=cname).first()
     clouds = [cloud
               for cloud in db.session.query(Cloud).filter_by(name=cname).all()
-              if cloud.uname() == uname]
+              if cloud.uname().lower() == uname.lower()]
     if len(clouds) > 1:
         mylog('get_cloud_by_name error '
               '- There should be AT MOST one result'

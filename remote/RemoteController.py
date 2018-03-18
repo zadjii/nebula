@@ -283,9 +283,10 @@ def host_add_contributor(remote_obj, connection, address, msg_obj):
         err = AddContributorFailureMessage(msg)
         send_error_and_close(err, connection)
         return
-    source_host = cloud.hosts.filter_by(id=host_id).first()
-    if source_host is None:
-        msg = 'No matching host {}'.format(host_id)
+    source_mirror = cloud.mirrors.filter_by(id=host_id).first()
+    # source_host = cloud.hosts.filter_by(id=host_id).first()
+    if source_mirror is None:
+        msg = 'No matching mirror {}'.format(host_id)
         err = AddContributorFailureMessage(msg)
         send_error_and_close(err, connection)
         return

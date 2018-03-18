@@ -144,9 +144,12 @@ def get_cloud_host(remote_obj, connection, address, msg_obj):
         connection.send_obj(rd.data)
     else:
         host_mapping = rd.data
-        host = host_mapping.host
+        # host = host_mapping.host
+        mirror = host_mapping.mirror
+        host = mirror.host
+        cloud = mirror.cloud
         # cloud = host_mapping.cloud
-        cloud = db.session.query(Cloud).get(host_mapping.cloud_id)
+        # cloud = db.session.query(Cloud).get(host_mapping.cloud_id)
         # tell client
         msg = ClientGetCloudHostResponseMessage(session_id, cloud.uname(), cloud.cname(), host.ipv6,
                                                 host.port, host.ws_port)

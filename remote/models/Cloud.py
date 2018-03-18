@@ -32,8 +32,8 @@ cloud_contributors = Table(
 # # todo: when making links, host needs to know privacy state. If a host wants to
 # # cont make a public link, then the cloud needs to be public, etc.
 
-PRIVATE_CLOUD = 1 # No file on the coud was ever shared with the public.
-PUBLIC_CLOUD = 2 # At least one file was shared with the public.
+PRIVATE_CLOUD = 1  # No file on the coud was ever shared with the public.
+PUBLIC_CLOUD = 2  # At least one file was shared with the public.
 # Honestly, we could still probably just do away with this...
 # We'd make all clouds public, and then it'd be the host's responsibility to reject the requests.
 # Kinda shitty though, to have all hosts ddos-able...
@@ -110,6 +110,7 @@ class Cloud(base):
             return self.has_owner(user)
 
     def active_hosts(self):
+        # type: () -> [Mirror]
         mirrors = []
         for mirror in self.mirrors.all():
             if mirror.is_active():

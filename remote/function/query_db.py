@@ -18,14 +18,15 @@ def list_clouds(instance, argv):
     # clouds = Cloud.query.all()
     clouds = db.session.query(Cloud).all()
     print('There are {} clouds.'.format(len(clouds)))
-    print('[{}], {}, {}, {}'.format('id', 'uname/cname', 'max_size', 'owners'))
+    print('[{}], {}, {}, {}, {}'.format('id', 'uname/cname', 'privacy', 'max_size', 'owners', 'contributors'))
     for cloud in clouds:
         # owners = ''
         # for owner in cloud.owners:
         #     owners = owners + owner.username + ' '
         owners = [u.username for u in cloud.owners]
-        print('[{}], {}, {}B, {}'
-              .format(cloud.id, cloud.full_name(), cloud.max_size, owners))
+        contributors = [u.username for u in cloud.contributors]
+        print('[{}], {}, {}, {}B, {}, {}'
+              .format(cloud.id, cloud.full_name(), cloud.privacy, cloud.max_size, owners, contributors))
 
 
 def list_hosts(instance, argv):

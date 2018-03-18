@@ -163,9 +163,10 @@ def respond_to_mirror_request(db, connection, address, new_host, cloud):
     db.session.commit()
 
     # rand_host = match.hosts.first()
+    # FIXME why is this rand_mirror then rand_host???????
     rand_mirror = None
     if len(cloud.active_hosts()) > 0:
-        rand_host = cloud.active_hosts()[0]  # todo make this random
+        rand_mirror = cloud.active_hosts()[0]  # todo make this random
     if rand_mirror is not None:
         # ip = rand_host.ip
         ip = rand_mirror.host.ip()
