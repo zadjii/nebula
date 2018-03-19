@@ -239,9 +239,10 @@ class PrivateData(object):
         # # make sure to always use the cloud root.
         # if path_elems[0] != '.':
         #     path_elems.insert(0, '.')
-        curr_path = path_elems[0]  # NOT self._cloud.root_directory
+        # curr_path = path_elems[0]  # NOT self._cloud.root_directory
+        curr_path = '.' # always start by checking the root
         current_perms = NO_ACCESS
-        i = 1
+        i = 0
         # I'm so sorry that this loop is structured weird
         while i <= len(path_elems) and current_perms < RDWR_ACCESS:
             # curr_path = posixpath.normpath(curr_path)

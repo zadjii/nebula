@@ -189,7 +189,7 @@ def do_client_list_files(host_obj, connection, address, msg_obj, client):
     if rd.success:
         mylog('Responding successfully to ClientListFiles')
         full_path = rel_path.to_absolute(cloud.root_directory)
-        resp = ListFilesResponseMessage(cloudname, session_id, rel_path,
+        resp = ListFilesResponseMessage(cloudname, session_id, rel_path.to_string(),
                                         full_path)
         connection.send_obj(resp)
     else:
