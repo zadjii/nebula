@@ -187,10 +187,14 @@ def do_client_list_files(host_obj, connection, address, msg_obj, client):
     rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
                                                rel_path, READ_ACCESS)
     if rd.success:
-        mylog('Responding successfully to ClientListFiles')
         full_path = rel_path.to_absolute(cloud.root_directory)
-        resp = ListFilesResponseMessage(cloudname, session_id, rel_path.to_string(),
-                                        full_path)
+        if not os.path.isdir(full_path):
+            mylog('Responding to ClientListFiles with error - {} is a file, not dir.'.format(rel_path.to_string()))
+            resp = FileIsNotDirErrorMessage()
+        else:
+            mylog('Responding successfully to ClientListFiles')
+            resp = ListFilesResponseMessage(cloudname, session_id, rel_path.to_string(),
+                                            full_path)
         connection.send_obj(resp)
     else:
         # the access check will send error

@@ -229,7 +229,6 @@ class RelativePath(object):
     # See RelativePathTests
     def __init__(self):
         self._path = None
-        pass
 
     def from_relative(self, relative_path_string):
         """
@@ -239,6 +238,8 @@ class RelativePath(object):
         :return:
         """
         working = relative_path_string
+        if working == '':
+            working = '/'
 
         if not os.path.isabs(working):
             working = os.path.join('/', working)
