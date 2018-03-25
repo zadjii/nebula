@@ -21,7 +21,8 @@ from host.PrivateData import PrivateData, NO_ACCESS, READ_ACCESS
 from host.WatchdogThread import WatchdogWorker
 from host.function.network.client import list_files_handler, \
     handle_recv_file_from_client, handle_read_file_request, \
-    handle_client_add_owner, handle_client_add_contributor
+    handle_client_add_owner, handle_client_add_contributor, handle_client_make_directory, handle_client_get_permissions, \
+    handle_client_get_shared_paths
 from host.function.network_updates import handle_fetch, handle_file_change
 from host.models.Cloud import Cloud
 from host.models.Remote import Remote
@@ -29,10 +30,7 @@ from host.util import set_mylog_name, mylog, get_ipv6_list, setup_remote_socket,
     get_client_session, permissions_are_sufficient, create_key_pair, create_cert_request
 from messages import *
 
-from msg_codes import HOST_HOST_FETCH, HOST_FILE_PUSH, \
-    STAT_FILE_REQUEST, LIST_FILES_REQUEST, CLIENT_FILE_PUT, READ_FILE_REQUEST, \
-    CLIENT_ADD_OWNER, CLIENT_ADD_CONTRIBUTOR, REFRESH_MESSAGE, \
-    HOST_MOVE_RESPONSE, CLIENT_UPGRADE_CONNECTION_REQUEST
+from msg_codes import *
 
 __author__ = 'Mike'
 
@@ -553,6 +551,12 @@ class HostController:
             elif msg_type == CLIENT_UPGRADE_CONNECTION_REQUEST:
                 self.handle_connection_upgrade(connection, address, msg_obj)
                 mylog('Upgraded connection')
+            elif msg_type == CLIENT_MAKE_DIRECTORY:
+                handle_client_make_directory(self, connection, address, msg_obj)
+            elif msg_type == CLIENT_GET_PERMISSIONS:
+                handle_client_get_permissions(self, connection, address, msg_obj)
+            elif msg_type == CLIENT_GET_SHARED_PATHS:
+                handle_client_get_shared_paths(self, connection, address, msg_obj)
             else:
                 mylog('I don\'t know what to do with {},\n{}'.format(msg_obj, msg_obj.__dict__))
         except Exception, e:

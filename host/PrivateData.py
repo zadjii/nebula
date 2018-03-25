@@ -322,7 +322,6 @@ class PrivateData(object):
         found_permissions.append((new_path, new_permissions))
         return found_permissions
 
-
     def get_user_permissions(self, user_id):
         # type: (int) -> [(str, int)]
         """

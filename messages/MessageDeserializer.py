@@ -1,13 +1,11 @@
-# last generated 2016-10-10 23:18:11.708000
+# last generated 2018-03-25 00:09:52.859000
 import json
-import logging
-
 from msg_codes import *
 from messages import *
 from common_util import *
-
 _decoder_table = {
-    ADD_CONTRIBUTOR_FAILURE: AddContributorFailureMessage.deserialize # -17
+    FILE_ALREADY_EXISTS: FileAlreadyExistsMessage.deserialize # -18
+    , ADD_CONTRIBUTOR_FAILURE: AddContributorFailureMessage.deserialize # -17
     , ADD_OWNER_FAILURE: AddOwnerFailureMessage.deserialize # -16
     , MIRROR_FAILURE: MirrorFailureMessage.deserialize # -15
     , SYSTEM_FILE_WRITE_ERROR: SystemFileWriteErrorMessage.deserialize # -14
@@ -80,7 +78,12 @@ _decoder_table = {
     , HOST_MOVE_RESPONSE: HostMoveResponseMessage.deserialize # 54
     , CLIENT_UPGRADE_CONNECTION_REQUEST: ClientUpgradeConnectionRequestMessage.deserialize # 55
     , ENABLE_ALPHA_ENCRYPTION_RESPONSE: EnableAlphaEncryptionResponseMessage.deserialize # 56
-
+    , CLIENT_MAKE_DIRECTORY: ClientMakeDirectoryMessage.deserialize # 57
+    , CLIENT_MAKE_DIRECTORY_RESPONSE: ClientMakeDirectoryResponseMessage.deserialize # 58
+    , CLIENT_GET_PERMISSIONS: ClientGetPermissionsMessage.deserialize # 59
+    , CLIENT_GET_PERMISSIONS_RESPONSE: ClientGetPermissionsResponseMessage.deserialize # 60
+    , CLIENT_GET_SHARED_PATHS: ClientGetSharedPathsMessage.deserialize # 61
+    , CLIENT_GET_SHARED_PATHS_RESPONSE: ClientGetSharedPathsResponseMessage.deserialize # 62
 }
 
 

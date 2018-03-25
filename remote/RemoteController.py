@@ -89,6 +89,7 @@ def do_client_get_clouds(db, session_id):
 
     owned_clouds = [c.to_dict() for c in user.owned_clouds.all()]
     contributed_clouds = [c.to_dict() for c in user.contributed_clouds.all()]
+    _log.debug('{}'.format(contributed_clouds))
     return Success((owned_clouds, contributed_clouds))
 
 
