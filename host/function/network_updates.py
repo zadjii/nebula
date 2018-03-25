@@ -97,7 +97,7 @@ def handle_file_change(host_obj, connection, address, msg_obj):
     # todo:33 replace all the calls to this with a function.
     matching_cloud = matching_id_clouds.filter_by(username=cloud_uname, name=cloudname).first()
     if matching_cloud is None:
-        send_generic_error_and_close(connection)
+        # send_generic_error_and_close(connection)
         raise Exception(
             'host came asking for cloudname=\'' + cloudname + '\''
             + ', however, I don\'t have a matching cloud.'

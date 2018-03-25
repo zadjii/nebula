@@ -1,6 +1,6 @@
 from common_util import mylog, get_mylog
 from messages import GetHostsResponseMessage, GetActiveHostsResponseMessage, InvalidStateMessage
-from msg_codes import send_generic_error_and_close, GET_HOSTS_REQUEST
+from msg_codes import GET_HOSTS_REQUEST
 from remote import Host, Cloud
 from remote.models.Cloud import cloud_contributors
 from remote.models.Mirror import Mirror
@@ -54,7 +54,7 @@ def get_hosts_response(remote_obj, connection, address, msg_obj):
     matching_cloud = creator.created_clouds.filter_by(name=cloudname).first()
 
     if matching_cloud is None:
-        send_generic_error_and_close(connection)
+        # send_generic_error_and_close(connection)
         raise Exception('No cloud with name ' + cloudname)
 
     # At this point, we've identified the mirror requesting this information

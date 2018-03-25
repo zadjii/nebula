@@ -384,10 +384,11 @@ def handle_client_make_directory(host_obj, connection, address, msg_obj):
 
 
 def do_client_get_permissions(host_obj, connection, address, msg_obj, client):
+    # type: (HostController, AbstractConnection, object, ClientGetPermissionsMessage, Client) -> object
     _log = get_mylog()
     cloud = client.cloud
     session_id = client.uuid
-    fpath = msg_obj.fpath
+    fpath = msg_obj.path
 
     rel_path = RelativePath()
     rd = rel_path.from_relative(fpath)
@@ -412,6 +413,7 @@ def do_client_get_permissions(host_obj, connection, address, msg_obj, client):
         return
 
     perms = rd.data
+    _log.debug('{} has {} permission for {}'.format(client.user_id, perms, rel_path.to_string()))
     resp = ClientGetPermissionsResponseMessage(perms)
     connection.send_obj(resp)
 

@@ -1,6 +1,5 @@
 from common_util import mylog, Error, ResultAndData, Success, get_mylog
 from messages import ClientGetCloudHostsResponseMessage, AuthErrorMessage, InvalidStateMessage
-from msg_codes import send_generic_error_and_close
 from remote.util import get_user_from_session, get_cloud_by_name
 
 

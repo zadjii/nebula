@@ -2,7 +2,6 @@ from common_util import send_error_and_close, mylog, get_mylog
 from messages import GoRetrieveHereMessage, HostVerifyHostFailureMessage, \
     HostVerifyHostSuccessMessage, InvalidStateMessage, MirrorFailureMessage, \
     AuthErrorMessage
-from msg_codes import send_generic_error_and_close
 from remote import Host, Cloud, Session
 from remote.models.Mirror import Mirror
 from remote.models.User import User
