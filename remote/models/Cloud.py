@@ -25,13 +25,18 @@ cloud_contributors = Table(
     , Column('user_id', Integer, ForeignKey('user.id'))
     )
 
+# These definitions left here as we change the meanings.
+# HIDDEN_CLOUD = 0  # only owners can access IP
+# PRIVATE_CLOUD = 1  # only owners and contributors
+# PUBLIC_CLOUD = 2  # anyone (host can still reject RDWR)
+# # todo: when making links, host needs to know privacy state. If a host wants to
+# # cont make a public link, then the cloud needs to be public, etc.
 
-HIDDEN_CLOUD = 0  # only owners can access IP
-PRIVATE_CLOUD = 1  # only owners and contributors
-PUBLIC_CLOUD = 2  # anyone (host can still reject RDWR)
-# todo: when making links, host needs to know privacy state. If a host wants to
-# cont make a public link, then the cloud needs to be public, etc.
-
+PRIVATE_CLOUD = 1  # No file on the coud was ever shared with the public.
+PUBLIC_CLOUD = 2  # At least one file was shared with the public.
+# Honestly, we could still probably just do away with this...
+# We'd make all clouds public, and then it'd be the host's responsibility to reject the requests.
+# Kinda shitty though, to have all hosts ddos-able...
 
 class Cloud(base):
     __tablename__ = 'cloud'
@@ -55,6 +60,7 @@ class Cloud(base):
     mirrors = relationship('Mirror', backref='cloud', lazy='dynamic')
     last_update = Column(DateTime)
     max_size = Column(Integer, default=INFINITE_SIZE)  # Cloud size in bytes
+    # If this is set to public, then at least one file was shared publicly.
     privacy = Column(Integer, default=PRIVATE_CLOUD)
 
     creator_id = Column(ForeignKey('user.id'))
@@ -69,12 +75,16 @@ class Cloud(base):
         self.max_size = -1
 
     def is_hidden(self):
-        return self.privacy == HIDDEN_CLOUD
+        # return self.privacy == HIDDEN_CLOUD
+        # The cloud has been shared with no one.
+        return self.contributors.count() == 0 and self.privacy == PRIVATE_CLOUD
 
     def is_private(self):
+        # The cloud has been shared, but no file is publicly available.
         return self.privacy == PRIVATE_CLOUD
 
     def is_public(self):
+        # There is at least one file that has been shared with the public.
         return self.privacy == PUBLIC_CLOUD
 
     def has_owner(self, user):
@@ -92,14 +102,17 @@ class Cloud(base):
             self.contributors.append(user)
 
     def can_access(self, user):
-        if self.is_hidden():
-            return self.has_owner(user)
+        if self.is_public():
+            return True
+        elif user is None:
+            return False
         elif self.is_private():
             return self.has_owner(user) or self.has_contributor(user)
-        else:
-            return True
+        else: # self.is_hidden():
+            return self.has_owner(user)
 
     def active_hosts(self):
+        # type: () -> [Mirror]
         mirrors = []
         for mirror in self.mirrors.all():
             if mirror.is_active():
@@ -116,7 +129,7 @@ class Cloud(base):
 
     def uname(self):
         # type: () -> str
-        return self.creator.username
+        return self.creator.get_username()
 
     def cname(self):
         # type: () -> str
@@ -150,6 +163,9 @@ class Cloud(base):
     def to_json(self):
         # todo: Replace this with a proper marshmallow implementation
         return json.dumps(self.to_dict())
+
+    def make_public(self):
+        self.privacy = PUBLIC_CLOUD
 
     def get_get_hosts_dict(self, active_only=False):
         # type: (bool) -> [dict]

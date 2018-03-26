@@ -165,20 +165,21 @@ class Instance(object):
         return rd
 
     @staticmethod
-    def get_other_processes():
+    def get_other_processes(argv=None):
         _log = get_mylog()
         my_pid = os.getpid()
-        pids = Instance._get_existing_process()
+        argv = sys.argv if argv is None else argv
+        pids = Instance._get_existing_process(argv)
         _log.debug('Found these processes={}'.format(pids))
         other_pids = [p for p in pids if p != my_pid]
         _log.debug('These are the other ones={}'.format(other_pids))
         return other_pids
 
     @staticmethod
-    def _get_existing_process():
+    def _get_existing_process(argv=None):
         # type: () -> List[int]
         _log = get_mylog()
-        argv = sys.argv
+        argv = sys.argv if argv is None else argv
         # process_name = argv[0]
         _log.debug('These are my args={}'.format(argv))
         matching_pids = []
@@ -219,6 +220,7 @@ class Instance(object):
 
         _log = get_mylog()
         my_pid = os.getpid()
+        # other_pids = Instance.get_other_processes(['-i', self.get_instance_name()])
         other_pids = Instance.get_other_processes()
         rd = Instance.kill_pids(other_pids)
         # pid_file = self._get_pid_file_path()

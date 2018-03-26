@@ -237,8 +237,12 @@ def local_file_delete(host_obj, directory_path, dir_node, filename, filenode, db
     #   The same subset as in recursive child delete needs to be removed from that file.
     #   **It's the deleter's responsibility to also update the .nebs.**
     relative_deletables = [os.path.relpath(child[0], mirror.root_directory) for child in deletables]
-
-    result = private_data.delete_paths(relative_deletables)
+    rel_deletable_paths = []
+    for deletable in relative_deletables:
+        rp = RelativePath()
+        rp.from_relative(deletable)
+        rel_deletable_paths.append(rp)
+    result = private_data.delete_paths(rel_deletable_paths)
     private_data.commit()
     db.session.commit()
     updates = [(FILE_DELETE, file_pathname)]

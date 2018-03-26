@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 
-from common_util import ResultAndData, send_error_and_close, Error, Success
+from common_util import ResultAndData, send_error_and_close, Error, Success, get_mylog
 from host import Cloud
 # from host.function.network.ls_handler import list_files_handler
 from host.function.recv_files import recv_file_tree
@@ -51,9 +51,9 @@ def verify_host(db, cloud_uname, cname, local_id, other_id):
 
 
 def handle_fetch(host_obj, connection, address, msg_obj):
-    mylog('handle_fetch 0')
+    _log = get_mylog()
     db = host_obj.get_instance().make_db_session ()
-    mylog('handle_fetch 1')
+    _log.debug('handle_fetch 1')
     # the id's are swapped because they are named from the origin host's POV.
     other_id = msg_obj.my_id
     local_id = msg_obj.other_id
@@ -97,7 +97,7 @@ def handle_file_change(host_obj, connection, address, msg_obj):
     # todo:33 replace all the calls to this with a function.
     matching_cloud = matching_id_clouds.filter_by(username=cloud_uname, name=cloudname).first()
     if matching_cloud is None:
-        send_generic_error_and_close(connection)
+        # send_generic_error_and_close(connection)
         raise Exception(
             'host came asking for cloudname=\'' + cloudname + '\''
             + ', however, I don\'t have a matching cloud.'

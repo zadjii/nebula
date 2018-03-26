@@ -10,14 +10,14 @@ from host.models import FileNode
 from host.models.Client import Client
 from host.models.Cloud import Cloud
 from messages import HostVerifyClientRequestMessage
-from msg_codes import send_generic_error_and_close, HOST_VERIFY_CLIENT_SUCCESS
+from msg_codes import HOST_VERIFY_CLIENT_SUCCESS
 from common_util import *
 
 
 def validate_host_id(db, host_id, conn):
     rd = get_matching_clouds(db, host_id)
     if not rd.success:
-        send_generic_error_and_close(conn)
+        # send_generic_error_and_close(conn)
         raise Exception(rd.data)
     return rd
 
@@ -69,8 +69,8 @@ def check_response(expected, recieved):
 def get_clouds_by_name(db, uname, cname):
     # return [cloud for cloud in db.session.query(Cloud).filter_by(name=cname)]
     # return [cloud for cloud in db.session.query(Cloud).filter_by(username=uname, name=cname)]
-    return db.session.query(Cloud).filter_by(username=uname, name=cname).all()
-
+    # return db.session.query(Cloud).filter_by(username=uname, name=cname).all()
+    return db.session.query(Cloud).filter(Cloud.username.ilike(uname)).filter_by(name=cname).all()
 
 def get_client_session(db, uuid, cloud_uname, cloud_cname):
     rd = Error()

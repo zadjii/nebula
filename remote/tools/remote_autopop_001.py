@@ -1,5 +1,7 @@
 import sys
-
+import os
+_NEBULA_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+sys.path.append(_NEBULA_ROOT)
 from common.Instance import Instance
 from remote.NebrInstance import NebrInstance
 
@@ -83,6 +85,11 @@ def repop(instance):
     bachelorette.owners.append(alli)
 
     db.session.commit()
+
+    print('{} privacy={}'.format(wedding.name, wedding.privacy))
+    print('{} privacy={}'.format(bridesmaids.name, bridesmaids.privacy))
+    print('{} privacy={}'.format(bachelorette.name, bachelorette.privacy))
+
     print 'Remote DB populated with 001 data - "Wedding"'
 
 if __name__ == '__main__':

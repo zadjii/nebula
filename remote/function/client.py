@@ -1,6 +1,5 @@
-from common_util import mylog, Error, ResultAndData, Success
+from common_util import mylog, Error, ResultAndData, Success, get_mylog
 from messages import ClientGetCloudHostsResponseMessage, AuthErrorMessage, InvalidStateMessage
-from msg_codes import send_generic_error_and_close
 from remote.util import get_user_from_session, get_cloud_by_name
 
 
@@ -22,7 +21,7 @@ def do_client_get_cloud_hosts(db, session_id, cloud_uname, cname):
     # type: (SimpleDB, str, str, str) -> ResultAndData
     # type: (SimpleDB, str, str, str) -> ResultAndData(True, [dict])
     # type: (SimpleDB, str, str, str) -> ResultAndData(False, BaseMessage)
-
+    _log = get_mylog()
     rd = get_user_from_session(db, session_id)
     if not rd.success:
         return ResultAndData(False, InvalidStateMessage(rd.data))
@@ -32,11 +31,13 @@ def do_client_get_cloud_hosts(db, session_id, cloud_uname, cname):
     # todo: also use uname to lookup cloud
     cloud = get_cloud_by_name(db, cloud_uname, cname)
     if cloud is None:
-        return Error(InvalidStateMessage('Cloud {}/{} does not exist'.format(cloud_uname, cname)))
-    if not cloud.has_owner(user):
-        # Pretend that the cloud doesnt exist
-        # todo: evaluate if this is a good answer
-        return Error(InvalidStateMessage('Cloud {}/{} does not exist'.format(cloud_uname, cname)))
+        msg = 'Cloud {}/{} does not exist'.format(cloud_uname, cname)
+        _log.debug(msg)
+        return Error(InvalidStateMessage(msg))
+    if not cloud.can_access(user):
+        msg = 'You do not have permission to access {}/{} '.format(cloud_uname, cname)
+        _log.debug(msg)
+        return Error(InvalidStateMessage(msg))
 
     # todo:37 maybe this should be an option in the API, to get all or only active
     # For now I'm defaulting to active, becuase all mirror attempts make a host,

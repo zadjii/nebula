@@ -4,7 +4,7 @@ from remote import User, Cloud, Session
 from msg_codes import *
 from messages import *
 from remote.models.ClientCloudHostMapping import ClientCloudHostMapping
-from remote.util import get_cloud_by_name, validate_session_id
+from remote.util import get_cloud_by_name, validate_session_id, get_user_by_name
 
 __author__ = 'Mike'
 
@@ -19,25 +19,6 @@ def setup_client_session(remote_obj, connection, address, msg_obj):
     username = msg_obj.uname
     password = msg_obj.passw
 
-    # user = db.session.query(User).filter_by(username=username).first()
-    # if user is None:
-    #     mylog('ERR: user was none')
-    #     send_generic_error_and_close(connection)  # todo send proper error
-    #     return
-    # if not user.check_password(password):
-    #     mylog('ERR: user pass wrong')
-    #     send_generic_error_and_close(connection)  # todo send proper error
-    #     return
-    #
-    # # At this point, user exists, provided correct password.
-    # # Now we assign them a session ID.
-    # # THAT'S IT. They'll come ask us for a cloud later.
-    #
-    # session = Session(user)
-    # db.session.add(session)
-    #
-    # # session.user = user
-    # db.session.commit()
     db = remote_obj.get_db()
     rd = do_setup_client_session(db, username, password)
     if rd.success:
@@ -55,7 +36,8 @@ def do_setup_client_session(db, username, password):
     # type: (SimpleDB, str, str) -> ResultAndData
     rd = Error()
     _log = get_mylog()
-    user = db.session.query(User).filter_by(username=username).first()
+
+    user = get_user_by_name(db, username)
     if user is None:
         msg = 'ERR: user was none'
         _log.debug(msg)
@@ -100,7 +82,7 @@ def do_client_get_cloud_host(db, cloud_uname, cloudname, session_id):
         mylog(msg)
         return Error(InvalidStateMessage(msg))
 
-    creator = db.session.query(User).filter_by(username=cloud_uname).first()
+    creator = get_user_by_name(db, cloud_uname)
     if creator is None:
         err = 'No cloud matching {}/{}'.format(cloud_uname, cloudname)
         msg = InvalidStateMessage(err)
@@ -162,9 +144,12 @@ def get_cloud_host(remote_obj, connection, address, msg_obj):
         connection.send_obj(rd.data)
     else:
         host_mapping = rd.data
-        host = host_mapping.host
+        # host = host_mapping.host
+        mirror = host_mapping.mirror
+        host = mirror.host
+        cloud = mirror.cloud
         # cloud = host_mapping.cloud
-        cloud = db.session.query(Cloud).get(host_mapping.cloud_id)
+        # cloud = db.session.query(Cloud).get(host_mapping.cloud_id)
         # tell client
         msg = ClientGetCloudHostResponseMessage(session_id, cloud.uname(), cloud.cname(), host.ipv6,
                                                 host.port, host.ws_port)

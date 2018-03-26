@@ -1,5 +1,6 @@
-# last generated 2016-10-10 23:18:11.361000
+# last generated 2018-03-25 00:09:52.075000
 from messages.BaseMessage import BaseMessage
+from messages.FileAlreadyExistsMessage import FileAlreadyExistsMessage
 from messages.AddContributorFailureMessage import AddContributorFailureMessage
 from messages.AddOwnerFailureMessage import AddOwnerFailureMessage
 from messages.MirrorFailureMessage import MirrorFailureMessage
@@ -73,5 +74,10 @@ from messages.HostMoveRequestMessage import HostMoveRequestMessage
 from messages.HostMoveResponseMessage import HostMoveResponseMessage
 from messages.ClientUpgradeConnectionRequestMessage import ClientUpgradeConnectionRequestMessage
 from messages.EnableAlphaEncryptionResponseMessage import EnableAlphaEncryptionResponseMessage
-
+from messages.ClientMakeDirectoryMessage import ClientMakeDirectoryMessage
+from messages.ClientMakeDirectoryResponseMessage import ClientMakeDirectoryResponseMessage
+from messages.ClientGetPermissionsMessage import ClientGetPermissionsMessage
+from messages.ClientGetPermissionsResponseMessage import ClientGetPermissionsResponseMessage
+from messages.ClientGetSharedPathsMessage import ClientGetSharedPathsMessage
+from messages.ClientGetSharedPathsResponseMessage import ClientGetSharedPathsResponseMessage
 

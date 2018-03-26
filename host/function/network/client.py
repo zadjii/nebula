@@ -3,9 +3,9 @@ import os
 import time
 from stat import S_ISDIR
 
-from common_util import mylog, send_error_and_close, Success, Error
-from host.PrivateData import READ_ACCESS, SHARE_ACCESS
-from host.function.recv_files import recv_file_tree
+from common_util import mylog, send_error_and_close, Success, Error, PUBLIC_USER_ID, RelativePath, get_mylog
+from host.PrivateData import READ_ACCESS, SHARE_ACCESS, NO_ACCESS, WRITE_ACCESS
+from host.function.recv_files import recv_file_tree, recv_file_transfer
 from host.util import check_response, validate_or_get_client_session, \
     permissions_are_sufficient
 from messages import *
@@ -38,10 +38,20 @@ def handle_read_file_request(host_obj, connection, address, msg_obj):
 
 def do_client_read_file(host_obj, connection, address, msg_obj, client):
     db = host_obj.get_db()
+    _log = get_mylog()
     cloud = client.cloud
 
     cloudname = cloud.name
     requested_file = msg_obj.fpath
+
+    rel_path = RelativePath()
+    rd = rel_path.from_relative(requested_file)
+    if not rd.success:
+        msg = '{} is not a valid cloud path'.format(requested_file)
+        err = InvalidStateMessage(msg)
+        _log.debug(err)
+        send_error_and_close(err, connection)
+        return
 
     requesting_all = requested_file == '/'
     filepath = None
@@ -51,11 +61,8 @@ def do_client_read_file(host_obj, connection, address, msg_obj, client):
         # todo: if they're requesting all, it's definitely a dir,
         # which is an error
     else:
-        filepath = os.path.join(cloud.root_directory, requested_file)
+        filepath = rel_path.to_absolute(cloud.root_directory)
 
-    # FIXME: Make sure paths are limited to children of the root
-
-    req_file_stat = None
     try:
         req_file_stat = os.stat(filepath)
     except Exception:
@@ -64,10 +71,8 @@ def do_client_read_file(host_obj, connection, address, msg_obj, client):
         # connection.close()
         return
 
-    relative_pathname = os.path.relpath(filepath, cloud.root_directory)
-
     rd = host_obj.client_access_check_or_close(connection, client.uuid, cloud,
-                                               relative_pathname, READ_ACCESS)
+                                               rel_path, READ_ACCESS)
     if not rd.success:
         return
 
@@ -80,7 +85,7 @@ def do_client_read_file(host_obj, connection, address, msg_obj, client):
         # send RFP - ReadFileResponse
         req_file_size = req_file_stat.st_size
         requested_file = open(filepath, 'rb')
-        response = ReadFileResponseMessage(client.uuid, relative_pathname,
+        response = ReadFileResponseMessage(client.uuid, rel_path.to_string(),
                                            req_file_size)
         connection.send_obj(response)
         mylog(
@@ -156,26 +161,40 @@ def client_message_wrapper(host_obj, connection, address, msg_obj, callback):
 
 
 def do_client_list_files(host_obj, connection, address, msg_obj, client):
-    mylog('do_client_list_files')
+    _log = get_mylog()
+    _log.debug('do_client_list_files')
     cloud = client.cloud
     cloudname = cloud.name
-    rel_path = msg_obj.fpath
+    # rel_path = msg_obj.fpath
     session_id = client.uuid
-    full_path = cloud.translate_relative_path(rel_path)
+    # full_path = cloud.translate_relative_path(rel_path)
 
     # todo: I believe this should be more complicated.
     # Say a person has permission to read some children of the directory,
     # but not the directory itself. ls returns ACCESS_ERROR currently.
     # Perhaps it should return the children it can access?
     # though, is this process recursive? What if I ls "/", but only have access to "/foo/bar/..."?
-    
+
+    rel_path = RelativePath()
+    rd = rel_path.from_relative(msg_obj.fpath)
+    if not rd.success:
+        msg = '{} is not a valid cloud path'.format(msg_obj.fpath)
+        err = InvalidStateMessage(msg)
+        _log.debug(err)
+        send_error_and_close(err, connection)
+        return
 
     rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
                                                rel_path, READ_ACCESS)
     if rd.success:
-        mylog('Responding successfully to ClientListFiles')
-        resp = ListFilesResponseMessage(cloudname, session_id, rel_path,
-                                        full_path)
+        full_path = rel_path.to_absolute(cloud.root_directory)
+        if not os.path.isdir(full_path):
+            mylog('Responding to ClientListFiles with error - {} is a file, not dir.'.format(rel_path.to_string()))
+            resp = FileIsNotDirErrorMessage()
+        else:
+            mylog('Responding successfully to ClientListFiles')
+            resp = ListFilesResponseMessage(cloudname, session_id, rel_path.to_string(),
+                                            full_path)
         connection.send_obj(resp)
     else:
         # the access check will send error
@@ -202,6 +221,12 @@ def do_client_add_owner(host_obj, connection, address, msg_obj, client):
         send_error_and_close(err, connection)
         return
 
+    if new_owner_id == PUBLIC_USER_ID:
+        msg = 'The public can\'t be a owner of a cloud'
+        err = AddOwnerFailureMessage(msg)
+        mylog(err.message, '31')
+        send_error_and_close(err, connection)
+        return
     if not private_data.has_owner(client.user_id):
         msg = 'User [{}] is not an owner of the cloud "{}"'.format(client.user_id, cloudname)
         err = AddOwnerFailureMessage(msg)
@@ -240,6 +265,7 @@ def handle_client_add_contributor(host_obj, connection, address, msg_obj):
 
 
 def do_client_add_contributor(host_obj, connection, address, msg_obj, client):
+    _log = get_mylog()
     cloud = client.cloud
     cloudname = cloud.name
     session_id = client.uuid
@@ -247,9 +273,14 @@ def do_client_add_contributor(host_obj, connection, address, msg_obj, client):
     fpath = msg_obj.fpath
     new_permissions = msg_obj.permissions
 
-    # TODO: make sure the path is a relative path to the cloud
-
-    # TODO: Normalize the path
+    rel_path = RelativePath()
+    rd = rel_path.from_relative(fpath)
+    if not rd.success:
+        msg = '{} is not a valid cloud path'.format(fpath)
+        err = InvalidStateMessage(msg)
+        _log.debug(err)
+        send_error_and_close(err, connection)
+        return
 
     private_data = host_obj.get_private_data(cloud)
     if private_data is None:
@@ -259,7 +290,7 @@ def do_client_add_contributor(host_obj, connection, address, msg_obj, client):
         send_error_and_close(err, connection)
         return
     rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
-                                               fpath, SHARE_ACCESS)
+                                               rel_path, SHARE_ACCESS)
     if not rd.success:
         # conn was closed by client_access_check_or_close
         return
@@ -290,10 +321,143 @@ def do_client_add_contributor(host_obj, connection, address, msg_obj, client):
         mylog(err.message, '31')
         send_error_and_close(err, connection)
     else:
-        private_data.add_user_permission(new_user_id, fpath, new_permissions)
+        # PrivateData will be able to handle the public_user_id
+        private_data.add_user_permission(new_user_id, rel_path, new_permissions)
         private_data.commit()
         mylog('Added permission {} for user [{}] to file {}:{}'.format(
             new_permissions, new_user_id, cloudname, fpath
         ))
         response = AddContributorSuccessMessage(new_user_id, cloud.uname(), cloudname)
         connection.send_obj(response)
+
+def do_client_make_directory(host_obj, connection, address, msg_obj, client):
+    _log = get_mylog()
+    cloud = client.cloud
+    session_id = client.uuid
+    root_path = msg_obj.root
+    child_path = msg_obj.dir_name
+
+    real_message = ClientFileTransferMessage(msg_obj.sid
+                                             , msg_obj.cloud_uname
+                                             , msg_obj.cname
+                                             , os.path.join(msg_obj.root, msg_obj.dir_name)
+                                             , 0
+                                             , True)
+    mylog('converted={}'.format(real_message.serialize()))
+    return recv_file_transfer(host_obj, real_message, cloud, connection, host_obj.get_db(), True)
+
+    # root_rel_path = RelativePath()
+    # rd = root_rel_path.from_relative(root_path)
+    # if not rd.success:
+    #     msg = '{} is not a valid cloud path'.format(root_path)
+    #     err = InvalidStateMessage(msg)
+    #     _log.debug(err)
+    #     send_error_and_close(err, connection)
+    #     return
+    # child_rel_path = RelativePath()
+    # rd = child_rel_path.from_relative(child_path)
+    # if not rd.success:
+    #     msg = '{} is not a valid cloud path'.format(child_path)
+    #     err = InvalidStateMessage(msg)
+    #     _log.debug(err)
+    #     send_error_and_close(err, connection)
+    #     return
+    #
+    # private_data = host_obj.get_private_data(cloud)
+    # if private_data is None:
+    #     msg = 'Somehow the cloud doesn\'t have a privatedata associated with it'
+    #     err = InvalidStateMessage(msg)
+    #     mylog(err.message, '31')
+    #     send_error_and_close(err, connection)
+    #     return
+    # rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
+    #                                            root_rel_path, WRITE_ACCESS)
+    # if not rd.success:
+    #     # conn was closed by client_access_check_or_close
+    #     return
+    #
+    # full_path = root_rel_path.to_absolute(cloud.root_directory)
+    # full_path = child_rel_path.to_absolute(full_path)
+    #
+    # if not os.path.exists(full_path):
+    #     os.makedirs(full_path)
+    #     resp = ClientMakeDirectoryResponseMessage()
+    # else:
+    #     resp = FileAlreadyExistsMessage()
+    #
+    # connection.send_obj(resp)
+
+def handle_client_make_directory(host_obj, connection, address, msg_obj):
+    mylog('handle_client_make_directory')
+    # real_message = ClientFileTransferMessage(msg_obj.sid
+    #                                          , msg_obj.cloud_uname
+    #                                          , msg_obj.cname
+    #                                          , os.path.join(msg_obj.root, msg_obj.dir_name)
+    #                                          , 0
+    #                                          , True)
+    # mylog('converted={}'.format(real_message.serialize()))
+    # return handle_recv_file_from_client(host_obj, connection, address, real_message)
+    return client_message_wrapper(host_obj, connection, address, msg_obj,
+                                  do_client_make_directory)
+
+
+def do_client_get_permissions(host_obj, connection, address, msg_obj, client):
+    # type: (HostController, AbstractConnection, object, ClientGetPermissionsMessage, Client) -> object
+    _log = get_mylog()
+    cloud = client.cloud
+    session_id = client.uuid
+    fpath = msg_obj.path
+
+    rel_path = RelativePath()
+    rd = rel_path.from_relative(fpath)
+    if not rd.success:
+        msg = '{} is not a valid cloud path'.format(fpath)
+        err = InvalidStateMessage(msg)
+        _log.debug(err)
+        send_error_and_close(err, connection)
+        return
+
+    private_data = host_obj.get_private_data(cloud)
+    if private_data is None:
+        msg = 'Somehow the cloud doesn\'t have a privatedata associated with it'
+        err = InvalidStateMessage(msg)
+        mylog(err.message, '31')
+        send_error_and_close(err, connection)
+        return
+    rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
+                                               rel_path, NO_ACCESS)
+    if not rd.success:
+        # conn was closed by client_access_check_or_close
+        return
+
+    perms = rd.data
+    _log.debug('{} has {} permission for {}'.format(client.user_id, perms, rel_path.to_string()))
+    resp = ClientGetPermissionsResponseMessage(perms)
+    connection.send_obj(resp)
+
+def handle_client_get_permissions(host_obj, connection, address, msg_obj):
+    mylog('handle_client_get_permissions')
+    return client_message_wrapper(host_obj, connection, address, msg_obj,
+                                  do_client_get_permissions)
+
+
+def do_client_get_shared_paths(host_obj, connection, address, msg_obj, client):
+    _log = get_mylog()
+    cloud = client.cloud
+    user_id = client.user_id
+
+    private_data = host_obj.get_private_data(cloud)
+    if private_data is None:
+        msg = 'Somehow the cloud doesn\'t have a privatedata associated with it'
+        err = InvalidStateMessage(msg)
+        mylog(err.message, '31')
+        send_error_and_close(err, connection)
+        return
+
+    resp = ClientGetSharedPathsResponseMessage(private_data.get_user_permissions(user_id))
+    connection.send_obj(resp)
+
+def handle_client_get_shared_paths(host_obj, connection, address, msg_obj):
+    mylog('handle_client_get_shared_paths')
+    return client_message_wrapper(host_obj, connection, address, msg_obj,
+                                  do_client_get_shared_paths)

@@ -23,7 +23,7 @@ from remote.function.mirror import mirror_complete, host_request_cloud, \
     client_mirror, host_verify_host
 from remote.models.Mirror import Mirror
 from remote.util import get_user_from_session, validate_session_id, \
-    get_cloud_by_name
+    get_cloud_by_name, get_user_by_name
 
 __author__ = 'Mike'
 
@@ -89,6 +89,7 @@ def do_client_get_clouds(db, session_id):
 
     owned_clouds = [c.to_dict() for c in user.owned_clouds.all()]
     contributed_clouds = [c.to_dict() for c in user.contributed_clouds.all()]
+    _log.debug('{}'.format(contributed_clouds))
     return Success((owned_clouds, contributed_clouds))
 
 
@@ -100,7 +101,7 @@ def do_add_user(db, username, password, email):
     if (username is None) or (password is None) or (email is None):
         return Error(InvalidStateMessage('Must provide username, password and email'))
 
-    user = db.session.query(User).filter_by(username=username).first()
+    user = get_user_by_name(db, username)
     if user is not None:
         return Error(InvalidStateMessage('Username already taken'))
     user = db.session.query(User).filter_by(email=email).first()
@@ -175,6 +176,13 @@ def client_add_owner(remote_obj, connection, address, msg_obj):
     else:
         sess_obj = rd.data
         user = sess_obj.user
+
+    if new_user_id == PUBLIC_USER_ID:
+        msg = 'The public can\'t be a owner of a cloud'
+        err = AddOwnerFailureMessage(msg)
+        mylog(err.message, '31')
+        send_error_and_close(err, connection)
+        return
 
     cloud = get_cloud_by_name(db, cloud_uname, cloudname)
     if cloud is None:
@@ -257,6 +265,7 @@ def host_move(remote_obj, connection, address, msg_obj):
 
 def host_add_contributor(remote_obj, connection, address, msg_obj):
     # type: (RemoteController, AbstractConnection, object, AddContributorMessage) -> None
+    _log = get_mylog()
     if not msg_obj.type == ADD_CONTRIBUTOR:
         msg = 'Somehow tried to host_add_contributor without ADD_CONTRIBUTOR'
         err = InvalidStateMessage(msg)
@@ -275,20 +284,27 @@ def host_add_contributor(remote_obj, connection, address, msg_obj):
         err = AddContributorFailureMessage(msg)
         send_error_and_close(err, connection)
         return
-    source_host = cloud.hosts.filter_by(id=host_id).first()
-    if source_host is None:
-        msg = 'No matching host {}'.format(host_id)
-        err = AddContributorFailureMessage(msg)
-        send_error_and_close(err, connection)
-        return
-    new_owner = db.session.query(User).get(new_user_id)
-    if new_owner is None:
-        msg = 'No matching user {}'.format(new_user_id)
+    source_mirror = cloud.mirrors.filter_by(id=host_id).first()
+    # source_host = cloud.hosts.filter_by(id=host_id).first()
+    if source_mirror is None:
+        msg = 'No matching mirror {}'.format(host_id)
         err = AddContributorFailureMessage(msg)
         send_error_and_close(err, connection)
         return
 
-    cloud.add_contributor(new_owner)
+    is_public = new_user_id == PUBLIC_USER_ID
+    if is_public:
+        # Make sure the cloud is a publicly available cloud
+        cloud.make_public()
+    else:
+        new_owner = db.session.query(User).get(new_user_id)
+        if new_owner is None:
+            msg = 'No matching user {}'.format(new_user_id)
+            err = AddContributorFailureMessage(msg)
+            send_error_and_close(err, connection)
+            return
+        cloud.add_contributor(new_owner)
+
     db.session.commit()
     response = AddContributorSuccessMessage(new_user_id, cloud_uname, cloudname)
     mylog('host_add_contributor success')
@@ -340,6 +356,7 @@ class RemoteController(object):
             self.network_updates()
 
     def network_updates(self):
+        _log = get_mylog()
         # context = SSL.Context(SSL.SSLv23_METHOD)
         context = SSL.Context(SSL.TLSv1_2_METHOD)
         mylog(self.nebr_instance.get_key_file())
@@ -350,7 +367,19 @@ class RemoteController(object):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s = SSL.Connection(context, s)
         address = (HOST, PORT)  # ipv4
-        s.bind(address)
+        attempts = 0
+        succeeded = False
+        while attempts < 5 and not succeeded:
+            attempts += 1
+            try:
+                s.bind(address)
+                succeeded = True
+            except Exception, e:
+                _log.error('Failed to bind to address, {}'.format(e.message))
+        if not succeeded:
+            return Error('Failed to bind to network (is the socket already in use?)')
+
+
         _log = get_mylog()
         _log.info('Listening on {}'.format(address))
 

@@ -18,7 +18,7 @@ def create(instance, argv):
     print 'Creating a new cloud. First, enter credentials for the owner'
     owner_uname = raw_input('Enter the owner\'s username: ')
     owner_pass = getpass.getpass('Enter the owner\'s password: ')
-    owner = db.session.query(User).filter_by(username=owner_uname).first()
+    owner = get_user_by_name(db, owner_uname)
 
     if (owner is None) or (not (check_password_hash(owner.password, owner_pass))):
         print 'username/password combination invalid.'
@@ -47,7 +47,7 @@ def create(instance, argv):
 
 
 def create_cloud(db, username, password, cloudname, max_size):
-    owner = db.session.query(User).filter_by(username=username).first()
+    owner = get_user_by_name(db, username)
     if (owner is None) or (not (check_password_hash(owner.password, password))):
         raise Exception('Owner username/password combination invalid.')
     owned_clouds_dups_check = owner.owned_clouds\

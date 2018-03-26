@@ -9,7 +9,7 @@ from common.Instance import Instance
 from common_util import INSTANCES_ROOT, NEBULA_ROOT, Success, ResultAndData, Error
 from connections.RawConnection import RawConnection
 from host import REMOTE_HOST, REMOTE_PORT
-from host.util import setup_remote_socket
+from host.util import setup_remote_socket, setup_ssl_socket_for_address
 from messages import *
 from msg_codes import *
 from messages import ListFilesRequestMessage, ClientFilePutMessage, ClientFileTransferMessage, ReadFileRequestMessage, \
@@ -105,6 +105,16 @@ def start_nebr_and_nebs_instance(instance_name='test'):
     # return host_proc_0, host_proc_1, remote_proc
 
 
+def start_nebs_instance(instance_name='test'):
+    nebs_path = os.path.join(NEBULA_ROOT, './nebs.py')
+    host_working_dir, argv = Instance.get_working_dir(['-i', instance_name], is_remote=False)
+    host_working_dir = os.path.join(NEBULA_ROOT, host_working_dir)
+    log_text('host WD = {}'.format(host_working_dir))
+    host_proc = Popen('python {} -w {} start'.format(nebs_path, host_working_dir))
+    sleep(1.0)
+    print 'nebs start pid: {}'.format(host_proc.pid)
+    return host_proc
+
 def teardown_children(children):
     for child in children:
         if child is not None:
@@ -156,7 +166,10 @@ def make_fresh_test_env():
 
 def get_client_host(sid, cloud_uname, cname):
     try:
-        rem_sock = setup_remote_socket(REMOTE_HOST, REMOTE_PORT)
+        rem_sock = setup_test_remote_socket()
+        if rem_sock is None:
+            log_warn('Failed to get client host socket')
+            return Error()
         rem_conn = RawConnection(rem_sock)
 
         msg = ClientGetCloudHostRequestMessage(sid, cloud_uname, cname)
@@ -183,9 +196,13 @@ def create_sock_and_send(ip, port, msg):
     conn.send_obj(msg)
     return conn
 
+def setup_test_remote_socket():
+    rd = setup_ssl_socket_for_address(REMOTE_HOST, REMOTE_PORT)
+    return rd.data if rd.success else None
+
 def get_client_session(uname, password):
     try:
-        rem_sock = setup_remote_socket(REMOTE_HOST, REMOTE_PORT)
+        rem_sock = setup_test_remote_socket()
         rem_conn = RawConnection(rem_sock)
         request = ClientSessionRequestMessage(uname, password)
         rem_conn.send_obj(request)
@@ -317,6 +334,7 @@ class HostSession(object):
         log_text('Created mirror process')
         mirror_proc.wait()
         log_text('mirror process joined')
+        sleep(2)
 
 
 def check_file_contents(root, path, data):

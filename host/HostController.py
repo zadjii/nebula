@@ -21,7 +21,8 @@ from host.PrivateData import PrivateData, NO_ACCESS, READ_ACCESS
 from host.WatchdogThread import WatchdogWorker
 from host.function.network.client import list_files_handler, \
     handle_recv_file_from_client, handle_read_file_request, \
-    handle_client_add_owner, handle_client_add_contributor
+    handle_client_add_owner, handle_client_add_contributor, handle_client_make_directory, handle_client_get_permissions, \
+    handle_client_get_shared_paths
 from host.function.network_updates import handle_fetch, handle_file_change
 from host.models.Cloud import Cloud
 from host.models.Remote import Remote
@@ -29,10 +30,7 @@ from host.util import set_mylog_name, mylog, get_ipv6_list, setup_remote_socket,
     get_client_session, permissions_are_sufficient, create_key_pair, create_cert_request
 from messages import *
 
-from msg_codes import HOST_HOST_FETCH, HOST_FILE_PUSH, \
-    STAT_FILE_REQUEST, LIST_FILES_REQUEST, CLIENT_FILE_PUT, READ_FILE_REQUEST, \
-    CLIENT_ADD_OWNER, CLIENT_ADD_CONTRIBUTOR, REFRESH_MESSAGE, \
-    HOST_MOVE_RESPONSE, CLIENT_UPGRADE_CONNECTION_REQUEST
+from msg_codes import *
 
 __author__ = 'Mike'
 
@@ -495,6 +493,7 @@ class HostController:
         return os.path.join(cloud.root_directory, '.nebs') == full_path
 
     def get_client_permissions(self, client_sid, cloud, relative_path):
+        # type: (str, Cloud, RelativePath) -> int
         db = self.get_db()
         rd = get_client_session(db, client_sid, cloud.uname(), cloud.cname())
         # mylog('get_client_permissions [{}] {}'.format(0, rd))
@@ -502,10 +501,10 @@ class HostController:
             client = rd.data
             private_data = self.get_private_data(cloud)
             if private_data is not None:
-                mylog('Looking up [{}]\'s permission to access <{}>'.format(client.user_id, relative_path))
+                mylog('Looking up [{}]\'s permission to access <{}>'.format(client.user_id, relative_path.to_string()))
                 return private_data.get_permissions(client.user_id, relative_path)
             else:
-                mylog('There has no private data for {}'.format(cloud.name), '31')
+                mylog('There is no private data for {}'.format(cloud.name), '31')
         return NO_ACCESS
 
     def get_db(self):
@@ -551,7 +550,12 @@ class HostController:
                 handle_client_add_contributor(self, connection, address, msg_obj)
             elif msg_type == CLIENT_UPGRADE_CONNECTION_REQUEST:
                 self.handle_connection_upgrade(connection, address, msg_obj)
-                mylog('Upgraded connection')
+            elif msg_type == CLIENT_MAKE_DIRECTORY:
+                handle_client_make_directory(self, connection, address, msg_obj)
+            elif msg_type == CLIENT_GET_PERMISSIONS:
+                handle_client_get_permissions(self, connection, address, msg_obj)
+            elif msg_type == CLIENT_GET_SHARED_PATHS:
+                handle_client_get_shared_paths(self, connection, address, msg_obj)
             else:
                 mylog('I don\'t know what to do with {},\n{}'.format(msg_obj, msg_obj.__dict__))
         except Exception, e:
@@ -598,9 +602,8 @@ class HostController:
 
         return Success(upgraded_connection)
 
-
     def client_access_check_or_close(self, connection, client_sid, cloud, rel_path, required_access=READ_ACCESS):
-        # type: (AbstractConnection, str, Cloud, str, int) -> ResultAndData
+        # type: (AbstractConnection, str, Cloud, RelativePath, int) -> ResultAndData
         """
 
         :param connection:
@@ -613,7 +616,7 @@ class HostController:
         permissions = self.get_client_permissions(client_sid, cloud, rel_path)
         rd = ResultAndData(True, permissions)
         if not permissions_are_sufficient(permissions, required_access):
-            err = 'Session does not have sufficient permission to access <{}>'.format(rel_path)
+            err = 'Session does not have sufficient permission to access <{}>'.format(rel_path.to_string())
             mylog(err, '31')
             response = InvalidPermissionsMessage(err)
             connection.send_obj(response)

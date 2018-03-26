@@ -128,14 +128,13 @@ def finish_request_cloud(remote, cloud, db, connection):
         mylog(msg, '31')
         rd = ResultAndData(False, msg)
     else:
-        handle_go_retrieve(resp_obj, remote, cloud, db)
-        rd = ResultAndData(True, None)
+        rd = handle_go_retrieve(resp_obj, remote, cloud, db)
         # attempt_wakeup()
     return rd
 
 
 def handle_go_retrieve(response, remote, cloud, db):
-    # type: (GoRetrieveHereMessage, Remote, Cloud, SimpleDB) -> None
+    # type: (GoRetrieveHereMessage, Remote, Cloud, SimpleDB) -> ResultAndData
 
     check_response(GO_RETRIEVE_HERE, response.type)
     other_address = response.ip
@@ -160,7 +159,7 @@ def handle_go_retrieve(response, remote, cloud, db):
         owner_ids = response.owner_ids
         private_data = PrivateData(cloud, owner_ids)
         # just instantiating the private data is enough to write the backend
-        return
+        return Success()
 
     mylog('requesting host at [{}]({},{})'.format(other_id, other_address, other_port))
     is_ipv6 = ':' in other_address
@@ -183,6 +182,7 @@ def handle_go_retrieve(response, remote, cloud, db):
     resp_obj = host_conn.recv_obj()
     resp_type = resp_obj.type
 
+    rd = Error()
     if resp_type == HOST_VERIFY_HOST_FAILURE:
         mylog('Other host failed to verify our request, "{}"'.format(resp_obj.message), '31')
     elif resp_type != HOST_FILE_TRANSFER:
@@ -190,7 +190,9 @@ def handle_go_retrieve(response, remote, cloud, db):
     else:
         # Here we recv a whole bunch of files from the host
         recv_file_tree(None, resp_obj, cloud, host_conn, db)
+        rd = Success()
     mylog('Bottom of go_retrieve')
+    return rd
 
 
 def complete_mirroring(db, cloud):

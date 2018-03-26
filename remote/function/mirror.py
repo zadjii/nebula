@@ -2,12 +2,11 @@ from common_util import send_error_and_close, mylog, get_mylog
 from messages import GoRetrieveHereMessage, HostVerifyHostFailureMessage, \
     HostVerifyHostSuccessMessage, InvalidStateMessage, MirrorFailureMessage, \
     AuthErrorMessage
-from msg_codes import send_generic_error_and_close
 from remote import Host, Cloud, Session
 from remote.models.Mirror import Mirror
 from remote.models.User import User
 from remote.models.HostHostFetchMapping import HostHostFetchMapping
-from remote.util import get_cloud_by_name
+from remote.util import get_cloud_by_name, get_user_by_name
 
 
 def mirror_complete(remote_obj, connection, address, msg_obj):
@@ -56,7 +55,7 @@ def host_request_cloud(remote_obj, connection, address, msg_obj):
         connection.close()
         return
 
-    creator = db.session.query(User).filter_by(username=cloud_uname).first()
+    creator = get_user_by_name(db, cloud_uname)
     if creator is None:
         msg = 'There was no cloud matching name {}/{}'.format(cloud_uname, cloudname)
         resp = InvalidStateMessage(msg)
@@ -111,7 +110,7 @@ def client_mirror(remote_obj, connection, address, msg_obj):
     # todo: It'll be easier on the DB to find the user first, then filter their
     #   owned clouds to find the match
 
-    creator = db.session.query(User).filter_by(username=cloud_uname).first()
+    creator = get_user_by_name(db, cloud_uname)
     if creator is None:
         msg = 'There was no cloud matching name {}/{}'.format(cloud_uname, cloudname)
         resp = InvalidStateMessage(msg)
@@ -163,9 +162,10 @@ def respond_to_mirror_request(db, connection, address, new_host, cloud):
     db.session.commit()
 
     # rand_host = match.hosts.first()
+    # FIXME why is this rand_mirror then rand_host???????
     rand_mirror = None
     if len(cloud.active_hosts()) > 0:
-        rand_host = cloud.active_hosts()[0]  # todo make this random
+        rand_mirror = cloud.active_hosts()[0]  # todo make this random
     if rand_mirror is not None:
         # ip = rand_host.ip
         ip = rand_mirror.host.ip()
