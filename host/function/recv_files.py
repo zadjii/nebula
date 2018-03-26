@@ -1,12 +1,14 @@
 from datetime import datetime
 import os
 
+import errno
+
 from common_util import ResultAndData, RelativePath, get_mylog, send_error_and_close
 from host.PrivateData import WRITE_ACCESS
 from host.models import Cloud
 from host.util import mylog
 # from msg_codes import recv_msg
-from messages import InvalidPermissionsMessage, SystemFileWriteErrorMessage, InvalidStateMessage
+from messages import *
 from msg_codes import CLIENT_FILE_TRANSFER
 
 __author__ = 'Mike'
@@ -46,7 +48,7 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
             return rd
 
     full_path = rel_path.to_absolute(cloud.root_directory)
-
+    _log.debug('Client writing to {}'.format(full_path))
     # if it' the .nebs file:
     #   If they're a client, straight up reject the change.
     #   Else, accept, and have the host reload (after reading it)
@@ -62,17 +64,52 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
             is_private_data_file = True
 
     full_dir_path = os.path.dirname(full_path)
-    # mylog('full_dir_path={}'.format(full_dir_path))
+    mylog('full_dir_path={}'.format(full_dir_path))
 
     # Create the path to this file, if it doesn't exist
     if not os.path.exists(full_dir_path):
-        # mylog('had to make dirs for {}'.format(full_dir_path))
-        os.makedirs(full_dir_path)
+        mylog('had to make dirs for {}'.format(full_dir_path))
+        try:
+            os.makedirs(full_dir_path)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                err = 'I/O Error creating path {}'.format(full_dir_path)
+                resp = UnknownIoErrorMessage(err)
+                _log.debug(err)
+                socket_conn.send_obj(resp)
+                return ResultAndData(False, err)
+            else:
+                err = 'Path {} already exists'.format(full_dir_path)
+                resp = FileAlreadyExistsMessage(full_dir_path)
+                _log.debug(err)
+                socket_conn.send_obj(resp)
+                return ResultAndData(False, err)
+
+    if not os.path.isdir(full_dir_path):
+        err = '{} is not a directory'.format(full_dir_path)
+        _log.debug(err)
+        resp = FileIsNotDirErrorMessage()
+        socket_conn.send_obj(resp)
+        return ResultAndData(False, err)
 
     if msg_file_isdir:
         if not os.path.exists(full_path):
-            os.mkdir(full_path)
-            # mylog('Created directory {}'.format(full_path))
+            try:
+                os.mkdir(full_path)
+            except OSError as e:
+                if e.errno != errno.EEXIST:
+                    err = 'I/O Error creating path {}'.format(full_dir_path)
+                    resp = UnknownIoErrorMessage(err)
+                    _log.debug(err)
+                    socket_conn.send_obj(resp)
+                    return ResultAndData(False, err)
+                else:
+                    err = 'Path {} already exists'.format(full_dir_path)
+                    resp = FileAlreadyExistsMessage(full_dir_path)
+                    _log.debug(err)
+                    socket_conn.send_obj(resp)
+                    return ResultAndData(False, err)
+
     else:  # is normal file
         data_buffer = ''  # fixme i'm using a string to buffer this?? LOL
         total_read = 0
@@ -102,6 +139,9 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
         file_handle.write(data_buffer)
         file_handle.close()
         mylog('[{}] wrote the file to {}'.format(cloud.my_id_from_remote, full_path), '30;42')
+
+    resp = FileTransferSuccessMessage(cloud.uname(), cloud.cname(), rel_path.to_string())
+    socket_conn.send_obj(resp)
 
     # if it wasn't a client file transfer, update our node.
     #   We don't want to see that it was updated and send updates to the other hosts.

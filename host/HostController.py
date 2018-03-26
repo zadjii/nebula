@@ -550,7 +550,6 @@ class HostController:
                 handle_client_add_contributor(self, connection, address, msg_obj)
             elif msg_type == CLIENT_UPGRADE_CONNECTION_REQUEST:
                 self.handle_connection_upgrade(connection, address, msg_obj)
-                mylog('Upgraded connection')
             elif msg_type == CLIENT_MAKE_DIRECTORY:
                 handle_client_make_directory(self, connection, address, msg_obj)
             elif msg_type == CLIENT_GET_PERMISSIONS:

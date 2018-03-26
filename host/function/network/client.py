@@ -5,7 +5,7 @@ from stat import S_ISDIR
 
 from common_util import mylog, send_error_and_close, Success, Error, PUBLIC_USER_ID, RelativePath, get_mylog
 from host.PrivateData import READ_ACCESS, SHARE_ACCESS, NO_ACCESS, WRITE_ACCESS
-from host.function.recv_files import recv_file_tree
+from host.function.recv_files import recv_file_tree, recv_file_transfer
 from host.util import check_response, validate_or_get_client_session, \
     permissions_are_sufficient
 from messages import *
@@ -337,48 +337,66 @@ def do_client_make_directory(host_obj, connection, address, msg_obj, client):
     root_path = msg_obj.root
     child_path = msg_obj.dir_name
 
-    root_rel_path = RelativePath()
-    rd = root_rel_path.from_relative(root_path)
-    if not rd.success:
-        msg = '{} is not a valid cloud path'.format(root_path)
-        err = InvalidStateMessage(msg)
-        _log.debug(err)
-        send_error_and_close(err, connection)
-        return
-    child_rel_path = RelativePath()
-    rd = child_rel_path.from_relative(child_path)
-    if not rd.success:
-        msg = '{} is not a valid cloud path'.format(child_path)
-        err = InvalidStateMessage(msg)
-        _log.debug(err)
-        send_error_and_close(err, connection)
-        return
+    real_message = ClientFileTransferMessage(msg_obj.sid
+                                             , msg_obj.cloud_uname
+                                             , msg_obj.cname
+                                             , os.path.join(msg_obj.root, msg_obj.dir_name)
+                                             , 0
+                                             , True)
+    mylog('converted={}'.format(real_message.serialize()))
+    return recv_file_transfer(host_obj, real_message, cloud, connection, host_obj.get_db(), True)
 
-    private_data = host_obj.get_private_data(cloud)
-    if private_data is None:
-        msg = 'Somehow the cloud doesn\'t have a privatedata associated with it'
-        err = InvalidStateMessage(msg)
-        mylog(err.message, '31')
-        send_error_and_close(err, connection)
-        return
-    rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
-                                               root_rel_path, WRITE_ACCESS)
-    if not rd.success:
-        # conn was closed by client_access_check_or_close
-        return
-
-    full_path = root_rel_path.to_absolute(cloud.root_directory)
-    full_path = child_rel_path.to_absolute(full_path)
-    if not os.path.exists(full_path):
-        os.makedirs(full_path)
-        resp = ClientMakeDirectoryResponseMessage()
-    else:
-        resp = FileAlreadyExistsMessage()
-
-    connection.send_obj(resp)
+    # root_rel_path = RelativePath()
+    # rd = root_rel_path.from_relative(root_path)
+    # if not rd.success:
+    #     msg = '{} is not a valid cloud path'.format(root_path)
+    #     err = InvalidStateMessage(msg)
+    #     _log.debug(err)
+    #     send_error_and_close(err, connection)
+    #     return
+    # child_rel_path = RelativePath()
+    # rd = child_rel_path.from_relative(child_path)
+    # if not rd.success:
+    #     msg = '{} is not a valid cloud path'.format(child_path)
+    #     err = InvalidStateMessage(msg)
+    #     _log.debug(err)
+    #     send_error_and_close(err, connection)
+    #     return
+    #
+    # private_data = host_obj.get_private_data(cloud)
+    # if private_data is None:
+    #     msg = 'Somehow the cloud doesn\'t have a privatedata associated with it'
+    #     err = InvalidStateMessage(msg)
+    #     mylog(err.message, '31')
+    #     send_error_and_close(err, connection)
+    #     return
+    # rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
+    #                                            root_rel_path, WRITE_ACCESS)
+    # if not rd.success:
+    #     # conn was closed by client_access_check_or_close
+    #     return
+    #
+    # full_path = root_rel_path.to_absolute(cloud.root_directory)
+    # full_path = child_rel_path.to_absolute(full_path)
+    #
+    # if not os.path.exists(full_path):
+    #     os.makedirs(full_path)
+    #     resp = ClientMakeDirectoryResponseMessage()
+    # else:
+    #     resp = FileAlreadyExistsMessage()
+    #
+    # connection.send_obj(resp)
 
 def handle_client_make_directory(host_obj, connection, address, msg_obj):
-    mylog('handle_client_add_contributor')
+    mylog('handle_client_make_directory')
+    # real_message = ClientFileTransferMessage(msg_obj.sid
+    #                                          , msg_obj.cloud_uname
+    #                                          , msg_obj.cname
+    #                                          , os.path.join(msg_obj.root, msg_obj.dir_name)
+    #                                          , 0
+    #                                          , True)
+    # mylog('converted={}'.format(real_message.serialize()))
+    # return handle_recv_file_from_client(host_obj, connection, address, real_message)
     return client_message_wrapper(host_obj, connection, address, msg_obj,
                                   do_client_make_directory)
 
@@ -418,7 +436,7 @@ def do_client_get_permissions(host_obj, connection, address, msg_obj, client):
     connection.send_obj(resp)
 
 def handle_client_get_permissions(host_obj, connection, address, msg_obj):
-    mylog('handle_client_add_contributor')
+    mylog('handle_client_get_permissions')
     return client_message_wrapper(host_obj, connection, address, msg_obj,
                                   do_client_get_permissions)
 
@@ -440,6 +458,6 @@ def do_client_get_shared_paths(host_obj, connection, address, msg_obj, client):
     connection.send_obj(resp)
 
 def handle_client_get_shared_paths(host_obj, connection, address, msg_obj):
-    mylog('handle_client_add_contributor')
+    mylog('handle_client_get_shared_paths')
     return client_message_wrapper(host_obj, connection, address, msg_obj,
                                   do_client_get_shared_paths)
