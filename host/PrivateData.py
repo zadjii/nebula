@@ -318,12 +318,13 @@ class PrivateData(object):
 
     @staticmethod
     def add_path(found_permissions, new_path, new_permissions):
-        # type: ([(str, int)], str, int) -> [(str, int)]
-        found_permissions.append((new_path, new_permissions))
+        # type: ([{str: int}], str, int) -> [{str: int}]
+        n = {'path': new_path, 'perms': new_permissions}
+        found_permissions.append(n)
         return found_permissions
 
     def get_user_permissions(self, user_id):
-        # type: (int) -> [(str, int)]
+        # type: (int) -> [{str: int}]
         """
         Retrieves all of the paths that the user can access and the access they
           have to each path.

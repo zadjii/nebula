@@ -142,6 +142,7 @@
 56  , ENABLE_ALPHA_ENCRYPTION_RESPONSE, string:host_public_key
 
 57  , CLIENT_MAKE_DIRECTORY , sid  ,  string:cloud_uname  , string:cname, string:root, string:dir_name
+# I don't believe this will EVER be used. making a dir will return FILE_TRANSFER_SUCCESS TODO remove this
 58  , CLIENT_MAKE_DIRECTORY_RESPONSE
 
 59  , CLIENT_GET_PERMISSIONS , sid ,  string:cloud_uname  , string:cname, string:path
