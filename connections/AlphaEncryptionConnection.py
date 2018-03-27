@@ -55,12 +55,17 @@ class AlphaEncryptionConnection(AbstractConnection):
         self._conn.send_next_data(encoded_msg)
 
     def recv_next_data(self, length):
+        _log = get_mylog()
         # todo: This looks almost exactly like recv_obj
         data = self._conn.recv_next_data(16)
         encrypted_length = int(data, 16)
         encrypted_packet = self._conn.recv_next_data(encrypted_length)
-        decrypted_text = self._box.decrypt(encrypted_packet, None, HexEncoder)
-
+        try:
+            # The data is hex-encoded, so decrypt it with the HexEncoder.
+            decrypted_text = self._box.decrypt(encrypted_packet, None, HexEncoder)
+        except nacl.exceptions.CryptoError, e:
+            _log.debug('Exception while decoding next data.')
+            raise e
         return decrypted_text
 
     def send_next_data(self, data):
