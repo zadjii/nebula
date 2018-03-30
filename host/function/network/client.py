@@ -3,11 +3,14 @@ import os
 import time
 from stat import S_ISDIR
 
-from common_util import mylog, send_error_and_close, Success, Error, PUBLIC_USER_ID, RelativePath, get_mylog
+from common_util import mylog, send_error_and_close, Success, Error, PUBLIC_USER_ID, RelativePath, get_mylog, ResultAndData
+from connections.AbstractConnection import AbstractConnection
 from host.PrivateData import READ_ACCESS, SHARE_ACCESS, NO_ACCESS, WRITE_ACCESS
 from host.function.recv_files import recv_file_tree, recv_file_transfer
+from host.models.Cloud import Cloud
+from host.models.Client import Client
 from host.util import check_response, validate_or_get_client_session, \
-    permissions_are_sufficient
+    permissions_are_sufficient, get_clouds_by_name
 from messages import *
 from msg_codes import *
 
@@ -17,10 +20,10 @@ def handle_recv_file_from_client(host_obj, connection, address, msg_obj):
                                   , do_recv_file_from_client)
 
 
-def do_recv_file_from_client(host_obj, connection, address, msg_obj, client):
+def do_recv_file_from_client(host_obj, connection, address, msg_obj, client, cloud):
     db = host_obj.get_db()
-    cloud = client.cloud
-    cloudname = cloud.name
+    # cloud = client.cloud
+    # cloudname = cloud.name
     # todo: maybe add a quick response to tell the client the transfer is okay.
     resp_obj = connection.recv_obj()
     resp_type = resp_obj.type
@@ -36,10 +39,11 @@ def handle_read_file_request(host_obj, connection, address, msg_obj):
                                   , do_client_read_file)
 
 
-def do_client_read_file(host_obj, connection, address, msg_obj, client):
+def do_client_read_file(host_obj, connection, address, msg_obj, client, cloud):
     db = host_obj.get_db()
     _log = get_mylog()
-    cloud = client.cloud
+    client_uuid = client.uuid if client is not None else None
+    # cloud = client.cloud
 
     cloudname = cloud.name
     requested_file = msg_obj.fpath
@@ -71,8 +75,11 @@ def do_client_read_file(host_obj, connection, address, msg_obj, client):
         # connection.close()
         return
 
-    rd = host_obj.client_access_check_or_close(connection, client.uuid, cloud,
-                                               rel_path, READ_ACCESS)
+    rd = host_obj.client_access_check_or_close(connection
+                                               , client_uuid
+                                               , cloud
+                                               , rel_path
+                                               , READ_ACCESS)
     if not rd.success:
         return
 
@@ -85,7 +92,7 @@ def do_client_read_file(host_obj, connection, address, msg_obj, client):
         # send RFP - ReadFileResponse
         req_file_size = req_file_stat.st_size
         requested_file = open(filepath, 'rb')
-        response = ReadFileResponseMessage(client.uuid, rel_path.to_string(),
+        response = ReadFileResponseMessage(client_uuid, rel_path.to_string(),
                                            req_file_size)
         connection.send_obj(response)
         mylog(
@@ -124,7 +131,10 @@ def list_files_handler(host_obj, connection, address, msg_obj):
                                   do_client_list_files)
 
 
-def client_message_wrapper(host_obj, connection, address, msg_obj, callback):
+def client_message_wrapper(host_obj, connection, address, msg_obj
+                           , callback  # type: (HostController, AbstractConnection, object, BaseMessage, Client, Cloud) -> ResultAndData
+                           ):
+    # type: (HostController, AbstractConnection, object, BaseMessage, ...) -> None
     session_id = msg_obj.sid
     cloudname = msg_obj.cname
     cloud_uname = msg_obj.cloud_uname  # todo:15
@@ -138,35 +148,48 @@ def client_message_wrapper(host_obj, connection, address, msg_obj, callback):
     else:
         mylog('valid client session')
         client = rd.data
-        cloud = client.cloud
-        mylog('client.cloud={}'.format(client.cloud))
-        if cloud is None:
-            # todo:17 The cloud could have been deleted while a client had it
-            err = InvalidStateMessage('Somehow the client object did not have '
-                                      'a cloud associated with it.')
-            mylog(err.message, '31')
-            send_error_and_close(err, connection)
-            return
-
-        # refresh the session:
-        rd = cloud.get_remote_conn()
-        if rd.success:
-            refresh = ClientSessionRefreshMessage(session_id)
-            rd.data.send_obj(refresh)
-            rd.data.close()
+        cloud = None
+        if client is None:
+            # The client is the public client. Callers should be prepared to handle
+            # the public client case.
+            clouds = get_clouds_by_name(db, cloud_uname, cloudname)
+            if len(clouds) > 0:
+                cloud = clouds[0]
+            else:
+                err = InvalidStateMessage('Public client came for {}/{}, but was unable to find it.'.format(cloud_uname, cloudname))
+                mylog(err.message, '31')
+                send_error_and_close(err, connection)
+                return
         else:
-            mylog('Failed to refresh client session.')
+            cloud = client.cloud
+            mylog('client.cloud={}'.format(client.cloud.full_name()))
+            if cloud is None:
+                # todo:17 The cloud could have been deleted while a client had it
+                err = InvalidStateMessage('Somehow the client object did not have '
+                                          'a cloud associated with it.')
+                mylog(err.message, '31')
+                send_error_and_close(err, connection)
+                return
 
-        callback(host_obj, connection, address, msg_obj, client)
+            # refresh the session:
+            rd = cloud.get_remote_conn()
+            if rd.success:
+                refresh = ClientSessionRefreshMessage(session_id)
+                rd.data.send_obj(refresh)
+                rd.data.close()
+            else:
+                mylog('Failed to refresh client session.')
+
+        callback(host_obj, connection, address, msg_obj, client, cloud)
 
 
-def do_client_list_files(host_obj, connection, address, msg_obj, client):
+def do_client_list_files(host_obj, connection, address, msg_obj, client, cloud):
     _log = get_mylog()
     _log.debug('do_client_list_files')
-    cloud = client.cloud
+    # cloud = client.cloud
     cloudname = cloud.name
     # rel_path = msg_obj.fpath
-    session_id = client.uuid
+    session_id = client.uuid if client is not None else None
     # full_path = cloud.translate_relative_path(rel_path)
 
     # todo: I believe this should be more complicated.
@@ -208,10 +231,10 @@ def handle_client_add_owner(host_obj, connection, address, msg_obj):
                                   do_client_add_owner)
 
 
-def do_client_add_owner(host_obj, connection, address, msg_obj, client):
-    cloud = client.cloud
+def do_client_add_owner(host_obj, connection, address, msg_obj, client, cloud):
     cloudname = cloud.cname()
-    session_id = client.uuid
+    session_id = client.uuid if client else None
+    client_uid = client.user_id if client else PUBLIC_USER_ID
     new_owner_id = msg_obj.new_user_id
     private_data = host_obj.get_private_data(cloud)
     if private_data is None:
@@ -227,8 +250,8 @@ def do_client_add_owner(host_obj, connection, address, msg_obj, client):
         mylog(err.message, '31')
         send_error_and_close(err, connection)
         return
-    if not private_data.has_owner(client.user_id):
-        msg = 'User [{}] is not an owner of the cloud "{}"'.format(client.user_id, cloudname)
+    if not private_data.has_owner(client_uid):
+        msg = 'User [{}] is not an owner of the cloud "{}"'.format(client_uid, cloudname)
         err = AddOwnerFailureMessage(msg)
         mylog(err.message, '31')
         send_error_and_close(err, connection)
@@ -264,11 +287,10 @@ def handle_client_add_contributor(host_obj, connection, address, msg_obj):
                                   do_client_add_contributor)
 
 
-def do_client_add_contributor(host_obj, connection, address, msg_obj, client):
+def do_client_add_contributor(host_obj, connection, address, msg_obj, client, cloud):
     _log = get_mylog()
-    cloud = client.cloud
     cloudname = cloud.name
-    session_id = client.uuid
+    session_id = client.uuid if client else None
     new_user_id = msg_obj.new_user_id
     fpath = msg_obj.fpath
     new_permissions = msg_obj.permissions
@@ -330,82 +352,29 @@ def do_client_add_contributor(host_obj, connection, address, msg_obj, client):
         response = AddContributorSuccessMessage(new_user_id, cloud.uname(), cloudname)
         connection.send_obj(response)
 
-def do_client_make_directory(host_obj, connection, address, msg_obj, client):
+def do_client_make_directory(host_obj, connection, address, msg_obj, client, cloud):
     _log = get_mylog()
-    cloud = client.cloud
-    session_id = client.uuid
-    root_path = msg_obj.root
-    child_path = msg_obj.dir_name
-
     real_message = ClientFileTransferMessage(msg_obj.sid
                                              , msg_obj.cloud_uname
                                              , msg_obj.cname
                                              , os.path.join(msg_obj.root, msg_obj.dir_name)
                                              , 0
                                              , True)
-    mylog('converted={}'.format(real_message.serialize()))
+    _log.debug('converted={}'.format(real_message.serialize()))
     return recv_file_transfer(host_obj, real_message, cloud, connection, host_obj.get_db(), True)
 
-    # root_rel_path = RelativePath()
-    # rd = root_rel_path.from_relative(root_path)
-    # if not rd.success:
-    #     msg = '{} is not a valid cloud path'.format(root_path)
-    #     err = InvalidStateMessage(msg)
-    #     _log.debug(err)
-    #     send_error_and_close(err, connection)
-    #     return
-    # child_rel_path = RelativePath()
-    # rd = child_rel_path.from_relative(child_path)
-    # if not rd.success:
-    #     msg = '{} is not a valid cloud path'.format(child_path)
-    #     err = InvalidStateMessage(msg)
-    #     _log.debug(err)
-    #     send_error_and_close(err, connection)
-    #     return
-    #
-    # private_data = host_obj.get_private_data(cloud)
-    # if private_data is None:
-    #     msg = 'Somehow the cloud doesn\'t have a privatedata associated with it'
-    #     err = InvalidStateMessage(msg)
-    #     mylog(err.message, '31')
-    #     send_error_and_close(err, connection)
-    #     return
-    # rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
-    #                                            root_rel_path, WRITE_ACCESS)
-    # if not rd.success:
-    #     # conn was closed by client_access_check_or_close
-    #     return
-    #
-    # full_path = root_rel_path.to_absolute(cloud.root_directory)
-    # full_path = child_rel_path.to_absolute(full_path)
-    #
-    # if not os.path.exists(full_path):
-    #     os.makedirs(full_path)
-    #     resp = ClientMakeDirectoryResponseMessage()
-    # else:
-    #     resp = FileAlreadyExistsMessage()
-    #
-    # connection.send_obj(resp)
 
 def handle_client_make_directory(host_obj, connection, address, msg_obj):
     mylog('handle_client_make_directory')
-    # real_message = ClientFileTransferMessage(msg_obj.sid
-    #                                          , msg_obj.cloud_uname
-    #                                          , msg_obj.cname
-    #                                          , os.path.join(msg_obj.root, msg_obj.dir_name)
-    #                                          , 0
-    #                                          , True)
-    # mylog('converted={}'.format(real_message.serialize()))
-    # return handle_recv_file_from_client(host_obj, connection, address, real_message)
     return client_message_wrapper(host_obj, connection, address, msg_obj,
                                   do_client_make_directory)
 
 
-def do_client_get_permissions(host_obj, connection, address, msg_obj, client):
-    # type: (HostController, AbstractConnection, object, ClientGetPermissionsMessage, Client) -> object
+def do_client_get_permissions(host_obj, connection, address, msg_obj, client, cloud):
+    # type: (HostController, AbstractConnection, object, ClientGetPermissionsMessage, Client, Cloud) -> object
     _log = get_mylog()
-    cloud = client.cloud
-    session_id = client.uuid
+    session_id = client.uuid if client else None
+    client_uid = client.user_id if client else PUBLIC_USER_ID
     fpath = msg_obj.path
 
     rel_path = RelativePath()
@@ -431,7 +400,7 @@ def do_client_get_permissions(host_obj, connection, address, msg_obj, client):
         return
 
     perms = rd.data
-    _log.debug('{} has {} permission for {}'.format(client.user_id, perms, rel_path.to_string()))
+    _log.debug('{} has {} permission for {}'.format(client_uid, perms, rel_path.to_string()))
     resp = ClientGetPermissionsResponseMessage(perms)
     connection.send_obj(resp)
 
@@ -441,10 +410,10 @@ def handle_client_get_permissions(host_obj, connection, address, msg_obj):
                                   do_client_get_permissions)
 
 
-def do_client_get_shared_paths(host_obj, connection, address, msg_obj, client):
+def do_client_get_shared_paths(host_obj, connection, address, msg_obj, client, cloud):
     _log = get_mylog()
-    cloud = client.cloud
-    user_id = client.user_id
+    # cloud = client.cloud
+    user_id = client.user_id if client else PUBLIC_USER_ID
 
     private_data = host_obj.get_private_data(cloud)
     if private_data is None:

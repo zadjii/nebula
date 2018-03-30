@@ -73,6 +73,8 @@ def get_clouds_by_name(db, uname, cname):
     return db.session.query(Cloud).filter(Cloud.username.ilike(uname)).filter_by(name=cname).all()
 
 def get_client_session(db, uuid, cloud_uname, cloud_cname):
+    if uuid is None:
+        return Success(None)
     rd = Error()
     matching_clients = db.session.query(Client).filter_by(uuid=uuid).all()
     if len(matching_clients) < 1:
@@ -92,7 +94,8 @@ def validate_or_get_client_session(db, uuid, cloud_uname, cloud_cname):
     mylog('validate_or_get_client_session[{}]={}'.format(0, rd))
     if rd.success:
         client = rd.data
-        client.refresh()
+        if client is not None:
+            client.refresh()
         db.session.commit()
         mylog('validate_or_get_client_session[{}]={}'.format(1, rd))
         # great, this client is good to go

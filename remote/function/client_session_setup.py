@@ -70,6 +70,38 @@ def do_client_get_cloud_host(db, cloud_uname, cloudname, session_id):
     :param session_id:
     :return:
     """
+
+    creator = get_user_by_name(db, cloud_uname)
+    if creator is None:
+        err = 'No cloud matching {}/{}'.format(cloud_uname, cloudname)
+        msg = InvalidStateMessage(err)
+        return Error(msg)
+    cloud = creator.created_clouds.filter_by(name=cloudname).first()
+    if cloud is None:
+        msg = 'ERR: cloud was none'
+        mylog(msg)
+        return Error(InvalidStateMessage(msg))
+
+    if session_id is None:
+        cloud_is_pub = cloud.is_public()
+        if cloud_is_pub:
+            # We're returning out a host mapping here, even though the user is null
+            # and there's no actual entry in the database for it.
+            # Callers need that to get the host information.
+            host = None
+            if len(cloud.active_hosts()) > 0:
+                host = cloud.active_hosts()[0]  # todo:13 make this random
+
+            if host is None:
+                msg = 'No Active host for {},{}'.format(cloud.uname(), cloud.cname())
+                mylog(msg)
+                return Error(NoActiveHostMessage(cloud.uname(), cloud.cname()))
+            host_mapping = ClientCloudHostMapping(None, cloud, host)
+            return Success(host_mapping)
+        else:
+            msg = 'User cannot access this cloud'
+            return Error(InvalidPermissionsMessage('Public cannot access this cloud'))
+
     sess_obj = db.session.query(Session).filter_by(uuid=session_id).first()
     if sess_obj is None:
         msg = 'CGCHRq: no session? {}'.format(session_id)
@@ -82,17 +114,6 @@ def do_client_get_cloud_host(db, cloud_uname, cloudname, session_id):
         mylog(msg)
         return Error(InvalidStateMessage(msg))
 
-    creator = get_user_by_name(db, cloud_uname)
-    if creator is None:
-        err = 'No cloud matching {}/{}'.format(cloud_uname, cloudname)
-        msg = InvalidStateMessage(err)
-        return Error(msg)
-    cloud = creator.created_clouds.filter_by(name=cloudname).first()
-    # cloud = db.session.query(Cloud).filter_by(username=cloud_uname, name=cloudname).first()
-    if cloud is None:
-        msg = 'ERR: cloud was none'
-        mylog(msg)
-        return Error(InvalidStateMessage(msg))
 
     # verify user can access the cloud
     if not cloud.can_access(user):

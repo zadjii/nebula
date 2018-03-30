@@ -495,14 +495,19 @@ class HostController:
     def get_client_permissions(self, client_sid, cloud, relative_path):
         # type: (str, Cloud, RelativePath) -> int
         db = self.get_db()
+
         rd = get_client_session(db, client_sid, cloud.uname(), cloud.cname())
-        # mylog('get_client_permissions [{}] {}'.format(0, rd))
         if rd.success:
             client = rd.data
             private_data = self.get_private_data(cloud)
             if private_data is not None:
-                mylog('Looking up [{}]\'s permission to access <{}>'.format(client.user_id, relative_path.to_string()))
-                return private_data.get_permissions(client.user_id, relative_path)
+                is_public = client is None
+                if is_public:
+                    mylog('Looking up [PUBLIC]\'s permission to access <{}>'.format(relative_path.to_string()))
+                    return private_data.get_permissions(PUBLIC_USER_ID, relative_path)
+                else:
+                    mylog('Looking up [{}]\'s permission to access <{}>'.format(client.user_id, relative_path.to_string()))
+                    return private_data.get_permissions(client.user_id, relative_path)
             else:
                 mylog('There is no private data for {}'.format(cloud.name), '31')
         return NO_ACCESS
