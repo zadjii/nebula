@@ -41,7 +41,7 @@ class Client(base):
     user_id = Column(Integer)
 
     # def __init__(self, uuid, user_id):
-    def __init__(self, ):
+    def __init__(self):
         now = datetime.utcnow()
         self.created_on = now
         self.last_refresh = now
@@ -50,7 +50,8 @@ class Client(base):
 
     def has_timed_out(self):
         delta = datetime.utcnow() - self.last_refresh
-        return (delta.seconds/60) > 30
+        return (delta.total_seconds()/60) > 30
+        # return (delta.seconds) > 3
 
     def refresh(self):
         self.last_refresh = datetime.utcnow()

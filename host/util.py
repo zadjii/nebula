@@ -81,6 +81,11 @@ def get_client_session(db, uuid, cloud_uname, cloud_cname):
         rd = Error('No matching session')
     else:
         for client in matching_clients:
+            if client.has_timed_out():
+                mylog('client has timed out.')
+                db.session.delete(client)
+                db.session.commit()
+                continue
             if client.cloud.uname() == cloud_uname and client.cloud.cname() == cloud_cname:
                 rd = ResultAndData(True, client)
                 break
@@ -97,7 +102,7 @@ def validate_or_get_client_session(db, uuid, cloud_uname, cloud_cname):
         if client is not None:
             client.refresh()
         db.session.commit()
-        mylog('validate_or_get_client_session[{}]={}'.format(1, rd))
+        mylog('Found a valid session for this request')
         # great, this client is good to go
         pass
     else:
@@ -115,7 +120,7 @@ def validate_or_get_client_session(db, uuid, cloud_uname, cloud_cname):
             # if the client is alright, make an entry for it and return it.
             # otherwise, keep looking.
             rd = cloud.get_remote_conn()
-            mylog('validate_or_get_client_session[{}]={}'.format(2, rd))
+            mylog('acquired a connection to the remote')
             if rd.success:
                 conn = rd.data
                 msg = HostVerifyClientRequestMessage(cloud.my_id_from_remote
@@ -133,8 +138,8 @@ def validate_or_get_client_session(db, uuid, cloud_uname, cloud_cname):
                     cloud.clients.append(client)
                     db.session.commit()
                     rd = ResultAndData(True, client)
-                    mylog('validate_or_get_client_session[{}]={}'.format(3, rd))
-                    mylog('client.cloud={}'.format(client.cloud))
+                    mylog('Successfully verified the client with the remote')
+                    # mylog('client.cloud={}'.format(client.cloud.full_name()))
                     verified_cloud = True
                     break
                 else:

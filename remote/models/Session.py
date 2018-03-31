@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from uuid import uuid4
 
-from common_util import Error
+from common_util import Error, get_mylog
 from common_util import ResultAndData
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table, BigInteger
 from sqlalchemy.orm import relationship, backref
@@ -37,11 +37,19 @@ class Session(base):
         # todo:11 this is probably bad. Maybe store the numeric value or something.
 
     def has_timed_out(self):
+        # _log = get_mylog()
         delta = datetime.utcnow() - self.last_refresh
-        return (delta.seconds/60) > 30
+        return (delta.total_seconds()/60) > 30
+        # _log.debug('Session {} is {}s old'.format(self.uuid, delta.total_seconds()))
+        # return (delta.total_seconds()) > 3
 
     def refresh(self):
-        self.last_refresh = datetime.utcnow()
+        now = datetime.utcnow()
+        # only update the last refresh if the last refrest was in the past.
+        # We're implementing stay_logged_in by setting the last_refresh to 1yr in the future
+        if self.last_refresh < now:
+            self.last_refresh = datetime.utcnow()
+        # print('timeout time {}'.format(self.last_refresh))
 
     def get_user(self):
         print 'Session get_user, {}'.format(self.uuid)
