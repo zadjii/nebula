@@ -52,8 +52,8 @@ def host_handshake(remote_obj, connection, address, msg_obj):
         host.ipv6 = ipv6
         host.port = msg_obj.port
         host.ws_port = msg_obj.wsport
-        host.remaining_size = msg_obj.remaining_space
-        host.curr_size = msg_obj.used_space
+        mirror.remaining_size = msg_obj.remaining_space
+        mirror.curr_size = msg_obj.used_space
         host.hostname = msg_obj.hostname
         mirror.last_handshake = datetime.utcnow()
         db.session.commit()

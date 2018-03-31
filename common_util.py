@@ -16,6 +16,9 @@ INVALID_HOST_ID = -1
 ###############################################################################
 PUBLIC_USER_ID = -1
 ###############################################################################
+# This is the value to indicate that a cloud has whatever size is left on disk
+INFINITE_SIZE = -1
+###############################################################################
 # ClientUpgradeConnection message types:
 # This has to be updated manually, which is kinda shitty.
 # If add anything here, update socket_common.js as well.
@@ -188,9 +191,6 @@ def get_free_space_bytes(dirname):
     else:
         st = os.statvfs(dirname)
         return st.f_bavail * st.f_frsize
-
-# This is the value to indicate that a cloud has whatever size is left on disk
-INFINITE_SIZE = -1
 
 
 def get_full_cloudname(uname, cname):
