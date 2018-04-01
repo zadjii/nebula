@@ -93,7 +93,7 @@ def do_client_get_clouds(db, session_id):
     return Success((owned_clouds, contributed_clouds))
 
 
-def do_add_user(db, username, password, email):
+def do_add_user(db, name, username, password, email):
     # type: (SimpleDB) -> ResultAndData
     # type: (SimpleDB) -> ResultAndData(True, int)
     # type: (SimpleDB) -> ResultAndData(False, BaseMessage )
@@ -109,6 +109,7 @@ def do_add_user(db, username, password, email):
         return Error(InvalidStateMessage('Email already taken'))
 
     user = User()
+    user.name = name
     user.username = username
     user.password = generate_password_hash(password)
     user.email = email
