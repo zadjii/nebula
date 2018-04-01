@@ -55,6 +55,7 @@ def do_client_read_file(host_obj, connection, address, msg_obj, client, cloud):
         err = InvalidStateMessage(msg)
         _log.debug(err)
         send_error_and_close(err, connection)
+        host_obj.log_client(client, 'read', cloud, rel_path, 'error')
         return
 
     requesting_all = requested_file == '/'
@@ -72,6 +73,7 @@ def do_client_read_file(host_obj, connection, address, msg_obj, client, cloud):
     except Exception:
         err_msg = FileDoesNotExistErrorMessage()
         connection.send_obj(err_msg)
+        host_obj.log_client(client, 'read', cloud, rel_path, 'error')
         # connection.close()
         return
 
@@ -81,12 +83,14 @@ def do_client_read_file(host_obj, connection, address, msg_obj, client, cloud):
                                                , rel_path
                                                , READ_ACCESS)
     if not rd.success:
+        host_obj.log_client(client, 'read', cloud, rel_path, 'error')
         return
 
     req_file_is_dir = S_ISDIR(req_file_stat.st_mode)
     if req_file_is_dir:
         err_msg = FileIsDirErrorMessage()
         connection.send_obj(err_msg)
+        host_obj.log_client(client, 'read', cloud, rel_path, 'error')
         # connection.close()
     else:
         # send RFP - ReadFileResponse
@@ -121,6 +125,7 @@ def do_client_read_file(host_obj, connection, address, msg_obj, client, cloud):
         )
 
         requested_file.close()
+        host_obj.log_client(client, 'read', cloud, rel_path, 'success')
     mylog('[{}]bottom of handle_read_file_request(...,{})'
           .format(client.uuid, msg_obj))
 
@@ -180,7 +185,7 @@ def client_message_wrapper(host_obj, connection, address, msg_obj
             else:
                 mylog('Failed to refresh client session.')
 
-        callback(host_obj, connection, address, msg_obj, client, cloud)
+        return callback(host_obj, connection, address, msg_obj, client, cloud)
 
 
 def do_client_list_files(host_obj, connection, address, msg_obj, client, cloud):
@@ -205,6 +210,7 @@ def do_client_list_files(host_obj, connection, address, msg_obj, client, cloud):
         err = InvalidStateMessage(msg)
         _log.debug(err)
         send_error_and_close(err, connection)
+        host_obj.log_client(client, 'ls', cloud, rel_path, 'error')
         return
 
     rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
@@ -214,13 +220,17 @@ def do_client_list_files(host_obj, connection, address, msg_obj, client, cloud):
         if not os.path.isdir(full_path):
             mylog('Responding to ClientListFiles with error - {} is a file, not dir.'.format(rel_path.to_string()))
             resp = FileIsNotDirErrorMessage()
+            host_obj.log_client(client, 'ls', cloud, rel_path, 'error')
         else:
             mylog('Responding successfully to ClientListFiles')
             resp = ListFilesResponseMessage(cloudname, session_id, rel_path.to_string(),
                                             full_path)
+
+            host_obj.log_client(client, 'ls', cloud, rel_path, 'success')
         connection.send_obj(resp)
     else:
         # the access check will send error
+        host_obj.log_client(client, 'ls', cloud, rel_path, 'error')
         pass
 
 
@@ -241,6 +251,7 @@ def do_client_add_owner(host_obj, connection, address, msg_obj, client, cloud):
         msg = 'Somehow the cloud doesn\'t have a privatedata associated with it'
         err = InvalidStateMessage(msg)
         mylog(err.message, '31')
+        host_obj.log_client(client, 'add-owner', cloud, None, 'error')
         send_error_and_close(err, connection)
         return
 
@@ -248,12 +259,14 @@ def do_client_add_owner(host_obj, connection, address, msg_obj, client, cloud):
         msg = 'The public can\'t be a owner of a cloud'
         err = AddOwnerFailureMessage(msg)
         mylog(err.message, '31')
+        host_obj.log_client(client, 'add-owner', cloud, None, 'error')
         send_error_and_close(err, connection)
         return
     if not private_data.has_owner(client_uid):
         msg = 'User [{}] is not an owner of the cloud "{}"'.format(client_uid, cloudname)
         err = AddOwnerFailureMessage(msg)
         mylog(err.message, '31')
+        host_obj.log_client(client, 'add-owner', cloud, None, 'error')
         send_error_and_close(err, connection)
         return
     rd = cloud.get_remote_conn()
@@ -271,12 +284,14 @@ def do_client_add_owner(host_obj, connection, address, msg_obj, client, cloud):
         msg = 'failed to validate the ADD_OWNER request with the remote, msg={}'.format(rd.data)
         err = AddOwnerFailureMessage(msg)
         mylog(err.message, '31')
+        host_obj.log_client(client, 'add-owner', cloud, None, 'error')
         send_error_and_close(err, connection)
     else:
         private_data.add_owner(new_owner_id)
         private_data.commit()
         mylog('Added user [{}] to the owners of {}'.format(new_owner_id, cloudname))
         # todo:15
+        host_obj.log_client(client, 'add-owner', cloud, None, 'success')
         response = AddOwnerSuccessMessage(session_id, new_owner_id, cloud.uname(), cloudname)
         connection.send_obj(response)
 
@@ -301,6 +316,7 @@ def do_client_add_contributor(host_obj, connection, address, msg_obj, client, cl
         msg = '{} is not a valid cloud path'.format(fpath)
         err = InvalidStateMessage(msg)
         _log.debug(err)
+        host_obj.log_client(client, 'share', cloud, rel_path, 'error')
         send_error_and_close(err, connection)
         return
 
@@ -310,6 +326,7 @@ def do_client_add_contributor(host_obj, connection, address, msg_obj, client, cl
         err = InvalidStateMessage(msg)
         mylog(err.message, '31')
         send_error_and_close(err, connection)
+        host_obj.log_client(client, 'share', cloud, rel_path, 'error')
         return
     rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
                                                rel_path, SHARE_ACCESS)
@@ -323,6 +340,7 @@ def do_client_add_contributor(host_obj, connection, address, msg_obj, client, cl
         err = AddContributorFailureMessage(msg)
         mylog(err.message, '31')
         send_error_and_close(err, connection)
+        host_obj.log_client(client, 'share', cloud, rel_path, 'error')
         return
     mylog('Client has sharing permission')
     rd = cloud.get_remote_conn()
@@ -341,6 +359,7 @@ def do_client_add_contributor(host_obj, connection, address, msg_obj, client, cl
         msg = 'failed to validate the ADD_ADD_CONTRIBUTOR request with the remote, msg={}'.format(rd.data)
         err = AddContributorFailureMessage(msg)
         mylog(err.message, '31')
+        host_obj.log_client(client, 'share', cloud, rel_path, 'error')
         send_error_and_close(err, connection)
     else:
         # PrivateData will be able to handle the public_user_id
@@ -349,6 +368,7 @@ def do_client_add_contributor(host_obj, connection, address, msg_obj, client, cl
         mylog('Added permission {} for user [{}] to file {}:{}'.format(
             new_permissions, new_user_id, cloudname, fpath
         ))
+        host_obj.log_client(client, 'share', cloud, rel_path, 'success')
         response = AddContributorSuccessMessage(new_user_id, cloud.uname(), cloudname)
         connection.send_obj(response)
 

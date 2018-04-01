@@ -122,6 +122,33 @@ def get_log_path(argv):
     return log_path, remaining_argv
 
 
+def get_client_log_path(argv):
+    # type: ([str]) -> (str, [str])
+    """
+    If there's a [--access <path>] in argv,
+    it removes the pair and returns it.
+    Else it returns None
+
+    :param argv:
+    :return: (path, [argv] - [-l, path]) or (None, argv)
+    """
+    # print('initial argv={}'.format(argv))
+    remaining_argv = []
+    log_path = None
+    for index, arg in enumerate(argv):
+        if index >= (len(argv) - 1):
+            remaining_argv.append(arg)
+        if arg == '--access':
+            log_path = argv[index+1]
+            remaining_argv.extend(argv[index+2:])
+            break
+        else:
+            remaining_argv.append(arg)
+
+    # print('remaining_argv={}'.format(remaining_argv))
+    return log_path, remaining_argv
+
+
 def get_log_verbosity(argv):
     # type: ([str]) -> (int, [str])
     """

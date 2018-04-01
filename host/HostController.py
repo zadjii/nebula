@@ -1,5 +1,6 @@
 import atexit
 import logging
+import logging.handlers
 import os
 import signal
 import sys
@@ -56,12 +57,19 @@ class HostController:
         # if we've failed to send to the network, then we'll set this to false.
         #   Next time we've handshaken the remotes, we'll set this back to true.
         self._is_online = True
+        self._client_log = get_mylog()
 
     def start(self, argv):
         # type: ([str]) -> None
         _log = get_mylog()
         set_mylog_name('nebs')
         # todo process start() args here
+
+        client_log_path, argv = get_client_log_path(argv)
+        if client_log_path is not None:
+            print('writing access log to {}'.format(client_log_path))
+            self.create_client_logger(client_log_path)
+
 
         # read in all the .nebs
         db = self.get_db()
@@ -682,3 +690,37 @@ class HostController:
     def set_online(self):
         self._is_online = True
 
+    def log_client(self, client, verb, cloud, relative_path, result):
+        msg = '[{}] {} {}:{}=>{}'.format(
+            client.user_id if client else 'PUBLIC'
+            , verb
+            , cloud.full_name()
+            , relative_path.to_string() if relative_path else '#'
+            , result
+        )
+        self._client_log.info(msg)
+
+    def log_client_sid(self, client_sid, verb, cloud, relative_path, result):
+        rd = get_client_session(self.get_db(), client_sid, cloud.uname(), cloud.cname())
+        if rd.success:
+            client = rd.data
+        else:
+            client = None
+        self.log_client(client, verb, cloud, relative_path, result)
+
+    def create_client_logger(self, filename=None, level=logging.INFO):
+        _log = getLogger('client')
+        for h in _log.handlers:
+            _log.removeHandler(h)
+        if filename is None:
+            hdlr = logging.StreamHandler()
+        else:
+            # todo: make this a configurable number of bytes
+            hdlr = logging.handlers.RotatingFileHandler(
+                    filename, maxBytes=100*1024*1024, backupCount=5)
+        _log.setLevel(level)
+        formatter = logging.Formatter('%(asctime)s|(%(levelname)s) %(message)s')
+        hdlr.setFormatter(formatter)
+        _log.addHandler(hdlr)
+        _log.propagate = False
+        self._client_log = _log

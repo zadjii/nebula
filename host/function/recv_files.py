@@ -6,7 +6,7 @@ import errno
 from common_util import ResultAndData, RelativePath, get_mylog, send_error_and_close
 from host.PrivateData import WRITE_ACCESS
 from host.models import Cloud
-from host.util import mylog
+from host.util import mylog, get_client_session
 # from msg_codes import recv_msg
 from messages import *
 from msg_codes import CLIENT_FILE_TRANSFER
@@ -31,12 +31,17 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
     mylog('[{}] is recv\'ing <{}>'.format(cloud.my_id_from_remote, msg_rel_path))
 
     rel_path = RelativePath()
+    def _clog(result):
+        if is_client:
+            host_obj.log_client_sid(msg.sid, 'write', cloud, rel_path, result)
+
     rd = rel_path.from_relative(msg_rel_path)
     if not rd.success:
         msg = '{} is not a valid cloud path'.format(msg_rel_path)
         err = InvalidStateMessage(msg)
         _log.debug(err)
         send_error_and_close(err, socket_conn)
+        _clog('error')
         return rd
 
     # if they are a client, make sure the host_obj verifies their permissions on
@@ -45,6 +50,7 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
         rd = host_obj.client_access_check_or_close(socket_conn, msg.sid, cloud,
                                                    rel_path, WRITE_ACCESS)
         if not rd.success:
+            _clog('error')
             return rd
 
     full_path = rel_path.to_absolute(cloud.root_directory)
@@ -59,6 +65,7 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
             mylog(err, '33')
             response = SystemFileWriteErrorMessage(err)
             socket_conn.send_obj(response)
+            _clog('error')
             return ResultAndData(False, err)
         else:
             is_private_data_file = True
@@ -77,12 +84,14 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
                 resp = UnknownIoErrorMessage(err)
                 _log.debug(err)
                 socket_conn.send_obj(resp)
+                _clog('error')
                 return ResultAndData(False, err)
             else:
                 err = 'Path {} already exists'.format(full_dir_path)
                 resp = FileAlreadyExistsMessage(full_dir_path)
                 _log.debug(err)
                 socket_conn.send_obj(resp)
+                _clog('error')
                 return ResultAndData(False, err)
 
     if not os.path.isdir(full_dir_path):
@@ -90,6 +99,7 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
         _log.debug(err)
         resp = FileIsNotDirErrorMessage()
         socket_conn.send_obj(resp)
+        _clog('error')
         return ResultAndData(False, err)
 
     if msg_file_isdir:
@@ -102,12 +112,14 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
                     resp = UnknownIoErrorMessage(err)
                     _log.debug(err)
                     socket_conn.send_obj(resp)
+                    _clog('error')
                     return ResultAndData(False, err)
                 else:
                     err = 'Path {} already exists'.format(full_dir_path)
                     resp = FileAlreadyExistsMessage(full_dir_path)
                     _log.debug(err)
                     socket_conn.send_obj(resp)
+                    _clog('error')
                     return ResultAndData(False, err)
 
     else:  # is normal file
@@ -142,7 +154,8 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
 
     resp = FileTransferSuccessMessage(cloud.uname(), cloud.cname(), rel_path.to_string())
     socket_conn.send_obj(resp)
-
+    if is_client:
+        host_obj.log_client_sid(msg.sid, 'write', cloud, rel_path, 'success')
     # if it wasn't a client file transfer, update our node.
     #   We don't want to see that it was updated and send updates to the other hosts.
     # else (this came from a client):

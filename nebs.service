@@ -1,0 +1,22 @@
+# This is used for running a nebs instance. Uses the default instance, and
+#   client logging to /var/log/nebs-access.log.
+# This file should be placed in: /lib/systemd/system/nebs.service
+# and assumes nebula is installed to: /var/lib/nebula
+# probably best to install a symlink
+#   /lib/systemd/system/nebs.service->/var/lib/nebula/nebs.service
+
+[Unit]
+Description=nebs instance
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+Environment="PATH=/home/zadjii/.local/bin:/home/zadjii/.local/lib/python2.7:"
+ExecStart=/usr/bin/python /var/lib/nebula/nebs.py -v debug -l /var/log/nebs.log --access /var/log/nebs-access.log start
+Restart=always
+Type=simple
+NotifyAccess=all
+
+[Install]
+WantedBy=multi-user.target
