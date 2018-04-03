@@ -64,10 +64,12 @@ class HostController:
         _log = get_mylog()
         set_mylog_name('nebs')
         # todo process start() args here
-
+        _log.debug('setting up client logging...')
         client_log_path, argv = get_client_log_path(argv)
         if client_log_path is not None:
-            print('writing access log to {}'.format(client_log_path))
+            msg = 'writing access log to {}'.format(client_log_path)
+            _log.debug(msg)
+            print(msg)
             self.create_client_logger(client_log_path)
 
 
