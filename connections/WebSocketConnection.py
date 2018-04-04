@@ -86,10 +86,8 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
 
     def __init__(self):
         _log = get_mylog()
-        _log.debug('Top of MBFLSP.__init__')
         super(MyBigFuckingLieServerProtocol, self).__init__()
         self._internal_client_socket = None
-        _log.debug('Bottom of MBFLSP.__init__')
 
     def onConnect(self, request):
         _log = get_mylog()
@@ -99,8 +97,7 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
             ('localhost'
              , MyBigFuckingLieServerProtocol.net_thread._ws_internal_port))
         MyBigFuckingLieServerProtocol.net_thread.add_ws_conn(self)
-        _log.debug('Bottom of MBFLSP.onConnect')
-
+        _log.debug('Connected to internal socket')
 
     def onOpen(self):
         _log = get_mylog()
@@ -108,15 +105,9 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
 
     def onMessage(self, payload, isBinary):
         _log = get_mylog()
-        # if isBinary:
-        #     _log.debug("Binary message received: {0} bytes".format(len(payload)))
-        # else:
-        #     _log.debug("Text message received: {0}".format(payload.decode('utf8')))
+
         self._internal_client_socket.send(payload)
         MyBigFuckingLieServerProtocol.net_thread.signal_host()
-
-        # echo back message verbatim
-        # self.sendMessage(payload, isBinary)
 
     def onClose(self, wasClean, code, reason):
         _log = get_mylog()
@@ -124,8 +115,6 @@ class MyBigFuckingLieServerProtocol(WebSocketServerProtocol):
         if self._internal_client_socket:
             self._internal_client_socket.send('\0')
             self._internal_client_socket.close()
-        # if self._child_thread is not None:
-        #     self._child_thread.exit()
 
     # def _connectionLost(self, reason):
     #     mylog('_connectionLost')

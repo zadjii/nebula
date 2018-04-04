@@ -96,12 +96,14 @@ class NetworkController(object):
 
             self._miniupnp.selectigd()
             local_ipaddress = self._miniupnp.lanaddr
+            old_local = self._last_local_ip
+            local_ip_changed = local_ipaddress != self._last_local_ip
             external_ipaddress = self._miniupnp.externalipaddress()
             _log.debug('Woo we got an external ID!')
             self._last_external_ip = external_ipaddress
             self._last_local_ip = local_ipaddress
-            _log.debug('old, now= {}, {}'.format(old_ip, external_ipaddress))
-            rd = Success(external_ipaddress != old_ip)
+            _log.debug('old(local->external), now= ({}->{}), ({}->{})'.format(old_local, old_ip, self._last_local_ip, external_ipaddress))
+            rd = Success(local_ip_changed or external_ipaddress != old_ip)
         except Exception, e:
             rd = Error('Exception during miniupnpc operation: {}'.format(e.message))
 
@@ -159,6 +161,7 @@ class NetworkController(object):
                                               , bound_port
                                               , 'nebs port mapping {}'.format(external_port)
                                               , '')
+
             rd = Success(external_port)
         except Exception, e:
             rd = Error('Exception during miniupnpc operation: {}'.format(e.message))

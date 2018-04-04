@@ -6,7 +6,7 @@ from util import mylog
 from connections.WebSocketConnection import MyBigFuckingLieServerProtocol, \
     WebsocketConnection
 import txaio
-
+from twisted.python import log
 from autobahn.twisted.websocket import WebSocketServerFactory, listenWS
 from time import sleep
 
@@ -47,6 +47,10 @@ class NetworkThread(object):
         self._use_ssl = use_ssl
         self.ssl_context_factory = RemoteSSLContextFactory(host_instance=host.get_instance()) if use_ssl else None
         self.setup_socket()
+
+        # There's a problem where the pi sometimes gets disconected from the
+        #   socket, but I don't know why. TODO: figure out why.
+        # txaio.start_logging(level='debug')
 
         # This V is done when the ws_work_thread is started,
         #   to keep in another thread
@@ -174,6 +178,7 @@ class NetworkThread(object):
         return rd
 
     def work_thread(self):
+        _log = get_mylog()
         self.server_sock.listen(5)
 
         while not self.shutdown_requested:
@@ -187,6 +192,7 @@ class NetworkThread(object):
 
         if self.server_sock is not None:
             self.server_sock.shutdown(socket.SHUT_RDWR)
+        _log.debug('Reached the bottom of work_thread.')
 
     def ws_work_thread(self):
         _log = get_mylog()

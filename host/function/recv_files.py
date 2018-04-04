@@ -3,7 +3,7 @@ import os
 
 import errno
 
-from common_util import ResultAndData, RelativePath, get_mylog, send_error_and_close
+from common_util import ResultAndData, RelativePath, get_mylog, send_error_and_close, Error
 from host.PrivateData import WRITE_ACCESS
 from host.models import Cloud
 from host.util import mylog, get_client_session
@@ -128,34 +128,33 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
         while total_read < msg_file_size:
             new_data = socket_conn.recv_next_data(min(1024, (msg_file_size - total_read)))
             nbytes = len(new_data)
-            # print 'read ({},{})'.format(new_data, nbytes)
             if total_read is None or new_data is None:
                 # todo:23 ??? what is happening here?
                 print 'I know I should have broke AND I JUST DIDN\'T ANYWAYS'
                 break
             total_read += nbytes
             data_buffer += new_data
-            # print '<{}>read:{}B, total:{}B, expected total:{}B'.format(
-            #     msg_rel_path, nbytes, total_read, msg_file_size
-            # )
-        exists = os.path.exists(full_path)
 
-        file_handle = None
-        # try:
-        file_handle = open(full_path, mode='wb')
-        # except (OSError, IOError) as e:
-        # todo:23
-        #     mylog('FUCK')
-        file_handle.seek(0, 0)  # seek to 0B relative to start
-
-        file_handle.write(data_buffer)
-        file_handle.close()
+        # exists = os.path.exists(full_path)
+        # file_handle = None
+        try:
+            file_handle = open(full_path, mode='wb')
+            file_handle.seek(0, 0)  # seek to 0B relative to start
+            file_handle.write(data_buffer)
+            file_handle.close()
+        except (OSError, IOError) as e:
+            err = 'I/O Error writing file path {} - ERRNO:{}'.format(rel_path.to_string(), e.errno)
+            resp = UnknownIoErrorMessage(err)
+            _log.debug(err)
+            socket_conn.send_obj(resp)
+            _clog('error')
+            return Error(err)
         mylog('[{}] wrote the file to {}'.format(cloud.my_id_from_remote, full_path), '30;42')
 
+    _clog('success')
     resp = FileTransferSuccessMessage(cloud.uname(), cloud.cname(), rel_path.to_string())
     socket_conn.send_obj(resp)
-    if is_client:
-        host_obj.log_client_sid(msg.sid, 'write', cloud, rel_path, 'success')
+
     # if it wasn't a client file transfer, update our node.
     #   We don't want to see that it was updated and send updates to the other hosts.
     # else (this came from a client):
