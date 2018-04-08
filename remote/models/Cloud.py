@@ -119,6 +119,10 @@ class Cloud(base):
                 mirrors.append(mirror)
         return mirrors
 
+    def all_hosts(self):
+        # type: () -> [Mirror]
+        return self.mirrors.all()
+
     def creator_name(self):
         # todo/fixme: this is temporary until I add uname properly to the DB
         # first_owner = self.owners.first()
@@ -152,8 +156,8 @@ class Cloud(base):
         self_dict = {
             'uname': self.uname()
             , 'cname': self.cname()
-            , 'created_on': self.created_on.isoformat() + 'Z"'
-            , 'last_update': self.last_update.isoformat() + 'Z"'
+            , 'created_on': self.created_on.isoformat() + 'Z'
+            , 'last_update': self.last_update.isoformat() + 'Z'
             , 'max_size': self.max_size
             , 'available_space': self.available_space()
             , 'privacy': self.privacy

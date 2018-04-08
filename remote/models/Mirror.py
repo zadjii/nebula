@@ -44,6 +44,7 @@ class Mirror(base):
 
         self_dict = {
             'curr_size': self.curr_size
+            , 'active': self.is_active()
             , 'ip': self.host.ipv6
             , 'port': self.host.port
             , 'ws_port': self.host.ws_port

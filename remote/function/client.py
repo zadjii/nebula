@@ -42,7 +42,7 @@ def do_client_get_cloud_hosts(db, session_id, cloud_uname, cname):
     # todo:37 maybe this should be an option in the API, to get all or only active
     # For now I'm defaulting to active, becuase all mirror attempts make a host,
     #   Which is bad todo:38
-    hosts = [host.to_dict() for host in cloud.active_hosts()]
+    hosts = [host.to_dict() for host in cloud.all_hosts()]
     # hosts = [host.to_dict() for host in cloud.hosts.all()]
     return Success(hosts)
 
