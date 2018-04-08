@@ -58,6 +58,9 @@ class Cloud(base):
         return self.username
 
     def get_remote_conn(self):
+        # type: () -> ResultAndData
+        # type: () -> ResultAndData(True, RawConnection)
+        # type: () -> ResultAndData(False, Exception)
         from host.util import setup_remote_socket
 
         rd = ResultAndData(False, None)

@@ -65,6 +65,7 @@ class Cloud(base):
 
     creator_id = Column(ForeignKey('user.id'))
     # sessions = relationship('Session', backref='cloud', lazy='dynamic')
+    links = relationship('CloudLink', backref='cloud', lazy='dynamic')
 
     def __init__(self, creator):
         self.creator_id = creator.id

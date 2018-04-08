@@ -16,11 +16,12 @@ from msg_codes import *
 from remote import User, Host
 from remote.NebrInstance import NebrInstance
 from remote.function.client import respond_to_client_get_cloud_hosts
-from remote.function.client_session_setup import setup_client_session,\
-    get_cloud_host, host_verify_client
+from remote.function.client_session_setup import setup_client_session, \
+    get_cloud_host, host_verify_client, do_client_get_cloud_host
 from remote.function.get_hosts import get_hosts_response
 from remote.function.mirror import mirror_complete, host_request_cloud, \
     client_mirror, host_verify_host
+from remote.models.CloudLink import CloudLink
 from remote.models.Mirror import Mirror
 from remote.util import get_user_from_session, validate_session_id, \
     get_cloud_by_name, get_user_by_name
@@ -313,6 +314,89 @@ def host_add_contributor(remote_obj, connection, address, msg_obj):
     connection.close()
 
 
+################################################################################
+def host_reserve_link(remote_obj, connection, address, msg_obj):
+    # type: (RemoteController, AbstractConnection, object, AddContributorMessage) -> None
+    _log = get_mylog()
+    db = remote_obj.get_db()
+    if not msg_obj.type == HOST_RESERVE_LINK_REQUEST:
+        msg = 'Somehow tried to host_reserve_link without HOST_RESERVE_LINK_REQUEST'
+        err = InvalidStateMessage(msg)
+        send_error_and_close(err, connection)
+        return
+    cloudname = msg_obj.cname
+    cloud_uname = msg_obj.cloud_uname
+    rd = do_host_reserve_link(db, cloud_uname, cloudname)
+    if rd.success:
+        link = rd.data
+        response = HostReserveLinkResponseMessage(link.link_string)
+    else:
+        response = rd.data
+    connection.send_obj(response)
+    connection.close()
+
+
+def do_host_reserve_link(db, uname, cname):
+    # type: (SimpleDB, str, str) -> ResultAndData
+    # type: (SimpleDB, str, str) -> ResultAndData(True, CloudLink)
+    # type: (SimpleDB, str, str) -> ResultAndData(False, BaseMessage)
+    cloud = get_cloud_by_name(db, uname, cname)
+    if cloud is None:
+        msg = 'No matching cloud {}'.format((uname, cname))
+        err = InvalidStateMessage(msg)
+        return Error(err)
+    link = CloudLink(cloud, db)
+    db.session.add(link)
+    db.session.commit()
+    return Success(link)
+################################################################################
+def client_get_link_host(remote_obj, connection, address, msg_obj):
+    # type: (RemoteController, AbstractConnection, object, AddContributorMessage) -> None
+    _log = get_mylog()
+    db = remote_obj.get_db()
+    if not msg_obj.type == CLIENT_GET_LINK_HOST:
+        msg = 'Somehow tried to client_get_link_host without CLIENT_GET_LINK_HOST'
+        err = InvalidStateMessage(msg)
+        send_error_and_close(err, connection)
+        return
+
+    link_string = msg_obj.link_string
+    sid = msg_obj.sid
+    rd = do_client_get_link_host(db, link_string, sid)
+    if rd.success:
+        host_mapping = rd.data
+        mirror = host_mapping.mirror
+        host = mirror.host
+        cloud = mirror.cloud
+        response = ClientGetCloudHostResponseMessage(sid, cloud.uname(), cloud.cname(), host.ipv6,
+                                                     host.port, host.ws_port)
+    else:
+        response = rd.data
+    connection.send_obj(response)
+    connection.close()
+
+
+def do_client_get_link_host(db, link_string, session_id):
+    # type: (SimpleDB, str) -> ResultAndData
+    # type: (SimpleDB, str) -> ResultAndData(True, ClientCloudHostMapping)
+    # type: (SimpleDB, str) -> ResultAndData(False, BaseMessage)
+    link = db.session.query(CloudLink).filter_by(link_string=link_string).first()
+    if link is None:
+        msg = 'No matching link {}'.format(link_string)
+        err = InvalidStateMessage(msg)
+        return Error(err)
+
+    cloud = link.cloud
+    if cloud is None:
+        msg = 'No matching cloud for link {}'.format(link_string)
+        err = InvalidStateMessage(msg)
+        return Error(err)
+
+    return do_client_get_cloud_host(db, cloud.uname(), cloud.cname(), session_id)
+
+################################################################################
+
+
 class RemoteController(object):
     def __init__(self, nebr_instance):
         # type: (NebrInstance) -> None
@@ -439,6 +523,10 @@ class RemoteController(object):
             client_session_refresh(self, connection, address, msg_obj)
         elif msg_type == HOST_MOVE_REQUEST:
             host_move(self, connection, address, msg_obj)
+        elif msg_type == HOST_RESERVE_LINK_REQUEST:
+            host_reserve_link(self, connection, address, msg_obj)
+        elif msg_type == CLIENT_GET_LINK_HOST:
+            client_get_link_host(self, connection, address, msg_obj)
         else:
             print 'I don\'t know what to do with', msg_obj
         connection.close()

@@ -1,4 +1,4 @@
-# last generated 2018-03-25 00:09:52.859000
+# last generated 2018-04-08 18:03:55.035000
 import json
 from msg_codes import *
 from messages import *
@@ -84,6 +84,12 @@ _decoder_table = {
     , CLIENT_GET_PERMISSIONS_RESPONSE: ClientGetPermissionsResponseMessage.deserialize # 60
     , CLIENT_GET_SHARED_PATHS: ClientGetSharedPathsMessage.deserialize # 61
     , CLIENT_GET_SHARED_PATHS_RESPONSE: ClientGetSharedPathsResponseMessage.deserialize # 62
+    , CLIENT_CREATE_LINK_REQUEST: ClientCreateLinkRequestMessage.deserialize # 63
+    , CLIENT_CREATE_LINK_RESPONSE: ClientCreateLinkResponseMessage.deserialize # 64
+    , HOST_RESERVE_LINK_REQUEST: HostReserveLinkRequestMessage.deserialize # 65
+    , HOST_RESERVE_LINK_RESPONSE: HostReserveLinkResponseMessage.deserialize # 66
+    , CLIENT_GET_LINK_HOST: ClientGetLinkHostMessage.deserialize # 67
+    , CLIENT_READ_LINK: ClientReadLinkMessage.deserialize # 68
 }
 
 

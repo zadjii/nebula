@@ -14,6 +14,7 @@ from models.Host import Host
 from models.Session import Session
 from models.ClientCloudHostMapping import ClientCloudHostMapping
 from models.HostHostFetchMapping import HostHostFetchMapping
+from models.CloudLink import CloudLink
 # User.query = remote_db.session.query(User)
 # Cloud.query = remote_db.session.query(Cloud)
 # Host.query = remote_db.session.query(Host)

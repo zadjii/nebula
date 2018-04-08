@@ -332,6 +332,8 @@ def main():
     if MANUAL_CLASSES > 0:
         print 'there are {} instances that must be updated manually'\
             .format(MANUAL_CLASSES)
+    print('You will want to run `copy_messages.cmd` to get the new messages copied to the right places.')
+    print('It won\'t update the messages.js, or any existing files, so heads up.')
 
 if __name__ == '__main__':
     main()

@@ -151,6 +151,16 @@
 61  , CLIENT_GET_SHARED_PATHS , sid,  string:cloud_uname  , string:cname
 # paths:[{string:path, int:permissions}]
 62  , CLIENT_GET_SHARED_PATHS_RESPONSE, blob:paths
+
+63  , CLIENT_CREATE_LINK_REQUEST , sid,  string:cloud_uname  , string:cname, string:path
+64  , CLIENT_CREATE_LINK_RESPONSE, string:link_string
+
+65  , HOST_RESERVE_LINK_REQUEST , string:cloud_uname  , string:cname
+66  , HOST_RESERVE_LINK_RESPONSE , string:link_string
+
+67  , CLIENT_GET_LINK_HOST , sid, string:link_string
+#   We'll reply with a CLIENT_GET_CLOUD_HOST_RESPONSE, so no link-specific response
+68  , CLIENT_READ_LINK, sid, string:link_string
 ################################################################################
 #manually updated ones:
 ################################################################################

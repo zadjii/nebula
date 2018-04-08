@@ -75,24 +75,36 @@ def make_owners_group(owner_ids):
 
 
 class Link(object):
-    def __init__(self, path, user_ids, access):
+    def __init__(self, path, user_ids, access, id):
+        # type: (str, [int], int, str) -> None
         self._path = path
         self._user_ids = user_ids
         self._access = access
-        guid = uuid.uuid4()
-        guid64 = base64.urlsafe_b64encode(guid.bytes)
-        self.id = guid64
+        self.id = id
+
+    def has_permissions(self):
+        """
+        If there aren't any users in the link, then we should use the file's
+        permissions instead
+        :return:
+        """
+        return self._user_ids is not []
 
     def has_user(self, user_id):
-        return self.is_public() or (user_id in self._user_ids)
+        # type: (int) -> bool
+        # return self.is_public() or (user_id in self._user_ids)
+        return user_id in self._user_ids
 
-    # fixme no user.id, only user_id
+    def get_access(self):
+        return self._access
+
+    def get_path(self):
+        return self._path
+
     def add_user(self, user_id):
+        # type: (int) -> None
         if not self.has_user(user_id):
             self._user_ids.append(user_id)
-
-    def is_public(self):
-        return self._user_ids == []
 
     def to_serializable(self):
         return {
@@ -233,20 +245,13 @@ class PrivateData(object):
         :return:
         """
         filepath = relative_path.to_string()
-        # filepath = os.path.normpath(relative_path.to_string())
         # break the path into elements, start from the root, work down
         path_elems = get_path_elements(filepath)
-        # # make sure to always use the cloud root.
-        # if path_elems[0] != '.':
-        #     path_elems.insert(0, '.')
-        # curr_path = path_elems[0]  # NOT self._cloud.root_directory
-        curr_path = '.' # always start by checking the root
+        curr_path = '.'  # always start by checking the root
         current_perms = NO_ACCESS
         i = 0
         # I'm so sorry that this loop is structured weird
         while i <= len(path_elems) and current_perms < RDWR_ACCESS:
-            # curr_path = posixpath.normpath(curr_path)
-            # curr_path = os.path.normpath(curr_path)
             rp = RelativePath()
             rp.from_relative(curr_path)
             curr_corrected = rp.to_string()
@@ -260,6 +265,42 @@ class PrivateData(object):
                 curr_path = os.path.join(curr_corrected, path_elems[i])
             i += 1
         return current_perms
+
+    def get_link_permissions(self, user_id, link_str):
+        matching_link = None
+        for link in self._links:
+            if link.id == link_str:
+                matching_link = link
+                break
+        if matching_link is None:
+            return NO_ACCESS
+        if matching_link.has_permissions():
+            if matching_link.has_user(user_id):
+                return matching_link.get_access()
+            else:
+                return NO_ACCESS
+        else:
+            rel_path = RelativePath()
+            rel_path.from_relative(matching_link.get_path())
+            return self.get_permissions(user_id, rel_path)
+
+    def get_path_from_link(self, link_str):
+        matching_link = None
+        for link in self._links:
+            if link.id == link_str:
+                matching_link = link
+                break
+        if matching_link is None:
+            return None
+        else:
+            return matching_link.get_path()
+
+
+    def add_link(self, rel_path, link_str):
+        # type: (RelativePath, str) -> Link
+        link = Link(rel_path.to_string(), [], NO_ACCESS, link_str)
+        self._links.append(link)
+        return link
 
     def has_owner(self, user_id):
         owners_group = self.get_group(OWNERS_ID)
@@ -285,7 +326,7 @@ class PrivateData(object):
         if rel_path_str in self._files:
             file_perms = self._files[rel_path_str]
         else:
-        # if file_perms is None:
+            # if file_perms is None:
             mylog('Making new FilePermissions object')
             file_perms = FilePermissions(rel_path_str)
         mylog(file_perms.__dict__)
@@ -401,7 +442,7 @@ class PrivateData(object):
 
         new_links = []
         for link in json_obj[LINKS_KEY]:
-            new_link = Link(None, [], NO_ACCESS)
+            new_link = Link(None, [], NO_ACCESS, '')
             new_link.from_serializable(link)
             new_links.append(new_link)
         self._links = new_links

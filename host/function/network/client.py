@@ -22,8 +22,6 @@ def handle_recv_file_from_client(host_obj, connection, address, msg_obj):
 
 def do_recv_file_from_client(host_obj, connection, address, msg_obj, client, cloud):
     db = host_obj.get_db()
-    # cloud = client.cloud
-    # cloudname = cloud.name
     # todo: maybe add a quick response to tell the client the transfer is okay.
     resp_obj = connection.recv_obj()
     resp_type = resp_obj.type
@@ -191,11 +189,8 @@ def client_message_wrapper(host_obj, connection, address, msg_obj
 def do_client_list_files(host_obj, connection, address, msg_obj, client, cloud):
     _log = get_mylog()
     _log.debug('do_client_list_files')
-    # cloud = client.cloud
     cloudname = cloud.name
-    # rel_path = msg_obj.fpath
     session_id = client.uuid if client is not None else None
-    # full_path = cloud.translate_relative_path(rel_path)
 
     # todo: I believe this should be more complicated.
     # Say a person has permission to read some children of the directory,
@@ -432,7 +427,6 @@ def handle_client_get_permissions(host_obj, connection, address, msg_obj):
 
 def do_client_get_shared_paths(host_obj, connection, address, msg_obj, client, cloud):
     _log = get_mylog()
-    # cloud = client.cloud
     user_id = client.user_id if client else PUBLIC_USER_ID
 
     private_data = host_obj.get_private_data(cloud)
@@ -447,6 +441,104 @@ def do_client_get_shared_paths(host_obj, connection, address, msg_obj, client, c
     connection.send_obj(resp)
 
 def handle_client_get_shared_paths(host_obj, connection, address, msg_obj):
-    mylog('handle_client_get_shared_paths')
     return client_message_wrapper(host_obj, connection, address, msg_obj,
                                   do_client_get_shared_paths)
+
+
+################################################################################
+def do_client_create_link(host_obj, connection, address, msg_obj, client, cloud):
+    _log = get_mylog()
+    user_id = client.user_id if client else PUBLIC_USER_ID
+    session_id = client.uuid if client else None
+    rel_path = RelativePath()
+    rel_path.from_relative(msg_obj.path)
+
+    private_data = host_obj.get_private_data(cloud)
+    if private_data is None:
+        msg = 'Somehow the cloud doesn\'t have a privatedata associated with it'
+        err = InvalidStateMessage(msg)
+        mylog(err.message, '31')
+        host_obj.log_client(client, 'link', cloud, rel_path, 'error')
+        send_error_and_close(err, connection)
+        return Error(msg)
+
+    # how do we want to gate this? Owners only? or sharers only?
+    rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
+                                               rel_path, SHARE_ACCESS)
+    if not rd.success:
+        # conn was closed by client_access_check_or_close
+        return rd
+
+    # We'll ask the remote to give us a link id
+    remote_req = HostReserveLinkRequestMessage(cloud.uname(), cloud.cname())
+    rd = cloud.get_remote_conn()
+    if not rd.success:
+        msg = 'Failed to connect to remote for {}: {}'.format(cloud.full_name(), rd.data)
+        _log.error(msg)
+        host_obj.log_client(client, 'link', cloud, rel_path, 'error')
+        connection.send_obj(InvalidStateMessage(msg))
+        connection.close()
+        return Error(msg)
+    remote_conn = rd.data
+    remote_conn.send_obj(remote_req)
+    remote_resp = remote_conn.recv_obj()
+    if remote_resp.type is not HOST_RESERVE_LINK_RESPONSE:
+        msg = 'Remote failed to reserve link for us'
+        _log.error(msg)
+        host_obj.log_client(client, 'link', cloud, rel_path, 'error')
+        connection.send_obj(InvalidStateMessage(msg))
+        connection.close()
+        return Error(msg)
+
+    link_str = remote_resp.link_string
+    # Create the link in the private data
+    private_data.add_link(rel_path, link_str)
+    private_data.commit()
+
+    resp = ClientCreateLinkResponseMessage(link_str)
+    connection.send_obj(resp)
+    host_obj.log_client(client, 'link', cloud, rel_path, 'success')
+
+
+def handle_client_create_link(host_obj, connection, address, msg_obj):
+    return client_message_wrapper(host_obj, connection, address, msg_obj,
+                                  do_client_create_link)
+################################################################################
+
+
+################################################################################
+def do_client_read_link(host_obj, connection, address, msg_obj, client, cloud):
+    _log = get_mylog()
+    user_id = client.user_id if client else PUBLIC_USER_ID
+    session_id = client.uuid if client else None
+    link_str = msg_obj.link_str
+
+    private_data = host_obj.get_private_data(cloud)
+    if private_data is None:
+        msg = 'Somehow the cloud doesn\'t have a privatedata associated with it'
+        err = InvalidStateMessage(msg)
+        mylog(err.message, '31')
+        host_obj.log_client(client, 'read-link', cloud, link_str, 'error')
+        send_error_and_close(err, connection)
+        return Error(msg)
+
+    # TODO: how do we handle seperate link permissions here?
+    # We're just translating it straight to a normal readfile message
+
+    # get the path rom the link
+    rel_path = RelativePath()
+    path = private_data.get_path_from_link(link_str)
+    if path is None:
+        pass
+
+    rel_path.from_relative(path)
+    # construct a ReadFile message, using the path from the link
+    translated = ReadFileRequestMessage(session_id, cloud.uname(), cloud.cname(), rel_path.to_string())
+    # return do_read_file
+    return do_client_read_file(host_obj, connection, address, translated, client, cloud)
+
+
+def handle_client_read_link(host_obj, connection, address, msg_obj):
+    return client_message_wrapper(host_obj, connection, address, msg_obj,
+                                  do_client_create_link)
+################################################################################

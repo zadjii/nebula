@@ -23,7 +23,7 @@ from host.WatchdogThread import WatchdogWorker
 from host.function.network.client import list_files_handler, \
     handle_recv_file_from_client, handle_read_file_request, \
     handle_client_add_owner, handle_client_add_contributor, handle_client_make_directory, handle_client_get_permissions, \
-    handle_client_get_shared_paths
+    handle_client_get_shared_paths, handle_client_create_link, handle_client_read_link
 from host.function.network_updates import handle_fetch, handle_file_change
 from host.models.Cloud import Cloud
 from host.models.Remote import Remote
@@ -522,6 +522,26 @@ class HostController:
                 mylog('There is no private data for {}'.format(cloud.name), '31')
         return NO_ACCESS
 
+    def get_link_permissions(self, client_sid, cloud, link_str):
+        # type: (str, Cloud, str) -> int
+        db = self.get_db()
+
+        rd = get_client_session(db, client_sid, cloud.uname(), cloud.cname())
+        if rd.success:
+            client = rd.data
+            private_data = self.get_private_data(cloud)
+            if private_data is not None:
+                is_public = client is None
+                if is_public:
+                    mylog('Looking up [PUBLIC]\'s permission to access <{}>'.format(link_str))
+                    return private_data.get_link_permissions(PUBLIC_USER_ID, link_str)
+                else:
+                    mylog('Looking up [{}]\'s permission to access <{}>'.format(client.user_id, link_str))
+                    return private_data.get_link_permissions(PUBLIC_USER_ID, link_str)
+            else:
+                mylog('There is no private data for {}'.format(cloud.name), '31')
+        return NO_ACCESS
+
     def get_db(self):
         return self._nebs_instance.get_db()
 
@@ -571,6 +591,10 @@ class HostController:
                 handle_client_get_permissions(self, connection, address, msg_obj)
             elif msg_type == CLIENT_GET_SHARED_PATHS:
                 handle_client_get_shared_paths(self, connection, address, msg_obj)
+            elif msg_type == CLIENT_CREATE_LINK_REQUEST:
+                handle_client_create_link(self, connection, address, msg_obj)
+            elif msg_type == CLIENT_READ_LINK:
+                handle_client_read_link(self, connection, address, msg_obj)
             else:
                 mylog('I don\'t know what to do with {},\n{}'.format(msg_obj, msg_obj.__dict__))
         except Exception, e:
@@ -639,6 +663,30 @@ class HostController:
             rd = ResultAndData(False, err)
         bg = '102' if rd.success else '101'
         mylog('c access check {} {} {}'.format(client_sid, rel_path, rd.success), '30;{}'.format(bg))
+        return rd
+
+    def client_link_access_check_or_close(self, connection, client_sid, cloud, link_str, required_access=READ_ACCESS):
+        # type: (AbstractConnection, str, Cloud, str, int) -> ResultAndData
+        """
+
+        :param connection:
+        :param client_sid:
+        :param cloud:
+        :param rel_path:
+        :param required_access:
+        :return:
+        """
+        permissions = self.get_link_permissions(client_sid, cloud, link_str)
+        rd = ResultAndData(True, permissions)
+        if not permissions_are_sufficient(permissions, required_access):
+            err = 'Session does not have sufficient permission to access <{}>'.format(link_str)
+            mylog(err, '31')
+            response = InvalidPermissionsMessage(err)
+            connection.send_obj(response)
+            connection.close()
+            rd = ResultAndData(False, err)
+        bg = '102' if rd.success else '101'
+        mylog('c access check {} {} {}'.format(client_sid, link_str, rd.success), '30;{}'.format(bg))
         return rd
 
     def acquire_lock(self):
