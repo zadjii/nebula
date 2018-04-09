@@ -23,7 +23,7 @@ class CloudLink(base):
         while not found:
             proposed_string = base64.urlsafe_b64encode(str(uuid.uuid4()))[0:8]
             other = db.session.query(CloudLink).filter_by(link_string=proposed_string).first()
-            found = other is not None
+            found = other is None
         self.link_string = proposed_string
 
 

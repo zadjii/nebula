@@ -202,7 +202,10 @@ def local_file_delete(host_obj, directory_path, dir_node, filename, filenode, db
     #       be the root (Cloud) node
     # we don't need to recurse for the subdirs of this name
     # we do need to recurse on subnodes
-    mirror = filenode.cloud
+    # Don't user the cloud property directly - cloud is only set if the FileNode
+    #   is a child of the root of the cloud.
+    mirror = filenode.get_mirror()
+
     # mylog('[{}] Found a deleted file {}'.format(mirror.my_id_from_remote, file_pathname), '33')
     private_data = host_obj.get_private_data(mirror)
     if private_data is None:

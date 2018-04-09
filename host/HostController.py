@@ -462,6 +462,14 @@ class HostController:
             return self._private_data[cloud.my_id_from_remote]
         return None
 
+    def find_link_clouds(self, link_id):
+        # type: (str) -> [Cloud]
+        db = self.get_db()
+        matches = []
+        for data in self._private_data.values():
+            matches.append(db.session.query(Cloud).get(data._cloud_id))
+        return matches
+
     def load_private_data(self, cloud):
         """
         Doesn't create duplicate data for existing PrivateData

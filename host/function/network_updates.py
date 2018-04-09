@@ -173,11 +173,14 @@ def do_remove_file(host_obj, mirror, relative_path, db):
             os.remove(full_child_path)
         # mylog('Deleted node, file for {}'.format(full_child_path), '34')
     db.session.delete(file_node)
-    if os.path.isdir(full_path):
-        os.rmdir(full_path)
+    if os.path.exists(full_path):
+        if os.path.isdir(full_path):
+            os.rmdir(full_path)
+        else:
+            os.remove(full_path)
     else:
-        os.remove(full_path)
-    # mylog('Deleted node, file for {}'.format(full_path), '35')
+        mylog('The file doesn\'t exist - may have already been deleted')
+
     db.session.commit()
     rd = Success(deletables)
 

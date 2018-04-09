@@ -330,6 +330,7 @@ def host_reserve_link(remote_obj, connection, address, msg_obj):
     if rd.success:
         link = rd.data
         response = HostReserveLinkResponseMessage(link.link_string)
+        _log.debug('Reserved link {}'.format(link.link_string))
     else:
         response = rd.data
     connection.send_obj(response)
@@ -460,7 +461,7 @@ class RemoteController(object):
                 s.bind(address)
                 succeeded = True
             except Exception, e:
-                _log.error('Failed to bind to address, {}'.format(e.message))
+                _log.error('Failed to bind to address ({}), {}'.format(address, e))
         if not succeeded:
             return Error('Failed to bind to network (is the socket already in use?)')
 

@@ -186,6 +186,45 @@ def client_message_wrapper(host_obj, connection, address, msg_obj
         return callback(host_obj, connection, address, msg_obj, client, cloud)
 
 
+def client_link_wrapper(host_obj, connection, address, msg_obj
+                       , callback  # type: (HostController, AbstractConnection, object, BaseMessage, Client, Cloud) -> ResultAndData
+                       ):
+    # type: (HostController, AbstractConnection, object, BaseMessage, ...) -> None
+    session_id = msg_obj.sid
+    link_id = msg_obj.link_string
+    db = host_obj.get_db()
+    _log = get_mylog()
+    # Search all of the private datas for one that has the given link.
+    clouds = host_obj.find_link_clouds(link_id)
+    if len(clouds) < 1:
+        err = '{} is not a link on this device'.format(link_id)
+        _log.debug(err)
+        msg = InvalidStateMessage(err)
+        connection.send_obj(msg)
+        connection.close()
+    cloud = clouds[0]
+    # validate that cloud as the one the client was prepped to find
+    # TODO: this is very similar to the body of client_message_wrapper
+    rd = validate_or_get_client_session(db, session_id, cloud.uname(), cloud.cname())
+    if not rd.success:
+        response = ClientAuthErrorMessage(rd.data)
+        send_error_and_close(response, connection)
+        return
+    client = rd.data
+    # None is the public user
+    if client is not None:
+        # refresh the session:
+        rd = cloud.get_remote_conn()
+        if rd.success:
+            refresh = ClientSessionRefreshMessage(session_id)
+            rd.data.send_obj(refresh)
+            rd.data.close()
+        else:
+            mylog('Failed to refresh client session.')
+
+    return callback(host_obj, connection, address, msg_obj, client, cloud)
+
+
 def do_client_list_files(host_obj, connection, address, msg_obj, client, cloud):
     _log = get_mylog()
     _log.debug('do_client_list_files')
@@ -452,7 +491,7 @@ def do_client_create_link(host_obj, connection, address, msg_obj, client, cloud)
     session_id = client.uuid if client else None
     rel_path = RelativePath()
     rel_path.from_relative(msg_obj.path)
-
+    _log.debug('Creating a link to {}'.format(rel_path.to_string()))
     private_data = host_obj.get_private_data(cloud)
     if private_data is None:
         msg = 'Somehow the cloud doesn\'t have a privatedata associated with it'
@@ -480,6 +519,7 @@ def do_client_create_link(host_obj, connection, address, msg_obj, client, cloud)
         connection.close()
         return Error(msg)
     remote_conn = rd.data
+    _log.debug('Got remote connection')
     remote_conn.send_obj(remote_req)
     remote_resp = remote_conn.recv_obj()
     if remote_resp.type is not HOST_RESERVE_LINK_RESPONSE:
@@ -489,10 +529,11 @@ def do_client_create_link(host_obj, connection, address, msg_obj, client, cloud)
         connection.send_obj(InvalidStateMessage(msg))
         connection.close()
         return Error(msg)
-
+    _log.debug('Got link from remote')
     link_str = remote_resp.link_string
     # Create the link in the private data
     private_data.add_link(rel_path, link_str)
+    _log.debug('Committing .nebs to add link {}->{}'.format(link_str, rel_path.to_string()))
     private_data.commit()
 
     resp = ClientCreateLinkResponseMessage(link_str)
@@ -511,7 +552,7 @@ def do_client_read_link(host_obj, connection, address, msg_obj, client, cloud):
     _log = get_mylog()
     user_id = client.user_id if client else PUBLIC_USER_ID
     session_id = client.uuid if client else None
-    link_str = msg_obj.link_str
+    link_str = msg_obj.link_string
 
     private_data = host_obj.get_private_data(cloud)
     if private_data is None:
@@ -539,6 +580,6 @@ def do_client_read_link(host_obj, connection, address, msg_obj, client, cloud):
 
 
 def handle_client_read_link(host_obj, connection, address, msg_obj):
-    return client_message_wrapper(host_obj, connection, address, msg_obj,
-                                  do_client_create_link)
+    return client_link_wrapper(host_obj, connection, address, msg_obj,
+                               do_client_read_link)
 ################################################################################

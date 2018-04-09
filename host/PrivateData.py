@@ -295,6 +295,12 @@ class PrivateData(object):
         else:
             return matching_link.get_path()
 
+    def has_link(self, link_id):
+        # type: (str) -> bool
+        for link in self._links:
+            if link.id is link_id:
+                return True
+        return False
 
     def add_link(self, rel_path, link_str):
         # type: (RelativePath, str) -> Link
