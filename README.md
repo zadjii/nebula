@@ -1,203 +1,84 @@
 # nebula
 
-## Installing
+Nebula is a platform for personal, private clouds. It enables users to host their own files in a "Cloud" that's running on a device they own, and enables them to access those files directly from that device, _without_ the files ever passing through a third party. This means that the users have full control over their data.
 
-### Dependencies
+Nebula is about so much more than just plain file storage. Applications built on top of nebula can guarentee that their user's data remains private to the user. Imagine a social media site, where you can be sure that your post is only visible to you and your friends, and impossible for the site operator to scrape your data, or knowing that when you delete a post (or even all your profile information) it's really gone for good! Imagine a web email service where the contents of your email aren't scraped to better serve you advertising. This is what nebula is for.
 
-Hey watch out it's python 2.7. I know that I'm terrible for not using python 3. 
-I know that I'm terrible for not using virtualenvs. 
+## How it Works
 
-Most all of the python dependencies should be in `requirements.txt`, so those 
-can all be installed with `pip install -r requirements.txt`. 
+Nebula is a system mainly comprised of three parts: the Remote, the Host, and the Client.
 
-There is one tricky dependency - MiniUPnP. On linux, it should install just fine from pip.
-However, I've found that the Windows install doesn't exactly work. I have the 
-`miniupnpc.pyd` to add to the project if installing from pip doesn't work.
-You'll need to drop it in `dep/win64`, and `NetworkController` will automatically look for it there.
+The Remote is the service running at a well known location responsible for tracking clouds and orchestrating communication between them. The Remote doesn't know anything about the contents of the cloud, only where the hosts for a cloud are, when they were last updated, and is responsible for authenticating a client's access to a cloud.
 
-### SSL Stuff
+The Host is the device actually hosting the cloud's files. Each host for a cloud communicates with each other via the remote, and updates each other's files in a peer-to-peer fashion, so the remote never knows the contents of the files. Because the files on a host are just plain-old files, the user can interact with them directly through any old piece of software, and nebula will automatically keep the other hosts in sync.
 
-I started doing some ssl work and then gave up on it to get the prototype 
-working, but there are still remnants. In order for anything to work, you'll 
-need to  generate a `key` and `cert` using OpenSSL and drop them into the 
-`remote` directory for using TLS/SSL.
+Clients are the applications that the users interact directly with their clouds from another computer. For example: a web-based file browser that would let a user upload files to their cloud and download them to another machine. Clients can read and write the files on a host directly, without the files ever passing through the remote, so the remote operator never knows what a user is doing to their cloud.
 
-This can be done as follows:
-
-``` bash
-openssl genrsa 1024 > remote/key
-
-openssl req -new -x509 -nodes -sha1 -days 365 -key remote/key > remote/cert
 ```
+    +---------+
+    |         |
+    | Client  |
+    |         |
+    +-------^-+
+           ||
+XXXXXXXXXXX||XXXXXXXXXXXXXXXXXXXXXXXXXX
+           ||
+           ||     +---------------+
+           ||     | Remote        |
+           ||     | +---+         |
+           ||     | |   |         |
+           ||     | +---+         |
+           ||     +---------------+
+           ||        | |
+XXXXXXXXXXX||XXXXXXXX| |XXXXXXXXXXXXXXX
+           ||        | |
+        +--v------+  | |   +--------+
+        | Host 1  <--+ +---> Host 2 |
+        |         |        |        |
+        |         <-------->        |
+        +---------+        +--------+
 
-TODO: Find out how do do this w/in python.
-
-  The host will definitely need certs/keys too. I'll give the host come as well.
-
-``` bash
-openssl genrsa 1024 > host/host.key
-
-openssl req -new -x509 -nodes -sha1 -days 365 -key host/host.key > host/host.crt
 ```
-
-## Running nebula
-
-There are two different components of nebula - the "remote" and the "host".
-
-The remote is frequently abbreviated `nebr`, and can be run via `nebr.py`. 
-The remote acts as the controller for an entire system of clouds, and should be 
-operated by a central authority. This could be either nebula.com 
-(working title), or a buisiness could have their own instance they operate. 
-This is much like how anyone could operate their own git remote.
-
-The host is also frequently called the "Server", and is usually abbreviated 
-`nebs`, and is similarly run with `nebs.py`.
-Many different nebs can "mirror" clouds from a remote onto their local machine.
-While the nebs process is running, it will use the remote to sync file changes 
-with any other nebs for that cloud. 
-
-### Simple Setup
-
-If you're on Windows, you can use `launch_both.bat` to launch both a nebr and a
- nebs for an instance. by default, this launches the `default` instance, but 
- `launch_both sunio` will run both for the `sunio` instance.
-
-### Running Tests
-
-Right now, the most complete set of tests is in `NebsTest002.py`. It's pretty 
-easy to run them in IntelliJ, or from the commandline, in the root of the project:
-
-`python -m test.NebsTest002`
-
-I am VERY sure that the tests don't pass currently, and at best like 53/56 
-cases worked. But specifically, right now, they're broken and I haven't figured 
-out why yet.
-
-The tests clean up startup of the test, and leave the database after running 
-them, so you can use them as repopulation script for testing.
-
-### Instances
-
-nebula supports running multiple instances at the same time, with different 
-sets of settings. These instances can each also have their own database 
-associated with them, which makes them very useful for testing.
-
-By default, both nebs and nebr default to the `default` instance. 
-You can run a differnet instance with the `-i <instance>` commandline arg.
-
-eg. The tests are currently configured to create run for the `sunio` instance.
-So, if you want to run that nebs instance from the commandline, you would run
-`nebs.py -i sunio start`.
-
-Instances keep their files under the nebula root directory, under 
-`nebula/instances/<host or remote>/<instance_name>`. The database and .conf file
-live in there, and the tests generate directories to mirror test clouds into 
-under there as well.
-
-You can also use a arbitrary directory as the root of an instance with the 
-`-w <working dir>` argument, but it's less supported and a little awkward to use.
-`-i foo` is basically the same as `-w instances/<host or remote>/foo`.
+*fig 1: A really okay ascii diagram of the remote, client, and host relationships*
 
 
-### bash aliases
 
-You'll probably want to add the following aliases to your `.bashrc`
-I generally place the "installed" nebula at `var/lib/nebula`, I don't know if that
-  really makes any sense but that's what I like.
+## Roadmap
 
-``` sh
-alias nebs='python /var/lib/nebula/nebs.py'
+Nebula as come quite a long way since work started on it in 2015, but there's still a long way to go. This gives a little bit of an outline of what's done and where we have yet to go.
 
-alias nebr='python /var/lib/nebula/nebr.py'
+- [x] **v0.1 Basic end-to-end proof of concept**
+  This milestone demonstrated that syncing files from host to host, as orchestrated by a remote, without the files passing through the remote.
 
-# Might be useful for watching log
-alias logr='less +F --follow-name -B'
-```
+- [x] **v0.2 Client File Access**
+  Enable users to access the files on their clouds being at the PC hosting those files. This involves, ut is not limited to:
+    * Additional work to enable the nebula host to be communicated with over WebSocket
+    * Work to expose nebula hosts to the internet, using upnp
+    * A bunch of messages just to be able to interact with the hosts remotely
 
+- [x] **v0.3 File Sharing, linking**
+  This milestome enabled users to share files on their clouds with other users, and to be able to create static "links" on a Remote, such that a client could access a file via a link without knowing anything about the underlying structure of the coud hosting the linked file.
 
-## Weirdness ##
+  As of this milestone, it's possible to write fairly feature-rich applications on top of the nebula platform, and the platform is considered "Alpha-complete"
 
-### nebr/nebs instantly exits
-There's a little bit of awkwardness now where you can launch a nebs/nebr process
-and it will immediatly exit. That's due to the process seeing a leftover `.pid` 
-file from the last time you ran it, and it will immediately exit. 
+- [ ] **v0.4 Multiple hosts per cloud**
+  At the moment, each cloud can only support one host per cloud reliably. Remotes without `ENABLE_MULTIPLE_HOSTS=1` in their config will reject any attempts to create a second host. There's definitely some support there currently for replicating the files, but there's almost no support for syncing updates in the scenario where a host's network connection is dropped, the file is changed, and the host re-connects.
 
-I haven't quite figured that out yet. So, here be dragons.
+- [ ] **v0.5 Improved security (SSL/HTTPS)**
+  If no one has told you yet, you should be using https. While it's relatively trivial to get a SSL cert for a domain you control, it's very hard to issue valid, trusted SSL certificates for arbitrary host computers.
+  This is probably the biggest remaining hurdle for a proper nebula implentation. The remote needs to be able to authenticate the hosts and issue signed certs for them, in a way that will be trusted by any old browser, without any other system coniguration.
 
-### PrivateData / .nebs files
-In the process of running, nebs uses a .nebs file in the root of the cloud to 
-track file permissions. This is a plain json file.  It is the mechanism by which
-files can be shared with people or groups of people, or even made public. It's 
-loaded when nebs boots up, and because it's under the cloud root, any changes to
-the file will be sync'd with the other mirrors. If you try and change it while 
-nebs is running, nebs will revert your changes to try and keep it correct.  
+- [ ] **v0.6 Email Support**
+  Running a mail server is definitely non-trivial
 
-Not every file will be listed in there, only files that hae been shared with 
-other users.
+- [ ] **v0.7 Application Isolation**
+  Right now, once you've logged in to a lient application, it has free reign to do whatever it wants to your cloud, including reading and writing all over the entire tree. This is obviously *not ideal*. Applications need to have permissions only over a subset of the tree, and granting an application access needs to be an explicit action by the user.
 
-It does have versions in the schema, but like, lol. I clearly haven't done anything with it.
+After this point, the platform will be "Beta-Complete", and hopefully should only require minor bugfixes to be "feature-complete" - though I'm sure there's a long list of features I'd love to continue to add.
 
-### message_blueprints
-Nebula works by exchanging messages back and forth between Host, Remote, and 
-Client. And instead of writing(copying and pasting) all these classes by hand, 
-I created a `message_blueprints` file that can be used to  generate them automatically.
+## Contributing
 
-The schema is basically:
-```
-<ID>, <NAME_OF_MESSAGE> [, <type:arg>] 
-```
-But of course, the types are pretty much ignored. I can help with this if needed.
+As you can see, there's still a lot left to do! If your interested in helping contribute, feel free to fork the repo and have at it! There are plenty of issues that are open, as well as numerous undocumented TODOs in the code itself.
 
-
-### ResultAndData (rd)
-
-All over the codebase, in both nebula and sunburst, I'll use a ResultAndData 
-struct as a return type. I don't really know why I started doing this. I guess I 
-don't love using exceptions or something.
-
-Basically, an rd has two members: `rd.success` and `rd.data`. `success` is a 
-simple bool indicating if the function succeeded. `data` is the tricky bit -
- Usually, in failure cases this will either be `None` or a string with a message.
- In success cases, this is usually whatever the return value of that function 
- is supposed to be.
-
-Here's an example, from RemoteController.py,
-``` python
-
-def do_client_get_clouds(db, session_id):
-    # type: (SimpleDB, str) -> ResultAndData
-    # type: (SimpleDB, str) -> ResultAndData(True, ([dict], [dict]) )
-    # type: (SimpleDB, str) -> ResultAndData(False, BaseMessage )
-    rd = get_user_from_session(db, session_id)
-    if not rd.success:
-        msg = 'generic CGCHsR error: "{}"'.format(rd.data)
-        mylog(msg, '31')
-        return Error(InvalidStateMessage(msg))
-    else:
-        user = rd.data
-
-    mylog('getting clouds for {}'.format(user.username))
-
-    owned_clouds = [c.to_dict() for c in user.owned_clouds.all()]
-    contributed_clouds = [c.to_dict() for c in user.contributed_clouds.all()]
-    return Success((owned_clouds, contributed_clouds))
-```
-
-`Success(data)` and `Error(data)` are defined as:
-
-```python
-def Error(data=None):
-    return ResultAndData(False, data)
-def Success(data=None):
-    return ResultAndData(True, data)
-```
-
- Because the `.data` member is essentially a void*, there's not a lot of help 
-   that type-hinting can give us, so when I'm writing functions that return a 
-   ResultAndData, I usually like to include three lines of type hinting - the 
-   official one, and then one for the success and one for the failure case.
-
-This probably isn't a real programming pattern, it's just something dumb that I do.
-I can only really get away with it because python isn't strongly typed.
-
+You can also take a look at the `CONTRIBUTING.md` file in the root of the project for some notes on how the project works.
 
