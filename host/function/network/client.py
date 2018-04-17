@@ -251,7 +251,10 @@ def do_client_list_files(host_obj, connection, address, msg_obj, client, cloud):
                                                rel_path, READ_ACCESS)
     if rd.success:
         full_path = rel_path.to_absolute(cloud.root_directory)
-        if not os.path.isdir(full_path):
+        if not os.path.exists(full_path):
+            resp = FileDoesNotExistErrorMessage()
+            host_obj.log_client(client, 'ls', cloud, rel_path, 'error')
+        elif not os.path.isdir(full_path):
             mylog('Responding to ClientListFiles with error - {} is a file, not dir.'.format(rel_path.to_string()))
             resp = FileIsNotDirErrorMessage()
             host_obj.log_client(client, 'ls', cloud, rel_path, 'error')
