@@ -111,7 +111,7 @@ def get_log_path(argv):
     for index, arg in enumerate(argv):
         if index >= (len(argv) - 1):
             remaining_argv.append(arg)
-        if (arg == '-l') or (arg == '--log'):
+        elif (arg == '-l') or (arg == '--log'):
             log_path = argv[index+1]
             remaining_argv.extend(argv[index+2:])
             break
@@ -138,14 +138,13 @@ def get_client_log_path(argv):
     for index, arg in enumerate(argv):
         if index >= (len(argv) - 1):
             remaining_argv.append(arg)
-        if arg == '--access':
+        elif arg == '--access':
             log_path = argv[index+1]
             remaining_argv.extend(argv[index+2:])
             break
         else:
             remaining_argv.append(arg)
 
-    # print('remaining_argv={}'.format(remaining_argv))
     return log_path, remaining_argv
 
 
@@ -166,7 +165,7 @@ def get_log_verbosity(argv):
     for index, arg in enumerate(argv):
         if index >= (len(argv) - 1):
             remaining_argv.append(arg)
-        if (arg == '-v') or (arg == '--verbose'):
+        elif (arg == '-v') or (arg == '--verbose'):
             verbosity = argv[index+1]
             remaining_argv.extend(argv[index+2:])
             break

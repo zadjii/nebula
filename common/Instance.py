@@ -36,11 +36,11 @@ class Instance(object):
         for index, arg in enumerate(argv):
             if index >= (len(argv) - 1):
                 remaining_argv.append(arg)
-            if (arg == '-w') or (arg == '--working-dir'):
+            elif (arg == '-w') or (arg == '--working-dir'):
                 working_dir = argv[index+1]
                 remaining_argv.extend(argv[index+2:])
                 break
-            if (arg == '-i') or (arg == '--instance'):
+            elif (arg == '-i') or (arg == '--instance'):
                 working_dir = os.path.join('{}/{}/'.format(INSTANCES_ROOT, instance_type), argv[index+1])
                 remaining_argv.extend(argv[index+2:])
                 break

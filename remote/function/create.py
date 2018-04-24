@@ -2,7 +2,7 @@ from datetime import datetime
 import getpass
 from werkzeug.security import check_password_hash
 
-from common_util import Error, Success
+from common_util import Error, Success, INFINITE_SIZE
 from remote import User, Cloud
 # from remote import remote_db as db
 
@@ -75,7 +75,7 @@ def create_cloud(db, username, password, cloudname, max_size):
     db.session.commit()
 
 
-def do_create_cloud(db, creator, cloudname, max_size=FOUR_GB):
+def do_create_cloud(db, creator, cloudname, max_size=INFINITE_SIZE):
     # type: (SimpleDB, User, str, int) -> ResultAndData
     # type: (SimpleDB, User, str, int) -> ResultAndData(True, Cloud)
     # type: (SimpleDB, User, str, int) -> ResultAndData(False, str)

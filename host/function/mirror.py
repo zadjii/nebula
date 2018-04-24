@@ -217,6 +217,7 @@ def complete_mirroring(db, cloud):
 
 def attempt_wakeup(instance):
     # type: (NebsInstance) -> None
+    # TODO: M0.4 - Suport multiple mirrors
     mylog('Attempting to alert any existing nebs')
     my_addr = instance.get_existing_ip()
     port = instance.get_existing_port()
