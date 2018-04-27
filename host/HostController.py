@@ -59,19 +59,16 @@ class HostController:
         self._is_online = True
         self._client_log = get_mylog()
 
-    def start(self, argv):
-        # type: ([str]) -> None
+    def start(self, force_kill=False, access_log=None):
+        # type: (bool, srt) -> None
         _log = get_mylog()
         set_mylog_name('nebs')
-        # todo process start() args here
-        _log.debug('setting up client logging...')
-        client_log_path, argv = get_client_log_path(argv)
-        if client_log_path is not None:
-            msg = 'writing access log to {}'.format(client_log_path)
+
+        if access_log is not None:
+            msg = 'writing access log to {}'.format(access_log)
             _log.debug(msg)
             print(msg)
-            self.create_client_logger(client_log_path)
-
+            self.create_client_logger(access_log)
 
         # read in all the .nebs
         db = self.get_db()
@@ -86,7 +83,6 @@ class HostController:
         # register the shutdown callback
         atexit.register(self.shutdown)
 
-        force_kill = '--force' in argv
         if force_kill:
             _log.info('Forcing shutdown of previous instance')
         rd = self._nebs_instance.start(force_kill)
@@ -123,6 +119,7 @@ class HostController:
             _log.info('Both the local update checking thread and the network thread'
                       ' have exited.')
             sys.exit()
+        return rd
 
     def do_local_updates(self):
         _log = get_mylog()

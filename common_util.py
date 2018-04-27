@@ -1,3 +1,4 @@
+import argparse
 import ctypes
 import os
 import platform
@@ -301,3 +302,11 @@ class RelativePath(object):
 
     def to_absolute(self, root):
         return os.path.join(root, self._path)
+
+def setup_common_argparsing():
+    common_parser = argparse.ArgumentParser(add_help=False)
+    common_parser.add_argument('-w', '--working-dir', default=None)
+    common_parser.add_argument('-i', '--instance', default=None)
+    common_parser.add_argument('-l', '--log', default=None)
+    common_parser.add_argument('-v', '--verbose', default=None)
+    return common_parser

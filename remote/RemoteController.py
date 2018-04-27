@@ -415,7 +415,7 @@ class RemoteController(object):
         """
         return self.nebr_instance.make_db_session()
 
-    def start(self, argv):
+    def start(self, force_kill=False):
         set_mylog_name('nebr')
         _log = get_mylog()
         enable_vt_support()
@@ -434,7 +434,7 @@ class RemoteController(object):
         # register the shutdown callback
         atexit.register(self.shutdown)
 
-        force_kill = '--force' in argv
+        # force_kill = '--force' in argv
         if force_kill:
             mylog('Forcing shutdown of previous instance')
         rd = self.nebr_instance.start(force_kill)

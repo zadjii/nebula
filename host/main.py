@@ -23,18 +23,15 @@ class StartCommand(BaseCommand):
         start.add_argument('--force'
                             , action='store_true'
                             , help='Force kill any existing nebula host processes')
+        start.add_argument('--access', default=None)
         return start
 
     def do_command_with_args(self, instance, args):
         # type: (Instance, Namespace) -> ResultAndData
-        print('start with args')
-        print(args)
-        return Error()
-
-
-def start(instance, argv):
-    host_controller = HostController(instance)
-    host_controller.start(argv=argv)
+        force_kill = args.force
+        access_log = args.access
+        host_controller = HostController(instance)
+        return host_controller.start(force_kill=force_kill, access_log=access_log)
 
 
 ################################################################################
@@ -74,18 +71,6 @@ class KillCommand(BaseCommand):
 #     print ' or [-i, --instance <name>] to provide the instance name'
 #     print '                            (same as `-w {nebula path}/instances/host/<name>`)'
 
-def setup_common_argparsing():
-    common_parser = argparse.ArgumentParser(add_help=False)
-    common_parser.add_argument('-w', '--working-dir', default=None)
-    common_parser.add_argument('-i', '--instance', default=None)
-    common_parser.add_argument('-l', '--log', default=None)
-    common_parser.add_argument('-v', '--verbose', default=None)
-    common_parser.add_argument('--access', default=None)
-    return common_parser
-
-
-class MigrateHostCommane(object):
-    pass
 
 
 def get_nebs_argparser():
