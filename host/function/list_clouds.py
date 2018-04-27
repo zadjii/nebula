@@ -2,8 +2,13 @@ from host import Cloud
 
 __author__ = 'zadjii'
 
+################################################################################
+def add_list_clouds_argparser(subparsers):
+    list_clouds = subparsers.add_parser('list-clouds', description='list all current clouds')
+    list_clouds.set_defaults(func=do_list_clouds)
 
-def list_clouds(instance, argv):
+
+def do_list_clouds(instance, args):
     db = instance.get_db()
     clouds = db.session.query(Cloud).all()
     print 'There are ', len(clouds), 'clouds.'

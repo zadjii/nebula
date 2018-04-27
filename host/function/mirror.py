@@ -1,3 +1,4 @@
+import argparse
 import os
 from datetime import datetime
 import socket
@@ -123,13 +124,19 @@ def client_request_cloud(remote, cloud, session_id, db):
 def finish_request_cloud(remote, cloud, db, connection):
     # type: (Remote, Cloud, SimpleDB, AbstractConnection) -> ResultAndData
     resp_obj = connection.recv_obj()
-    if not resp_obj.type == GO_RETRIEVE_HERE:
-        msg = 'Error while mirroring, {}'.format(resp_obj.__dict__)
-        mylog(msg, '31')
-        rd = ResultAndData(False, msg)
-    else:
+    if resp_obj.type == INVALID_STATE:
+        rd = Error(resp_obj.msg)
+    elif resp_obj.type == MIRROR_FAILURE:
+        rd = Error(resp_obj.msg)
+    elif resp_obj.type == AUTH_ERROR:
+        rd = Error(resp_obj.msg)
+    elif resp_obj.type == GO_RETRIEVE_HERE:
         rd = handle_go_retrieve(resp_obj, remote, cloud, db)
         # attempt_wakeup()
+    else:
+        rd = Error('Unidentified error {} while mirroring'.format(resp_obj.type))
+    # if not rd.success:
+    #     mylog(rd.data)
     return rd
 
 
@@ -309,134 +316,102 @@ def locate_remote(instance, address, port):
     _log.debug('Found remote for {},{}'.format(address, port))
     return rd
 
+# TODO: Allow clouds to be mirrored to non-empty directories if there isn't
+#       another mirror already.
+# Or maybe we have a different command, like `init` that creates a cloud from a
+#       working directory. That could be a good idea! TODO
 
-def mirror(instance, argv):
-    # mylog(argv)
-    """
-    Things we need for this:
-     - [-r address]
-     -- The name of the host. Either ip(4/6) or web address?
-     -- I think either will work just fine.
-     - [cloudname]
-     -- The name of a cloud to connect to. We'll figure this out later.
-     - [-d root directory]
-     -- the path to the root directory that will store this cloud.
-     -- default '.'
-     - [-s session_id]
-     -- a string representing a nebula client session_id
-     -- if not present, will prompt for a username and password.
-    """
-    set_mylog_name('mirror')
-    db = instance.get_db()
-    host = None
-    port = REMOTE_PORT
-    cloudname = None
-    root = '.'
-    test_enabled = False
-    session_id = None
-    if len(argv) < 7:
-        mirror_usage()
+DIRECTORY_HELP_TEXT = 'Provide a directory to mirror into. \n'\
+                      'If you omit this parameter, the mirror will create a path' \
+                      ' for the cloud in the current working directory, under ' \
+                      '"./<username>/<cloudname>."\n'\
+                      'If you provide a directory, it must be empty.'
+
+
+def add_mirror_argparser(subparsers):
+    mirror = subparsers.add_parser('mirror', description='mirror a cloud to this device')
+    mirror.add_argument('remote'
+                        , help='URL of the remote host to connect to. Don\'t include the port in this string, use the -p option.')
+    mirror.add_argument('-p', '--port'
+                        , help='Port on the remote to connect to. Defaults to {}'.format(REMOTE_PORT)
+                        , default=REMOTE_PORT)
+    mirror.add_argument('-d', '--directory'
+                        , help=DIRECTORY_HELP_TEXT)
+    mirror.add_argument('-s', '--session-id'
+                        , help='Optionally provide a session ID to bypass the authentication prompt')
+    # TODO: remove this arg entirely. The tests should be using sids
+    mirror.add_argument('--test'
+                        , action='store_true'
+                        , help='Used for testing - forces the  password prompt to be in plaintext.')
+    mirror.add_argument('cloud_name', metavar='cloud-name'
+                        , help='Name of the cloud to mirror, in <username>/<cloudname> format')
+    mirror.set_defaults(func=mirror_with_args)
+
+def mirror_with_args(instance, args):
+    print('mirror with args')
+    print(args)
+    # Namespace(access=None, cloud_name='foo/bar', command='mirror',
+    #   directory=None, func=<function mirror_with_args at 0x000000000998D518>,
+    #   instance=None, log=None, port=12345, remote='localhost', session_id=None,
+    #   test=False, verbose=None, working_dir=None)
+    remote_address = args.remote
+    cloud_name = args.cloud_name
+    directory = args.directory
+    remote_port = args.port
+    session_id = args.session_id
+    test = args.test
+    if cloud_name.find('/') == -1:
+        print('mirror: error: cloud name must be in the format <username>/<cloudname>')
         return
-
-    print('mirror args={}'.format(argv))
-
-    while len(argv) > 0:
-        arg = argv[0]
-        args_left = len(argv)
-        args_eaten = 0
-        if arg == '-r':
-            if args_left < 2:
-                # throw some exception
-                raise Exception('not enough args supplied to mirror')
-            host = argv[1]
-            args_eaten = 2
-        elif arg == '-p':
-            if args_left < 2:
-                # throw some exception
-                raise Exception('not enough args supplied to mirror')
-            port = int(argv[1])
-            args_eaten = 2
-        elif arg == '-d':
-            if args_left < 2:
-                # throw some exception
-                raise Exception('not enough args supplied to mirror')
-            root = argv[1]
-            args_eaten = 2
-        elif arg == '-s':
-            if args_left < 2:
-                # throw some exception
-                raise Exception('not enough args supplied to mirror')
-            session_id = argv[1]
-            args_eaten = 2
-        elif arg == '--test':
-            test_enabled = True
-            args_eaten = 1
-        else:
-            cloudname = arg
-            args_eaten = 1
-        argv = argv[args_eaten:]
-    if cloudname is None:
-        raise Exception('Must specify a cloud name to mirror')
-    if host is None:
-        raise Exception('Must specify a host to mirror from')
-
-    if cloudname.find('/') == -1:
-        raise Exception('Cloudname must be formatted as username/cloudname')
-
-    uname_cname = cloudname.split('/')
+    uname_cname = cloud_name.split('/')
     uname = uname_cname[0]
     cname = uname_cname[1]
 
     if len(uname) < 1 or len(cname) < 1:
-        raise Exception('Cloudname must be formatted as username/cloudname')
+        print('mirror: error: cloud name must be in the format <username>/<cloudname>')
+        return
 
-    abs_root = os.path.abspath(root)
+    rd = _do_mirror(instance, remote_address, remote_port, uname, cname, directory, session_id, test)
+    if not rd.success:
+        print(rd.data)
+    return
+
+
+def _do_mirror(instance, remote_address, remote_port, cloud_uname, cloudname, directory, session_id, test=False):
+    _log = get_mylog()
+    rd = locate_remote(instance, remote_address, remote_port)
+    if not rd.success:
+        return Error('Failed to locate the remote for remote address "{}:{}"'.format(remote_address, remote_port))
+    remote = rd.data
+
+    real_root = './{}/{}'.format(cloud_uname, cloudname) if directory is None else directory
+    abs_root = os.path.abspath(real_root)
     if not os.path.exists(abs_root):
-
         try:
             os.makedirs(abs_root)
         except Exception, e:
-            mylog('Exception while trying to create target directory {}'.format(abs_root))
-            mylog(str(e))
-            return
+            return Error('Failed to create the directory {}'.format(abs_root))
+    elif not os.path.isdir(abs_root):
+        return Error('target ({}) should be a directory'.format(real_root))
+    elif os.listdir(abs_root) is not []:
+        return Error('Target directory should be empty')
 
-    rd = locate_remote(instance, host, port)
-    if not rd.success:
-        msg = 'Failed to locate the remote for remote address ({}, {})'.format(host, port)
-        print(msg)
-        return
-    remote = rd.data
-
-    mylog('attempting to get cloud named "{}" from remote at [{}]:{} into root'
-          ' directory <{}>'.format(cloudname, host, port, abs_root))
-
-    # # okay, so manually decipher the FQDN if they input one.
-    # # todo:30 verify that directory is empty, don't do anything if it isn't
-    # # also todo:25 ^
-    # status, my_id = ask_remote_for_id(instance, host, port, db)
-    # if not status == 0:
-    #     raise Exception('Exception while mirroring:' +
-    #                     ' could not get ID from remote')
+    _log.debug('attempting to get cloud named "{}" from remote at [{}]:{} into '
+               'root directory <{}>'.format(cloudname, remote_address, remote_port, abs_root))
 
     cloud = Cloud()
     cloud.mirrored_on = datetime.utcnow()
-    # cloud.my_id_from_remote = my_id
-    cloud.name = cname
-    cloud.username = uname
+    cloud.name = cloudname
+    cloud.username = cloud_uname
     cloud.root_directory = abs_root
-    # cloud.remote_host = host
-    # cloud.remote_port = port
-
-    # db.session.add(cloud)
-    # remote.clouds.append(cloud)
-    # db.session.commit()
     # At this point, the cloud is not yet in the DB.
     rd = Error()
+    db = instance.get_db()
     if session_id is None:
-        rd = request_cloud(remote, cloud, test_enabled, db)
+        rd = request_cloud(remote, cloud, test, db)
     else:
         rd = client_request_cloud(remote, cloud, session_id, db)
-    mylog('finished requesting cloud')
+    _log.debug('finished requesting cloud')
 
     if rd.success:
         rd = complete_mirroring(db, cloud)
@@ -447,11 +422,153 @@ def mirror(instance, argv):
         attempt_wakeup(instance)
 
     # todo goto code that checks if a nebs.start process is running
+    _log.debug('nebs reached bottom of mirror()')
+    return rd
 
-    mylog('nebs reached bottom of mirror()')
 
+# def mirror(instance, argv):
+#     # mylog(argv)
+#     """
+#     Things we need for this:
+#      - [-r address]
+#      -- The name of the host. Either ip(4/6) or web address?
+#      -- I think either will work just fine.
+#      - [cloudname]
+#      -- The name of a cloud to connect to. We'll figure this out later.
+#      - [-d root directory]
+#      -- the path to the root directory that will store this cloud.
+#      -- default '.'
+#      - [-s session_id]
+#      -- a string representing a nebula client session_id
+#      -- if not present, will prompt for a username and password.
+#     """
+#     set_mylog_name('mirror')
+#     db = instance.get_db()
+#     host = None
+#     port = REMOTE_PORT
+#     cloudname = None
+#     root = '.'
+#     test_enabled = False
+#     session_id = None
+#     if len(argv) < 7:
+#         mirror_usage()
+#         return
+#
+#     print('mirror args={}'.format(argv))
+#
+#     while len(argv) > 0:
+#         arg = argv[0]
+#         args_left = len(argv)
+#         args_eaten = 0
+#         if arg == '-r':
+#             if args_left < 2:
+#                 # throw some exception
+#                 raise Exception('not enough args supplied to mirror')
+#             host = argv[1]
+#             args_eaten = 2
+#         elif arg == '-p':
+#             if args_left < 2:
+#                 # throw some exception
+#                 raise Exception('not enough args supplied to mirror')
+#             port = int(argv[1])
+#             args_eaten = 2
+#         elif arg == '-d':
+#             if args_left < 2:
+#                 # throw some exception
+#                 raise Exception('not enough args supplied to mirror')
+#             root = argv[1]
+#             args_eaten = 2
+#         elif arg == '-s':
+#             if args_left < 2:
+#                 # throw some exception
+#                 raise Exception('not enough args supplied to mirror')
+#             session_id = argv[1]
+#             args_eaten = 2
+#         elif arg == '--test':
+#             test_enabled = True
+#             args_eaten = 1
+#         else:
+#             cloudname = arg
+#             args_eaten = 1
+#         argv = argv[args_eaten:]
+#     if cloudname is None:
+#         raise Exception('Must specify a cloud name to mirror')
+#     if host is None:
+#         raise Exception('Must specify a host to mirror from')
+#
+#     if cloudname.find('/') == -1:
+#         raise Exception('Cloudname must be formatted as username/cloudname')
+#
+#     uname_cname = cloudname.split('/')
+#     uname = uname_cname[0]
+#     cname = uname_cname[1]
+#
+#     if len(uname) < 1 or len(cname) < 1:
+#         raise Exception('Cloudname must be formatted as username/cloudname')
+#
+#     abs_root = os.path.abspath(root)
+#     if not os.path.exists(abs_root):
+#
+#         try:
+#             os.makedirs(abs_root)
+#         except Exception, e:
+#             mylog('Exception while trying to create target directory {}'.format(abs_root))
+#             mylog(str(e))
+#             return
+#
+#     rd = locate_remote(instance, host, port)
+#     if not rd.success:
+#         msg = 'Failed to locate the remote for remote address ({}, {})'.format(host, port)
+#         print(msg)
+#         return
+#     remote = rd.data
+#
+#     mylog('attempting to get cloud named "{}" from remote at [{}]:{} into root'
+#           ' directory <{}>'.format(cloudname, host, port, abs_root))
+#
+#     # # okay, so manually decipher the FQDN if they input one.
+#     # # todo:30 verify that directory is empty, don't do anything if it isn't
+#     # # also todo:25 ^
+#     # status, my_id = ask_remote_for_id(instance, host, port, db)
+#     # if not status == 0:
+#     #     raise Exception('Exception while mirroring:' +
+#     #                     ' could not get ID from remote')
+#
+#     cloud = Cloud()
+#     cloud.mirrored_on = datetime.utcnow()
+#     # cloud.my_id_from_remote = my_id
+#     cloud.name = cname
+#     cloud.username = uname
+#     cloud.root_directory = abs_root
+#     # cloud.remote_host = host
+#     # cloud.remote_port = port
+#
+#     # db.session.add(cloud)
+#     # remote.clouds.append(cloud)
+#     # db.session.commit()
+#     # At this point, the cloud is not yet in the DB.
+#     rd = Error()
+#     if session_id is None:
+#         rd = request_cloud(remote, cloud, test_enabled, db)
+#     else:
+#         rd = client_request_cloud(remote, cloud, session_id, db)
+#     mylog('finished requesting cloud')
+#
+#     if rd.success:
+#         rd = complete_mirroring(db, cloud)
+#
+#     if rd.success:
+#         sleep(1)
+#         # try waking up any hosts on this machine that this mirror should be tracked by.
+#         attempt_wakeup(instance)
+#
+#     # todo goto code that checks if a nebs.start process is running
+#
+#     mylog('nebs reached bottom of mirror()')
+#
+#
+# def mirror_usage():
+#     print 'usage: neb mirror [--test][-r address][-p port]' + \
+#         '[-d root directory][cloudname]'
+#     print ''
 
-def mirror_usage():
-    print 'usage: neb mirror [--test][-r address][-p port]' + \
-        '[-d root directory][cloudname]'
-    print ''

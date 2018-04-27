@@ -3,7 +3,12 @@ from host import FileNode
 __author__ = 'zadjii'
 
 
-def dbg_nodes(instance, argv):
+def add_dbg_nodes_argparser(subparsers):
+    dbg_nodes = subparsers.add_parser('dbg-nodes', description='Debug print all the nodes in the database.')
+    dbg_nodes.set_defaults(func=_do_dbg_nodes)
+
+
+def _do_dbg_nodes(instance, args):
     db = instance.get_db()
     nodes = db.session.query(FileNode).all()
     for node in nodes:

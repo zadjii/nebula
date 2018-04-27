@@ -4,7 +4,12 @@ from host.models.Cloud import Cloud
 __author__ = 'zadjii'
 
 
-def dbg_mirrors(instance, argv):
+def add_dbg_mirrors_argparser(subparsers):
+    dbg_mirrors = subparsers.add_parser('dbg-mirrors', description='Debug print all the mirrors on this device')
+    dbg_mirrors.set_defaults(func=_do_dbg_mirrors)
+
+
+def _do_dbg_mirrors(instance, args):
     db = instance.get_db()
     mirrors = db.session.query(Cloud).all()
     for mirror in mirrors:
