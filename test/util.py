@@ -321,12 +321,12 @@ class HostSession(object):
         instance_command = ''
         if instance_root is not None:
             instance_command = '-w {}'.format(instance_root)
-        command = 'python {} {} mirror -r {} -d {} -s {} {}/{}'.format(
+        command = 'python {} {} mirror -d {} -s {} {} {}/{}'.format(
             os.path.join(NEBULA_ROOT, 'nebs.py')
             , instance_command
-            , 'localhost'
             , local_root
             , self.sid
+            , 'localhost'
             , uname
             , cname)
         log_text('Command is `{}`'.format(command))

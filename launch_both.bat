@@ -8,14 +8,14 @@ if (%1) == () (
 )
 
 :DEFAULT
-start "Host - Nebula" /max cmd /k "python %~dp0/nebs.py start -v debug" & 
+start "Host - Nebula" /max cmd /k "python %~dp0/nebs.py start -v debug" &
 start "Remote - Nebula" /max cmd /k "python %~dp0/nebr.py start -v debug" &
 
 goto EXIT
 
 :INSTANCE
-start "Host - Nebula" /max cmd /k "python %~dp0/nebs.py start -v debug -i %1" & 
-start "Remote - Nebula" /max cmd /k "python %~dp0/nebr.py start -v debug -i %1" &
+start "Host - Nebula" /max cmd /k "python %~dp0/nebs.py start -i %1 -v debug" &
+start "Remote - Nebula" /max cmd /k "python %~dp0/nebr.py start -i %1 -v debug" &
 
 goto EXIT
 
