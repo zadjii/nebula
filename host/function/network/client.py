@@ -12,6 +12,7 @@ from host.models.Client import Client
 from host.util import check_response, validate_or_get_client_session, \
     permissions_are_sufficient, get_clouds_by_name
 from messages import *
+from messages.util import make_ls_array, make_stat_dict
 from msg_codes import *
 
 
@@ -128,12 +129,6 @@ def do_client_read_file(host_obj, connection, address, msg_obj, client, cloud):
           .format(client.uuid, msg_obj))
 
 
-def list_files_handler(host_obj, connection, address, msg_obj):
-    mylog('list_files_handler')
-    return client_message_wrapper(host_obj, connection, address, msg_obj,
-                                  do_client_list_files)
-
-
 def client_message_wrapper(host_obj, connection, address, msg_obj
                            , callback  # type: (HostController, AbstractConnection, object, BaseMessage, Client, Cloud) -> ResultAndData
                            ):
@@ -225,11 +220,25 @@ def client_link_wrapper(host_obj, connection, address, msg_obj
     return callback(host_obj, connection, address, msg_obj, client, cloud)
 
 
+def list_files_handler(host_obj, connection, address, msg_obj):
+    mylog('list_files_handler')
+    return client_message_wrapper(host_obj, connection, address, msg_obj,
+                                  do_client_list_files)
+
+
 def do_client_list_files(host_obj, connection, address, msg_obj, client, cloud):
     _log = get_mylog()
-    _log.debug('do_client_list_files')
     cloudname = cloud.name
     session_id = client.uuid if client is not None else None
+    client_uid = client.user_id if client else PUBLIC_USER_ID
+
+    private_data = host_obj.get_private_data(cloud)
+    if private_data is None:
+        msg = 'Somehow the cloud doesn\'t have a privatedata associated with it'
+        err = InvalidStateMessage(msg)
+        host_obj.log_client(client, 'ls', cloud, None, 'error')
+        send_error_and_close(err, connection)
+        return
 
     # todo: I believe this should be more complicated.
     # Say a person has permission to read some children of the directory,
@@ -254,22 +263,81 @@ def do_client_list_files(host_obj, connection, address, msg_obj, client, cloud):
         if not os.path.exists(full_path):
             resp = FileDoesNotExistErrorMessage()
             host_obj.log_client(client, 'ls', cloud, rel_path, 'error')
+
         elif not os.path.isdir(full_path):
             mylog('Responding to ClientListFiles with error - {} is a file, not dir.'.format(rel_path.to_string()))
             resp = FileIsNotDirErrorMessage()
             host_obj.log_client(client, 'ls', cloud, rel_path, 'error')
+
         else:
             mylog('Responding successfully to ClientListFiles')
-            resp = ListFilesResponseMessage(cloudname, session_id, rel_path.to_string(),
-                                            full_path)
-
+            resp = ListFilesResponseMessage(cloudname, session_id, rel_path.to_string())
+            resp.stat = make_stat_dict(rel_path, private_data, cloud, client_uid)
+            resp.ls = make_ls_array(rel_path, private_data, cloud, client_uid)
             host_obj.log_client(client, 'ls', cloud, rel_path, 'success')
+
         connection.send_obj(resp)
     else:
         # the access check will send error
         host_obj.log_client(client, 'ls', cloud, rel_path, 'error')
         pass
 
+
+def stat_files_handler(host_obj, connection, address, msg_obj):
+    return client_message_wrapper(host_obj, connection, address, msg_obj,
+                                  do_client_stat_files)
+
+
+def do_client_stat_files(host_obj, connection, address, msg_obj, client, cloud):
+    _log = get_mylog()
+    cloudname = cloud.name
+    session_id = client.uuid if client is not None else None
+    client_uid = client.user_id if client else PUBLIC_USER_ID
+
+    private_data = host_obj.get_private_data(cloud)
+    if private_data is None:
+        msg = 'Somehow the cloud doesn\'t have a privatedata associated with it'
+        err = InvalidStateMessage(msg)
+        host_obj.log_client(client, 'stat', cloud, None, 'error')
+        send_error_and_close(err, connection)
+        return Error(err)
+
+    rel_path = RelativePath()
+    rd = rel_path.from_relative(msg_obj.fpath)
+    if not rd.success:
+        msg = '{} is not a valid cloud path'.format(msg_obj.fpath)
+        err = InvalidStateMessage(msg)
+        _log.debug(err)
+        send_error_and_close(err, connection)
+        host_obj.log_client(client, 'stat', cloud, rel_path, 'error')
+        return Error(err)
+
+    rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
+                                               rel_path, READ_ACCESS)
+    if rd.success:
+        full_path = rel_path.to_absolute(cloud.root_directory)
+        if not os.path.exists(full_path):
+            resp = FileDoesNotExistErrorMessage()
+            host_obj.log_client(client, 'stat', cloud, rel_path, 'error')
+
+        # elif not os.path.isdir(full_path):
+        #     mylog('Responding to ClientListFiles with error - {} is a file, not dir.'.format(rel_path.to_string()))
+        #     resp = FileIsNotDirErrorMessage()
+        #     host_obj.log_client(client, 'ls', cloud, rel_path, 'error')
+
+        else:
+            mylog('Responding successfully to ClientStatFile')
+            resp = StatFileResponseMessage(cloudname, session_id, rel_path.to_string())
+            resp.stat = make_stat_dict(rel_path, private_data, cloud, client_uid)
+            # resp.ls = make_ls_array(rel_path, private_data, cloud, client_uid)
+            host_obj.log_client(client, 'stat', cloud, rel_path, 'success')
+
+        connection.send_obj(resp)
+        return ResultAndData(resp.type == STAT_FILE_RESPONSE, resp)
+    else:
+        # the access check will send error
+        host_obj.log_client(client, 'stat', cloud, rel_path, 'error')
+        return rd
 
 
 def handle_client_add_owner(host_obj, connection, address, msg_obj):

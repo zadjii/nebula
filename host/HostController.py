@@ -23,7 +23,7 @@ from host.WatchdogThread import WatchdogWorker
 from host.function.network.client import list_files_handler, \
     handle_recv_file_from_client, handle_read_file_request, \
     handle_client_add_owner, handle_client_add_contributor, handle_client_make_directory, handle_client_get_permissions, \
-    handle_client_get_shared_paths, handle_client_create_link, handle_client_read_link
+    handle_client_get_shared_paths, handle_client_create_link, handle_client_read_link, stat_files_handler
 from host.function.network_updates import handle_fetch, handle_file_change
 from host.models.Cloud import Cloud
 from host.models.Remote import Remote
@@ -554,7 +554,7 @@ class HostController:
         try:
             msg_obj = connection.recv_obj()
         except Exception, e:
-            mylog('ERROR: nebs failed to decode a connection from ()'.format(address), '31')
+            mylog('ERROR: nebs failed to decode a connection from ({})'.format(address), '31')
             connection.close()
             return
 
@@ -576,8 +576,7 @@ class HostController:
                 connection.send_obj(RefreshMessageMessage())
             # ------------------------ C->H Messages ------------------------ #
             elif msg_type == STAT_FILE_REQUEST:
-                # todo:2 REALLY? This still isnt here? I guess list files does it...
-                pass
+                stat_files_handler(self, connection, address, msg_obj)
             elif msg_type == LIST_FILES_REQUEST:
                 list_files_handler(self, connection, address, msg_obj)
             elif msg_type == CLIENT_FILE_PUT:

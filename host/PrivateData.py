@@ -266,6 +266,16 @@ class PrivateData(object):
             i += 1
         return current_perms
 
+
+    def get_permissions_no_recursion(self, user_id, relative_path):
+        # type: (int, RelativePath) -> int
+        curr_corrected = relative_path.to_string()
+        if curr_corrected in self._files:
+            file_perms = self._files[curr_corrected]
+            new_perms = self._file_get_permissions(user_id, file_perms)
+            return new_perms
+        return NO_ACCESS
+
     def get_link_permissions(self, user_id, link_str):
         matching_link = None
         for link in self._links:

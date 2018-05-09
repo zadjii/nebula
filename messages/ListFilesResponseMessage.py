@@ -6,14 +6,18 @@ __author__ = 'Mike'
 
 
 class ListFilesResponseMessage(BaseMessage):
-    def __init__(self, sid=None, cname=None, rel_path=None, fpath=None):
+    def __init__(self, sid=None, cname=None, fpath=None):
         super(ListFilesResponseMessage, self).__init__()
         self.type = LIST_FILES_RESPONSE
         self.sid = sid
         self.cname = cname
-        self.fpath = rel_path
-        self.stat = make_stat_dict(fpath)
-        self.ls = make_ls_array(fpath)
+        self.fpath = fpath
+        # Note: You need to instantiate these members using the cloud and the
+        #   PrivateData for that cloud
+        # self.stat = make_stat_dict(fpath)
+        # self.ls = make_ls_array(fpath)
+        self.stat = None
+        self.ls = None
 
     @staticmethod
     def deserialize(json_dict):
