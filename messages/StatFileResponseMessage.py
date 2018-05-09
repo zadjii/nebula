@@ -12,7 +12,10 @@ class StatFileResponseMessage(BaseMessage):
         self.sid = sid
         self.cname = cname
         self.fpath = fpath
-        self.stat = make_stat_dict(fpath)
+        # Note: You need to instantiate this member using the cloud and the
+        #   PrivateData for that cloud
+        # self.stat = make_stat_dict(fpath)
+        self.stat = None
 
     @staticmethod
     def deserialize(json_dict):

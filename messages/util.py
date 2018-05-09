@@ -1,17 +1,31 @@
 import os
 import struct
 
+from common_util import RelativePath
+# from host import Cloud
+# from host.PrivateData import PrivateData
+
 __author__ = 'Mike'
 
 
-def make_stat_dict(file_path):
+def make_stat_dict(rel_path, private_data, cloud, user_id, parent_permissions=None):
+    # type: (RelativePath, PrivateData, Cloud, int) -> Optional[Dict[str, Any]]
     """You should make sure file exists before calling this."""
-    if file_path is None:
+    if rel_path is None:
         return None
-    if not os.path.exists(file_path):
+
+    full_path = rel_path.to_absolute(cloud.root_directory)
+
+    if not os.path.exists(full_path):
         return None
-    file_path = os.path.normpath(file_path)
-    file_stat = os.stat(file_path)
+
+    if parent_permissions is None:
+        permissions = private_data.get_permissions(user_id, rel_path)
+    else:
+        permissions = parent_permissions | private_data.get_permissions_no_recursion(user_id, rel_path)
+
+    # file_path = os.path.normpath(file_path)
+    file_stat = os.stat(full_path)
     stat_dict = {
         'atime': file_stat.st_atime
         , 'mtime': file_stat.st_mtime
@@ -23,27 +37,31 @@ def make_stat_dict(file_path):
         , 'uid': file_stat.st_uid
         , 'gid': file_stat.st_gid
         , 'size': file_stat.st_size
-        , 'name': os.path.basename(file_path)
+        , 'name': os.path.basename(full_path)
+        , 'permissions': permissions
     }
     return stat_dict
 
 
-def make_ls_array(file_path):
+def make_ls_array(rel_path, private_data, cloud, user_id):
+    # type: (RelativePath, PrivateData, Cloud, int) -> Optional[Dict[str, Any]]
     """You should make sure file exists before calling this."""
-    if file_path is None:
+    if rel_path is None:
         return None
-    if not os.path.exists(file_path):
+
+    full_path = rel_path.to_absolute(cloud.root_directory)
+
+    if not os.path.exists(full_path):
         return None
-    file_path = os.path.normpath(file_path)
+
+    permissions = private_data.get_permissions(user_id, rel_path)
+
     subdirs = []
-    if not os.path.isdir(file_path):
-        # fixme this should somehow indicate the path was not a dir
-        # cont not just that it had no children
-        return subdirs
-    subfiles_list = os.listdir(file_path)
-    # print subfiles_list
+    subfiles_list = os.listdir(full_path)
     for f in subfiles_list:
-        subdirs.append(make_stat_dict(os.path.join(file_path, f)))
+        rel_child = RelativePath()
+        rel_child.from_relative(os.path.join(rel_path.to_string(), f))
+        subdirs.append(make_stat_dict(rel_child, private_data, cloud, user_id, permissions))
     return subdirs
 
 

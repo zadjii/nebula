@@ -23,7 +23,7 @@ from host.WatchdogThread import WatchdogWorker
 from host.function.network.client import list_files_handler, \
     handle_recv_file_from_client, handle_read_file_request, \
     handle_client_add_owner, handle_client_add_contributor, handle_client_make_directory, handle_client_get_permissions, \
-    handle_client_get_shared_paths, handle_client_create_link, handle_client_read_link
+    handle_client_get_shared_paths, handle_client_create_link, handle_client_read_link, stat_files_handler
 from host.function.network_updates import handle_fetch, handle_file_change
 from host.models.Cloud import Cloud
 from host.models.Remote import Remote
@@ -59,19 +59,16 @@ class HostController:
         self._is_online = True
         self._client_log = get_mylog()
 
-    def start(self, argv):
-        # type: ([str]) -> None
+    def start(self, force_kill=False, access_log=None):
+        # type: (bool, srt) -> None
         _log = get_mylog()
         set_mylog_name('nebs')
-        # todo process start() args here
-        _log.debug('setting up client logging...')
-        client_log_path, argv = get_client_log_path(argv)
-        if client_log_path is not None:
-            msg = 'writing access log to {}'.format(client_log_path)
+
+        if access_log is not None:
+            msg = 'writing access log to {}'.format(access_log)
             _log.debug(msg)
             print(msg)
-            self.create_client_logger(client_log_path)
-
+            self.create_client_logger(access_log)
 
         # read in all the .nebs
         db = self.get_db()
@@ -86,7 +83,6 @@ class HostController:
         # register the shutdown callback
         atexit.register(self.shutdown)
 
-        force_kill = '--force' in argv
         if force_kill:
             _log.info('Forcing shutdown of previous instance')
         rd = self._nebs_instance.start(force_kill)
@@ -123,6 +119,7 @@ class HostController:
             _log.info('Both the local update checking thread and the network thread'
                       ' have exited.')
             sys.exit()
+        return rd
 
     def do_local_updates(self):
         _log = get_mylog()
@@ -557,7 +554,7 @@ class HostController:
         try:
             msg_obj = connection.recv_obj()
         except Exception, e:
-            mylog('ERROR: nebs failed to decode a connection from ()'.format(address), '31')
+            mylog('ERROR: nebs failed to decode a connection from ({})'.format(address), '31')
             connection.close()
             return
 
@@ -579,8 +576,7 @@ class HostController:
                 connection.send_obj(RefreshMessageMessage())
             # ------------------------ C->H Messages ------------------------ #
             elif msg_type == STAT_FILE_REQUEST:
-                # todo:2 REALLY? This still isnt here? I guess list files does it...
-                pass
+                stat_files_handler(self, connection, address, msg_obj)
             elif msg_type == LIST_FILES_REQUEST:
                 list_files_handler(self, connection, address, msg_obj)
             elif msg_type == CLIENT_FILE_PUT:

@@ -2,6 +2,8 @@ import os
 import imp
 import thread
 import signal
+from argparse import Namespace
+
 import psutil
 from migrate.versioning import api
 
@@ -49,6 +51,17 @@ class Instance(object):
 
         # print('remaining_argv={}'.format(remaining_argv))
         return working_dir, remaining_argv
+
+    @staticmethod
+    def get_working_dir_from_args(args, is_remote=False):
+        # type: (Namespace) -> (str)
+        """
+        """
+        working_dir = args.working_dir
+        instance_type = 'remote' if is_remote else 'host'
+        if args.instance:
+            working_dir = os.path.join('{}/{}/'.format(INSTANCES_ROOT, instance_type), args.instance)
+        return working_dir
 
     def __init__(self, working_dir=None):
         """

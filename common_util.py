@@ -1,3 +1,4 @@
+import argparse
 import ctypes
 import os
 import platform
@@ -181,6 +182,18 @@ def get_log_verbosity(argv):
     # print('remaining_argv={}'.format(remaining_argv))
     return log_level, remaining_argv
 
+def get_level_from_string(log_verbosity=None):
+    # type: (str) -> int
+    log_level = logging.INFO
+    if log_verbosity is None:
+        pass
+    elif log_verbosity == 'debug' \
+            or log_verbosity == 'verbose':
+        log_level = logging.DEBUG
+    elif log_verbosity == 'warn' \
+            or log_verbosity == 'production':
+        log_level = logging.WARNING
+    return log_level
 
 def send_error_and_close(message, connection):
     connection.send_obj(message)
@@ -289,3 +302,12 @@ class RelativePath(object):
 
     def to_absolute(self, root):
         return os.path.join(root, self._path)
+
+
+def setup_common_argparsing():
+    common_parser = argparse.ArgumentParser(add_help=False)
+    common_parser.add_argument('-w', '--working-dir', default=None)
+    common_parser.add_argument('-i', '--instance', default=None)
+    common_parser.add_argument('-l', '--log', default=None)
+    common_parser.add_argument('-v', '--verbose', default=None)
+    return common_parser
