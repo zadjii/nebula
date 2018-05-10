@@ -29,13 +29,8 @@ from remote.util import get_user_from_session, validate_session_id, \
 __author__ = 'Mike'
 
 ###############################################################################
-
 HOST = ''                 # Symbolic name meaning all available interfaces
 PORT = 12345              # Arbitrary non-privileged port
-
-# KEY_FILE = 'remote/key'
-# CERT_FILE = 'remote/cert'
-# todo this is jank AF
 ###############################################################################
 
 
@@ -43,12 +38,10 @@ def host_handshake(remote_obj, connection, address, msg_obj):
     _log = get_mylog()
     db = remote_obj.get_db()
     ipv6 = msg_obj.ipv6
-    # host = db.session.query(Host).get(msg_obj.id)
     mirror = db.session.query(Mirror).get(msg_obj.id)
     host = mirror.host
     if host is not None:
         if not host.ipv6 == ipv6:
-            # mylog('Host [{}] moved from "{}" to "{}"'.format(host.id, host.ipv6, ipv6))
             _log.debug('Host [{}] moved from "{}" to "{}"'.format(host.id, host.ipv6, ipv6))
         host.ipv6 = ipv6
         host.port = msg_obj.port

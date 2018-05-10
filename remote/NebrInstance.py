@@ -23,6 +23,7 @@ class NebrInstance(Instance):
 
         self.key_file = os.path.join(working_dir, './remote.ca.key')
         self.cert_file = os.path.join(working_dir, './remote.ca.chain.crt')
+        self.enable_multiple_hosts = False
         # self.host_ws_host = '127.0.0.1'
         # self.host_ws_port = 34567
 
@@ -47,6 +48,7 @@ class NebrInstance(Instance):
 
             self.key_file = get_from_conf(config, 'KEY', self.key_file)
             self.cert_file = get_from_conf(config, 'CERT', self.cert_file)
+            self.enable_multiple_hosts = get_from_conf(config, 'ENABLE_MULTIPLE_HOSTS', self.enable_multiple_hosts)
 
     def get_key_file(self):
         return self.key_file
@@ -54,6 +56,7 @@ class NebrInstance(Instance):
     def get_cert_file(self):
         return self.cert_file
 
-
+    def is_multiple_hosts_enabled(self):
+        return self.enable_multiple_hosts
 
 

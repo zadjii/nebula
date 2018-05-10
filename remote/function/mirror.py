@@ -1,4 +1,4 @@
-from common_util import send_error_and_close, mylog, get_mylog
+from common_util import send_error_and_close, mylog, get_mylog, get_full_cloudname
 from messages import GoRetrieveHereMessage, HostVerifyHostFailureMessage, \
     HostVerifyHostSuccessMessage, InvalidStateMessage, MirrorFailureMessage, \
     AuthErrorMessage
@@ -98,6 +98,7 @@ def client_mirror(remote_obj, connection, address, msg_obj):
     cloud_uname = msg_obj.cloud_uname
     # the cloud uname is currently unused, it will eventually be used
     cloudname = msg_obj.cname
+    full_name = get_full_cloudname(cloud_uname, cloudname)
 
     matching_host = db.session.query(Host).get(host_id)
     if matching_host is None:
@@ -107,12 +108,9 @@ def client_mirror(remote_obj, connection, address, msg_obj):
         connection.close()
         return
 
-    # todo: It'll be easier on the DB to find the user first, then filter their
-    #   owned clouds to find the match
-
     creator = get_user_by_name(db, cloud_uname)
     if creator is None:
-        msg = 'There was no cloud matching name {}/{}'.format(cloud_uname, cloudname)
+        msg = 'There was no cloud matching name {}'.format(full_name)
         resp = InvalidStateMessage(msg)
         connection.send_obj(resp)
         connection.close()
@@ -121,7 +119,7 @@ def client_mirror(remote_obj, connection, address, msg_obj):
     # match = db.session.query(Cloud).filter_by(name=cloudname).first()
     match = creator.created_clouds.filter_by(name=cloudname).first()
     if match is None:
-        msg = 'No cloud with name {}/{}'.format(cloud_uname, cloudname)
+        msg = 'No cloud with name {}'.format(full_name)
         resp = MirrorFailureMessage(msg)
         connection.send_obj(resp)
         connection.close()
@@ -141,11 +139,20 @@ def client_mirror(remote_obj, connection, address, msg_obj):
         # send_generic_error_and_close(connection)
         # print [owner.username for owner in match.owners.all()]
         # raise Exception(user.name + ' is not an owner of ' + cloudname)
-        msg = '{} is not an owner of {}'.format(user.username, cloudname)
+        msg = '{} is not an owner of {}'.format(user.username, full_name)
         resp = MirrorFailureMessage(msg)
         connection.send_obj(resp)
         connection.close()
         return
+
+    has_other_host = len(match.active_hosts()) > 0
+    if has_other_host and not remote_obj.nebr_instance.is_multiple_hosts_enabled():
+        msg = '{} already has a host. Multiple hosts for a single cloud are not enabled for this remote.'.format(full_name)
+        resp = MirrorFailureMessage(msg)
+        connection.send_obj(resp)
+        connection.close()
+        return
+
     # user is an owner, and the host exists
     respond_to_mirror_request(db, connection, address, matching_host, match)
 
@@ -155,16 +162,16 @@ def respond_to_mirror_request(db, connection, address, new_host, cloud):
     ip = '0'
     port = 0
 
+    has_other_host = len(cloud.active_hosts()) > 0
+
     new_mirror = Mirror()
     db.session.add(new_mirror)
     cloud.mirrors.append(new_mirror)
     new_host.mirrors.append(new_mirror)
     db.session.commit()
 
-    # rand_host = match.hosts.first()
-    # FIXME why is this rand_mirror then rand_host???????
     rand_mirror = None
-    if len(cloud.active_hosts()) > 0:
+    if has_other_host:
         rand_mirror = cloud.active_hosts()[0]  # todo make this random
     if rand_mirror is not None:
         # ip = rand_host.ip
@@ -172,8 +179,7 @@ def respond_to_mirror_request(db, connection, address, new_host, cloud):
         port = rand_mirror.host.port
 
         # Here we have to do what we did with HostClientVerify.
-        # The remote now makes an entry s
-        # aying that the requester is going to
+        # The remote now makes an entry saying that the requester is going to
         # rand_host. When the rand_host gets the HostHostFetch, then they'll ask
         # the remote if that host was told to fetch from rand_host.
         # we'll look up the entry, and return success/fail.
