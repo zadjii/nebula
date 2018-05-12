@@ -9,6 +9,7 @@ from host.function.send_files import send_tree
 from host.util import check_response, mylog, validate_host_id, find_deletable_children
 from messages import HostVerifyHostFailureMessage, HostVerifyHostRequestMessage
 from msg_codes import *
+from remote.util import get_cloud_by_name
 
 __author__ = 'Mike'
 
@@ -94,8 +95,7 @@ def handle_file_change(host_obj, connection, address, msg_obj):
     # validate_host_id will raise an exception if there is no cloud
     matching_id_clouds = rd.data
 
-    # todo:33 replace all the calls to this with a function.
-    matching_cloud = matching_id_clouds.filter_by(username=cloud_uname, name=cloudname).first()
+    matching_cloud = get_cloud_by_name(db, cloud_uname, cloudname)
     if matching_cloud is None:
         # send_generic_error_and_close(connection)
         raise Exception(
