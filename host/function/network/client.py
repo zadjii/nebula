@@ -674,7 +674,7 @@ def do_client_delete_file(host_obj, connection, address, msg_obj, client, cloud)
     session_id = client.uuid if client else None
     fpath = msg_obj.path
     rel_path = RelativePath()
-    rd = rel_path.from_relative(msg_obj.fpath)
+    rd = rel_path.from_relative(fpath)
     if not rd.success:
         msg = '{} is not a valid cloud path'.format(fpath)
         err = InvalidStateMessage(msg)
@@ -713,7 +713,7 @@ def do_client_delete_file(host_obj, connection, address, msg_obj, client, cloud)
 
 
 def handle_client_delete_file(host_obj, connection, address, msg_obj):
-    return client_link_wrapper(host_obj, connection, address, msg_obj,
+    return client_message_wrapper(host_obj, connection, address, msg_obj,
                                do_client_delete_file)
 ################################################################################
 
@@ -726,7 +726,7 @@ def do_client_remove_dir(host_obj, connection, address, msg_obj, client, cloud):
     fpath = msg_obj.path
     recurse = msg_obj.recursive
     rel_path = RelativePath()
-    rd = rel_path.from_relative(msg_obj.fpath)
+    rd = rel_path.from_relative(fpath)
     if not rd.success:
         msg = '{} is not a valid cloud path'.format(fpath)
         err = InvalidStateMessage(msg)
@@ -776,6 +776,6 @@ def do_client_remove_dir(host_obj, connection, address, msg_obj, client, cloud):
 
 
 def handle_client_remove_dir(host_obj, connection, address, msg_obj):
-    return client_link_wrapper(host_obj, connection, address, msg_obj,
+    return client_message_wrapper(host_obj, connection, address, msg_obj,
                                do_client_remove_dir)
 ################################################################################
