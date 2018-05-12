@@ -410,6 +410,13 @@ class PrivateData(object):
 
     def delete_paths(self, paths):
         # type: ([RelativePath]) -> bool
+        """
+        Removes a set of paths from the private data.
+        Doesn't attempt to find any children of the paths passed in, so the
+        caller should walk the directory tree first.
+        """
+        # TODO: What about children? We should probably be deleting all the children too
+        # Unless of course the caller already put all the children in the argument
         result = False
         for path in paths:
             if path in self._files.keys():

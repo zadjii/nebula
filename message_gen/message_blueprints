@@ -161,6 +161,11 @@
 67  , CLIENT_GET_LINK_HOST , sid, string:link_string
 #   We'll reply with a CLIENT_GET_CLOUD_HOST_RESPONSE, so no link-specific response
 68  , CLIENT_READ_LINK, sid, string:link_string
+
+69  , CLIENT_DELETE_FILE_REQUEST , sid,  string:cloud_uname  , string:cname, string:path
+70  , CLIENT_DELETE_DIR_REQUEST , sid,  string:cloud_uname  , string:cname, string:path, bool:recursive
+71  , CLIENT_DELETE_RESPONSE
+
 ################################################################################
 #manually updated ones:
 ################################################################################
@@ -238,7 +243,7 @@
 -16  , ADD_OWNER_FAILURE    , string:message
 -17  , ADD_CONTRIBUTOR_FAILURE    , string:message
 -18  , FILE_ALREADY_EXISTS    , string:message
-
+-19  , DIR_IS_NOT_EMPTY, string:message
 
 # ideas for this file:
 # superclasses. Let messages extend from abstract base messages.

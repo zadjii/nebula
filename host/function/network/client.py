@@ -3,6 +3,8 @@ import os
 import time
 from stat import S_ISDIR
 
+import shutil
+
 from common_util import mylog, send_error_and_close, Success, Error, PUBLIC_USER_ID, RelativePath, get_mylog, ResultAndData
 from connections.AbstractConnection import AbstractConnection
 from host.PrivateData import READ_ACCESS, SHARE_ACCESS, NO_ACCESS, WRITE_ACCESS
@@ -653,4 +655,127 @@ def do_client_read_link(host_obj, connection, address, msg_obj, client, cloud):
 def handle_client_read_link(host_obj, connection, address, msg_obj):
     return client_link_wrapper(host_obj, connection, address, msg_obj,
                                do_client_read_link)
+################################################################################
+
+# Things to consider while deleting:
+# Is the file a dir or plain file?
+# is it empty?
+# are we recursivly deleting?
+# removing the path from the .nebs
+#   Deleting the link?
+#       The file is gone now, probably don't want that link pointing at the same name
+#   Actually, won't need to do this, when the local udates thread wakes up it
+#       will take care of all this.
+
+################################################################################
+def do_client_delete_file(host_obj, connection, address, msg_obj, client, cloud):
+    _log = get_mylog()
+    user_id = client.user_id if client else PUBLIC_USER_ID
+    session_id = client.uuid if client else None
+    fpath = msg_obj.path
+    rel_path = RelativePath()
+    rd = rel_path.from_relative(msg_obj.fpath)
+    if not rd.success:
+        msg = '{} is not a valid cloud path'.format(fpath)
+        err = InvalidStateMessage(msg)
+        send_error_and_close(err, connection)
+        host_obj.log_client(client, 'rm', cloud, rel_path, 'error')
+        return Error(err)
+
+    # TODO Does the client need access to write the file, or the parent directory?
+    # Technically they're modifying the parent dir
+    rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
+                                               rel_path, WRITE_ACCESS)
+    if not rd.success:
+        # conn was closed by client_access_check_or_close
+        return
+
+    full_path = rel_path.to_absolute(cloud.root_directory)
+    if not os.path.exists(full_path):
+        resp = FileDoesNotExistErrorMessage()
+        host_obj.log_client(client, 'rm', cloud, rel_path, 'error')
+
+    elif os.path.isdir(full_path):
+        resp = FileIsDirErrorMessage()
+        host_obj.log_client(client, 'rm', cloud, rel_path, 'error')
+
+    else:
+        try:
+            os.remove(full_path)
+            resp = ClientDeleteResponseMessage()
+        except IOError as e:
+            msg = 'error deleting {}, "{}"', rel_path.to_string(), e.message
+            _log.error(msg)
+            resp = UnknownIoErrorMessage(msg)
+
+    host_obj.log_client(client, 'rm', cloud, rel_path, 'success' if resp.type == CLIENT_DELETE_RESPONSE else 'error')
+    connection.send_obj(resp)
+
+
+def handle_client_delete_file(host_obj, connection, address, msg_obj):
+    return client_link_wrapper(host_obj, connection, address, msg_obj,
+                               do_client_delete_file)
+################################################################################
+
+
+################################################################################
+def do_client_remove_dir(host_obj, connection, address, msg_obj, client, cloud):
+    _log = get_mylog()
+    user_id = client.user_id if client else PUBLIC_USER_ID
+    session_id = client.uuid if client else None
+    fpath = msg_obj.path
+    recurse = msg_obj.recursive
+    rel_path = RelativePath()
+    rd = rel_path.from_relative(msg_obj.fpath)
+    if not rd.success:
+        msg = '{} is not a valid cloud path'.format(fpath)
+        err = InvalidStateMessage(msg)
+        send_error_and_close(err, connection)
+        host_obj.log_client(client, 'rmdir', cloud, rel_path, 'error')
+        return Error(err)
+
+    # TODO Does the client need access to write the file, or the parent directory?
+    # Technically they're modifying the parent dir
+    rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
+                                               rel_path, WRITE_ACCESS)
+    if not rd.success:
+        # conn was closed by client_access_check_or_close
+        return
+
+    full_path = rel_path.to_absolute(cloud.root_directory)
+    if not os.path.exists(full_path):
+        resp = FileDoesNotExistErrorMessage()
+        host_obj.log_client(client, 'rmdir', cloud, rel_path, 'error')
+
+    elif not os.path.isdir(full_path):
+        resp = FileIsDirErrorMessage()
+        host_obj.log_client(client, 'rmdir', cloud, rel_path, 'error')
+    else:
+        subdirs = os.listdir(full_path)
+        if len(subdirs) > 0 and not recurse:
+            resp = DirIsNotEmptyMessage()
+        elif len(subdirs) > 0 and recurse:
+            try:
+                shutil.rmtree(full_path)
+                resp = ClientDeleteResponseMessage()
+            except OSError as e:
+                msg = 'error deleting {}, "{}"', rel_path.to_string(), e.message
+                _log.error(msg)
+                resp = UnknownIoErrorMessage(msg)
+        else:  # len subdirs == 0
+            try:
+                os.rmdir(full_path)
+                resp = ClientDeleteResponseMessage()
+            except IOError as e:
+                msg = 'error deleting {}, "{}"', rel_path.to_string(), e.message
+                _log.error(msg)
+                resp = UnknownIoErrorMessage(msg)
+
+    host_obj.log_client(client, 'rmdir', cloud, rel_path, 'success' if resp.type == CLIENT_DELETE_RESPONSE else 'error')
+    connection.send_obj(resp)
+
+
+def handle_client_remove_dir(host_obj, connection, address, msg_obj):
+    return client_link_wrapper(host_obj, connection, address, msg_obj,
+                               do_client_remove_dir)
 ################################################################################

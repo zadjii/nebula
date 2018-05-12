@@ -1,5 +1,7 @@
-# last generated 2018-04-08 18:03:54.587000
+# last generated 2018-05-11 00:36:22.624000
 from messages.BaseMessage import BaseMessage
+from messages.DirIsNotEmptyMessage import DirIsNotEmptyMessage
+from messages.FileAlreadyExistsMessage import FileAlreadyExistsMessage
 from messages.FileAlreadyExistsMessage import FileAlreadyExistsMessage
 from messages.AddContributorFailureMessage import AddContributorFailureMessage
 from messages.AddOwnerFailureMessage import AddOwnerFailureMessage
@@ -19,7 +21,7 @@ from messages.UnpreparedHostErrorMessage import UnpreparedHostErrorMessage
 from messages.AuthErrorMessage import AuthErrorMessage
 from messages.GenericErrorMessage import GenericErrorMessage
 from messages.NewHostMessage import NewHostMessage
-from messages.AssignHostIDMessage import AssignHostIdMessage
+from messages.AssignHostIdMessage import AssignHostIdMessage
 from messages.HostHandshakeMessage import HostHandshakeMessage
 from messages.RemoteHandshakeMessage import RemoteHandshakeMessage
 from messages.RemHandshakeGoFetchMessage import RemHandshakeGoFetchMessage
@@ -86,4 +88,7 @@ from messages.HostReserveLinkRequestMessage import HostReserveLinkRequestMessage
 from messages.HostReserveLinkResponseMessage import HostReserveLinkResponseMessage
 from messages.ClientGetLinkHostMessage import ClientGetLinkHostMessage
 from messages.ClientReadLinkMessage import ClientReadLinkMessage
+from messages.ClientDeleteFileRequestMessage import ClientDeleteFileRequestMessage
+from messages.ClientDeleteDirRequestMessage import ClientDeleteDirRequestMessage
+from messages.ClientDeleteResponseMessage import ClientDeleteResponseMessage
 

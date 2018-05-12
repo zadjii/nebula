@@ -23,7 +23,8 @@ from host.WatchdogThread import WatchdogWorker
 from host.function.network.client import list_files_handler, \
     handle_recv_file_from_client, handle_read_file_request, \
     handle_client_add_owner, handle_client_add_contributor, handle_client_make_directory, handle_client_get_permissions, \
-    handle_client_get_shared_paths, handle_client_create_link, handle_client_read_link, stat_files_handler
+    handle_client_get_shared_paths, handle_client_create_link, handle_client_read_link, stat_files_handler, \
+    handle_client_delete_file, handle_client_remove_dir
 from host.function.network_updates import handle_fetch, handle_file_change
 from host.models.Cloud import Cloud
 from host.models.Remote import Remote
@@ -599,6 +600,10 @@ class HostController:
                 handle_client_create_link(self, connection, address, msg_obj)
             elif msg_type == CLIENT_READ_LINK:
                 handle_client_read_link(self, connection, address, msg_obj)
+            elif msg_type == CLIENT_DELETE_FILE_REQUEST:
+                handle_client_delete_file(self, connection, address, msg_obj)
+            elif msg_type == CLIENT_DELETE_DIR_REQUEST:
+                handle_client_remove_dir(self, connection, address, msg_obj)
             else:
                 mylog('I don\'t know what to do with {},\n{}'.format(msg_obj, msg_obj.__dict__))
         except Exception, e:

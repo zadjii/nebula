@@ -1,10 +1,11 @@
-# last generated 2018-04-08 18:03:55.035000
+# last generated 2018-05-11 00:36:23.513000
 import json
 from msg_codes import *
 from messages import *
 from common_util import *
 _decoder_table = {
-    FILE_ALREADY_EXISTS: FileAlreadyExistsMessage.deserialize # -18
+    DIR_IS_NOT_EMPTY: DirIsNotEmptyMessage.deserialize # -19
+    , FILE_ALREADY_EXISTS: FileAlreadyExistsMessage.deserialize # -18
     , ADD_CONTRIBUTOR_FAILURE: AddContributorFailureMessage.deserialize # -17
     , ADD_OWNER_FAILURE: AddOwnerFailureMessage.deserialize # -16
     , MIRROR_FAILURE: MirrorFailureMessage.deserialize # -15
@@ -90,6 +91,9 @@ _decoder_table = {
     , HOST_RESERVE_LINK_RESPONSE: HostReserveLinkResponseMessage.deserialize # 66
     , CLIENT_GET_LINK_HOST: ClientGetLinkHostMessage.deserialize # 67
     , CLIENT_READ_LINK: ClientReadLinkMessage.deserialize # 68
+    , CLIENT_DELETE_FILE_REQUEST: ClientDeleteFileRequestMessage.deserialize # 69
+    , CLIENT_DELETE_DIR_REQUEST: ClientDeleteDirRequestMessage.deserialize # 70
+    , CLIENT_DELETE_RESPONSE: ClientDeleteResponseMessage.deserialize # 71
 }
 
 
