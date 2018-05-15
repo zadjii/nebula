@@ -93,7 +93,7 @@ class Link(object):
     def has_user(self, user_id):
         # type: (int) -> bool
         # return self.is_public() or (user_id in self._user_ids)
-        return user_id in self._user_ids
+        return PUBLIC_USER_ID in self._user_ids or user_id in self._user_ids
 
     def get_access(self):
         return self._access
@@ -105,6 +105,10 @@ class Link(object):
         # type: (int) -> None
         if not self.has_user(user_id):
             self._user_ids.append(user_id)
+
+    def set_access(self, permissions):
+        # type: (int) -> None
+        self._access = permissions
 
     def to_serializable(self):
         return {
@@ -277,11 +281,7 @@ class PrivateData(object):
         return NO_ACCESS
 
     def get_link_permissions(self, user_id, link_str):
-        matching_link = None
-        for link in self._links:
-            if link.id == link_str:
-                matching_link = link
-                break
+        matching_link = self._find_link(link_str)
         if matching_link is None:
             return NO_ACCESS
         if matching_link.has_permissions():
@@ -294,23 +294,39 @@ class PrivateData(object):
             rel_path.from_relative(matching_link.get_path())
             return self.get_permissions(user_id, rel_path)
 
+    def set_link_permissions(self, link_str, permissions):
+        # type: (str, int) -> ResultAndData
+        matching_link = self._find_link(link_str)
+        if matching_link is None:
+            return Error()
+        matching_link.set_access(permissions)
+        return Success()
+
+    def add_user_to_link(self, link_str, user_id):
+        # type: (str, int) -> ResultAndData
+        matching_link = self._find_link(link_str)
+        if matching_link is None:
+            return Error()
+        matching_link.add_user(user_id)
+        return Success()
+
     def get_path_from_link(self, link_str):
-        matching_link = None
-        for link in self._links:
-            if link.id == link_str:
-                matching_link = link
-                break
+        matching_link = self._find_link(link_str)
         if matching_link is None:
             return None
         else:
             return matching_link.get_path()
 
+    def _find_link(self, link_id):
+        # type: (str) -> Link
+        for link in self._links:
+            if link.id == link_str:
+                return link
+        return None
+
     def has_link(self, link_id):
         # type: (str) -> bool
-        for link in self._links:
-            if link.id is link_id:
-                return True
-        return False
+        return self._find_link(link_str) is not None
 
     def add_link(self, rel_path, link_str):
         # type: (RelativePath, str) -> Link
