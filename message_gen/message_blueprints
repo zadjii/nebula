@@ -166,6 +166,11 @@
 70  , CLIENT_DELETE_DIR_REQUEST , sid,  string:cloud_uname  , string:cname, string:path, bool:recursive
 71  , CLIENT_DELETE_RESPONSE
 
+72  , CLIENT_SET_LINK_PERMISSIONS, sid, string:link_string, int:permissions
+73  , CLIENT_ADD_USER_TO_LINK, sid, string:link_string, int:user_id
+74  , CLIENT_REMOVE_USER_FROM_LINK, sid, string:link_string, int:user_id
+75  , CLIENT_SET_LINK_PERMISSIONS_SUCCESS
+
 ################################################################################
 #manually updated ones:
 ################################################################################
@@ -244,6 +249,7 @@
 -17  , ADD_CONTRIBUTOR_FAILURE    , string:message
 -18  , FILE_ALREADY_EXISTS    , string:message
 -19  , DIR_IS_NOT_EMPTY, string:message
+-20  , LINK_DOES_NOT_EXIST, string:message
 
 # ideas for this file:
 # superclasses. Let messages extend from abstract base messages.

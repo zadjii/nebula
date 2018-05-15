@@ -106,6 +106,11 @@ class Link(object):
         if not self.has_user(user_id):
             self._user_ids.append(user_id)
 
+    def remove_user(self, user_id):
+        # type: (int) -> None
+        if self.has_user(user_id):
+            self._user_ids = [uid for uid in self._user_ids if uid != user_id]
+
     def set_access(self, permissions):
         # type: (int) -> None
         self._access = permissions
@@ -308,6 +313,14 @@ class PrivateData(object):
         if matching_link is None:
             return Error()
         matching_link.add_user(user_id)
+        return Success()
+
+    def remove_user_from_link(self, link_str, user_id):
+        # type: (str, int) -> ResultAndData
+        matching_link = self._find_link(link_str)
+        if matching_link is None:
+            return Error()
+        matching_link.remove_user(user_id)
         return Success()
 
     def get_path_from_link(self, link_str):

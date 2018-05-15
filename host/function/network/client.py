@@ -284,6 +284,7 @@ def do_client_list_files(host_obj, connection, address, msg_obj, client, cloud):
         host_obj.log_client(client, 'ls', cloud, rel_path, 'error')
         pass
 
+################################################################################
 
 def stat_files_handler(host_obj, connection, address, msg_obj):
     return client_message_wrapper(host_obj, connection, address, msg_obj,
@@ -341,6 +342,7 @@ def do_client_stat_files(host_obj, connection, address, msg_obj, client, cloud):
         host_obj.log_client(client, 'stat', cloud, rel_path, 'error')
         return rd
 
+################################################################################
 
 def handle_client_add_owner(host_obj, connection, address, msg_obj):
     mylog('handle_client_add_owner')
@@ -402,6 +404,7 @@ def do_client_add_owner(host_obj, connection, address, msg_obj, client, cloud):
         response = AddOwnerSuccessMessage(session_id, new_owner_id, cloud.uname(), cloudname)
         connection.send_obj(response)
 
+################################################################################
 
 def handle_client_add_contributor(host_obj, connection, address, msg_obj):
     mylog('handle_client_add_contributor')
@@ -478,6 +481,7 @@ def do_client_add_contributor(host_obj, connection, address, msg_obj, client, cl
         host_obj.log_client(client, 'share', cloud, rel_path, 'success')
         response = AddContributorSuccessMessage(new_user_id, cloud.uname(), cloudname)
         connection.send_obj(response)
+################################################################################
 
 def do_client_make_directory(host_obj, connection, address, msg_obj, client, cloud):
     _log = get_mylog()
@@ -496,6 +500,7 @@ def handle_client_make_directory(host_obj, connection, address, msg_obj):
     return client_message_wrapper(host_obj, connection, address, msg_obj,
                                   do_client_make_directory)
 
+################################################################################
 
 def do_client_get_permissions(host_obj, connection, address, msg_obj, client, cloud):
     # type: (HostController, AbstractConnection, object, ClientGetPermissionsMessage, Client, Cloud) -> object
@@ -513,18 +518,18 @@ def do_client_get_permissions(host_obj, connection, address, msg_obj, client, cl
         send_error_and_close(err, connection)
         return
 
-    private_data = host_obj.get_private_data(cloud)
-    if private_data is None:
-        msg = 'Somehow the cloud doesn\'t have a privatedata associated with it'
-        err = InvalidStateMessage(msg)
-        mylog(err.message, '31')
-        send_error_and_close(err, connection)
-        return
+    # private_data = host_obj.get_private_data(cloud)
+    # if private_data is None:
+    #     msg = 'Somehow the cloud doesn\'t have a privatedata associated with it'
+    #     err = InvalidStateMessage(msg)
+    #     mylog(err.message, '31')
+    #     send_error_and_close(err, connection)
+    #     return
     rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
                                                rel_path, NO_ACCESS)
     if not rd.success:
         # conn was closed by client_access_check_or_close
-        return
+        return rd
 
     perms = rd.data
     _log.debug('{} has {} permission for {}'.format(client_uid, perms, rel_path.to_string()))
@@ -536,6 +541,7 @@ def handle_client_get_permissions(host_obj, connection, address, msg_obj):
     return client_message_wrapper(host_obj, connection, address, msg_obj,
                                   do_client_get_permissions)
 
+################################################################################
 
 def do_client_get_shared_paths(host_obj, connection, address, msg_obj, client, cloud):
     _log = get_mylog()
@@ -643,7 +649,12 @@ def do_client_read_link(host_obj, connection, address, msg_obj, client, cloud):
     rel_path = RelativePath()
     path = private_data.get_path_from_link(link_str)
     if path is None:
-        pass
+        msg = 'The link {} is not valid for this cloud'.format(link_str)
+        err = LinkDoesNotExistMessage(msg)
+        _log.error(err.message)
+        host_obj.log_client(client, 'read-link', cloud, link_str, 'error')
+        send_error_and_close(err, connection)
+        return
 
     rel_path.from_relative(path)
     # construct a ReadFile message, using the path from the link
@@ -778,4 +789,146 @@ def do_client_remove_dir(host_obj, connection, address, msg_obj, client, cloud):
 def handle_client_remove_dir(host_obj, connection, address, msg_obj):
     return client_message_wrapper(host_obj, connection, address, msg_obj,
                                do_client_remove_dir)
+################################################################################
+
+################################################################################
+def do_client_set_link_permissions(host_obj, connection, address, msg_obj, client, cloud):
+    _log = get_mylog()
+    user_id = client.user_id if client else PUBLIC_USER_ID
+    session_id = client.uuid if client else None
+    link_str = msg_obj.link_string
+    permissions = msg_obj.permissions
+
+    private_data = host_obj.get_private_data(cloud)
+    if private_data is None:
+        msg = 'Somehow the cloud doesn\'t have a privatedata associated with it'
+        err = InvalidStateMessage(msg)
+        mylog(err.message, '31')
+        host_obj.log_client(client, 'share-link', cloud, link_str, 'error')
+        send_error_and_close(err, connection)
+        return Error(msg)
+
+    # get the path from the link
+    rel_path = RelativePath()
+    path = private_data.get_path_from_link(link_str)
+    if path is None:
+        msg = 'The link {} is not valid for this cloud'.format(link_str)
+        err = LinkDoesNotExistMessage(msg)
+        _log.error(err.message)
+        host_obj.log_client(client, 'share-link', cloud, link_str, 'error')
+        send_error_and_close(err, connection)
+        return
+
+    # Using the actual file, check if the client has access to share the file.
+    rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
+                                               rel_path, SHARE_ACCESS)
+    if not rd.success:
+        return rd
+
+    rd = private_data.set_link_permissions(link_str, permissions)
+    if rd.success:
+        privatedata.commit()
+    response = ClientSetLinkPermissionsSuccessMessage() if rd.success else LinkDoesNotExistMessage()
+    host_obj.log_client(client, 'share-link', cloud, link_str, 'success' if rd.success else 'error')
+    connection.send_obj(response)
+
+
+def handle_client_set_link_permissions(host_obj, connection, address, msg_obj):
+    return client_link_wrapper(host_obj, connection, address, msg_obj,
+                               do_client_set_link_permissions)
+################################################################################
+
+################################################################################
+def do_client_add_user_to_link(host_obj, connection, address, msg_obj, client, cloud):
+    _log = get_mylog()
+    user_id = client.user_id if client else PUBLIC_USER_ID
+    session_id = client.uuid if client else None
+    link_str = msg_obj.link_string
+    new_uid = msg_obj.user_id
+
+    private_data = host_obj.get_private_data(cloud)
+    if private_data is None:
+        msg = 'Somehow the cloud doesn\'t have a privatedata associated with it'
+        err = InvalidStateMessage(msg)
+        mylog(err.message, '31')
+        host_obj.log_client(client, 'share-link', cloud, link_str, 'error')
+        send_error_and_close(err, connection)
+        return Error(msg)
+
+    # get the path from the link
+    rel_path = RelativePath()
+    path = private_data.get_path_from_link(link_str)
+    if path is None:
+        msg = 'The link {} is not valid for this cloud'.format(link_str)
+        err = LinkDoesNotExistMessage(msg)
+        _log.error(err.message)
+        host_obj.log_client(client, 'share-link', cloud, link_str, 'error')
+        send_error_and_close(err, connection)
+        return
+
+    # Using the actual file, check if the client has access to share the file.
+    rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
+                                               rel_path, SHARE_ACCESS)
+    if not rd.success:
+        return rd
+
+    rd = private_data.add_user_to_link(link_str, new_uid)
+    if rd.success:
+        privatedata.commit()
+    response = ClientSetLinkPermissionsSuccessMessage() if rd.success else LinkDoesNotExistMessage()
+    host_obj.log_client(client, 'share-link', cloud, link_str, 'success' if rd.success else 'error')
+    connection.send_obj(response)
+
+
+def handle_client_add_user_to_link(host_obj, connection, address, msg_obj):
+    return client_link_wrapper(host_obj, connection, address, msg_obj,
+                               do_client_add_user_to_link)
+################################################################################
+
+
+################################################################################
+def do_client_remove_user_from_link(host_obj, connection, address, msg_obj, client, cloud):
+    _log = get_mylog()
+    user_id = client.user_id if client else PUBLIC_USER_ID
+    session_id = client.uuid if client else None
+    link_str = msg_obj.link_string
+    new_uid = msg_obj.user_id
+
+    private_data = host_obj.get_private_data(cloud)
+    if private_data is None:
+        msg = 'Somehow the cloud doesn\'t have a privatedata associated with it'
+        err = InvalidStateMessage(msg)
+        mylog(err.message, '31')
+        host_obj.log_client(client, 'share-link', cloud, link_str, 'error')
+        send_error_and_close(err, connection)
+        return Error(msg)
+
+    # get the path from the link
+    rel_path = RelativePath()
+    path = private_data.get_path_from_link(link_str)
+    if path is None:
+        msg = 'The link {} is not valid for this cloud'.format(link_str)
+        err = LinkDoesNotExistMessage(msg)
+        _log.error(err.message)
+        host_obj.log_client(client, 'share-link', cloud, link_str, 'error')
+        send_error_and_close(err, connection)
+        return
+
+    # Using the actual file, check if the client has access to share the file.
+    rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
+                                               rel_path, SHARE_ACCESS)
+    if not rd.success:
+        return rd
+
+    rd = private_data.remove_user_from_link(link_str, new_uid)
+    if rd.success:
+        privatedata.commit()
+    response = ClientSetLinkPermissionsSuccessMessage() if rd.success else LinkDoesNotExistMessage()
+    host_obj.log_client(client, 'share-link', cloud, link_str, 'success' if rd.success else 'error')
+    connection.send_obj(response)
+
+
+def handle_client_remove_user_from_link(host_obj, connection, address, msg_obj):
+    return client_link_wrapper(host_obj, connection, address, msg_obj,
+                               do_client_remove_user_from_link)
 ################################################################################

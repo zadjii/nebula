@@ -24,7 +24,8 @@ from host.function.network.client import list_files_handler, \
     handle_recv_file_from_client, handle_read_file_request, \
     handle_client_add_owner, handle_client_add_contributor, handle_client_make_directory, handle_client_get_permissions, \
     handle_client_get_shared_paths, handle_client_create_link, handle_client_read_link, stat_files_handler, \
-    handle_client_delete_file, handle_client_remove_dir
+    handle_client_delete_file, handle_client_remove_dir, handle_client_set_link_permissions, \
+    handle_client_add_user_to_link, handle_client_remove_user_from_link
 from host.function.network_updates import handle_fetch, handle_file_change
 from host.models.Cloud import Cloud
 from host.models.Remote import Remote
@@ -604,6 +605,12 @@ class HostController:
                 handle_client_delete_file(self, connection, address, msg_obj)
             elif msg_type == CLIENT_DELETE_DIR_REQUEST:
                 handle_client_remove_dir(self, connection, address, msg_obj)
+            elif msg_type == CLIENT_SET_LINK_PERMISSIONS:
+                handle_client_set_link_permissions(self, connection, address, msg_obj)
+            elif msg_type == CLIENT_ADD_USER_TO_LINK:
+                handle_client_add_user_to_link(self, connection, address, msg_obj)
+            elif msg_type == CLIENT_REMOVE_USER_FROM_LINK:
+                handle_client_remove_user_from_link(self, connection, address, msg_obj)
             else:
                 mylog('I don\'t know what to do with {},\n{}'.format(msg_obj, msg_obj.__dict__))
         except Exception, e:

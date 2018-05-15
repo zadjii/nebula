@@ -1,7 +1,7 @@
-# last generated 2018-05-11 00:36:22.624000
+# last generated 2018-05-15 01:49:42.530000
 from messages.BaseMessage import BaseMessage
+from messages.LinkDoesNotExistMessage import LinkDoesNotExistMessage
 from messages.DirIsNotEmptyMessage import DirIsNotEmptyMessage
-from messages.FileAlreadyExistsMessage import FileAlreadyExistsMessage
 from messages.FileAlreadyExistsMessage import FileAlreadyExistsMessage
 from messages.AddContributorFailureMessage import AddContributorFailureMessage
 from messages.AddOwnerFailureMessage import AddOwnerFailureMessage
@@ -91,4 +91,8 @@ from messages.ClientReadLinkMessage import ClientReadLinkMessage
 from messages.ClientDeleteFileRequestMessage import ClientDeleteFileRequestMessage
 from messages.ClientDeleteDirRequestMessage import ClientDeleteDirRequestMessage
 from messages.ClientDeleteResponseMessage import ClientDeleteResponseMessage
+from messages.ClientSetLinkPermissionsMessage import ClientSetLinkPermissionsMessage
+from messages.ClientAddUserToLinkMessage import ClientAddUserToLinkMessage
+from messages.ClientRemoveUserFromLinkMessage import ClientRemoveUserFromLinkMessage
+from messages.ClientSetLinkPermissionsSuccessMessage import ClientSetLinkPermissionsSuccessMessage
 
