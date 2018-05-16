@@ -304,6 +304,18 @@ class RelativePath(object):
         return os.path.join(root, self._path)
 
 
+class RelativeLink(object):
+    """
+    This is mostly just so we can use a link in the log_client function, because
+        it needs a to_string method.
+    """
+    def __init__(self, link_str=None):
+        self._link_str = link_str
+
+    def to_string(self):
+        return self._link_str
+
+
 def setup_common_argparsing():
     common_parser = argparse.ArgumentParser(add_help=False)
     common_parser.add_argument('-w', '--working-dir', default=None)

@@ -170,7 +170,8 @@
 73  , CLIENT_ADD_USER_TO_LINK, sid, string:link_string, int:user_id
 74  , CLIENT_REMOVE_USER_FROM_LINK, sid, string:link_string, int:user_id
 75  , CLIENT_SET_LINK_PERMISSIONS_SUCCESS
-
+76  , CLIENT_GET_LINK_PERMISSIONS_REQUEST, sid, string:link_string
+77  , CLIENT_GET_LINK_PERMISSIONS_RESPONSE, int:permissions, blob:users
 ################################################################################
 #manually updated ones:
 ################################################################################

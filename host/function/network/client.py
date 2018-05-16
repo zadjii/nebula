@@ -5,7 +5,8 @@ from stat import S_ISDIR
 
 import shutil
 
-from common_util import mylog, send_error_and_close, Success, Error, PUBLIC_USER_ID, RelativePath, get_mylog, ResultAndData
+from common_util import mylog, send_error_and_close, Success, Error, PUBLIC_USER_ID, RelativePath, get_mylog, \
+    ResultAndData, RelativeLink
 from connections.AbstractConnection import AbstractConnection
 from host.PrivateData import READ_ACCESS, SHARE_ACCESS, NO_ACCESS, WRITE_ACCESS
 from host.function.recv_files import recv_file_tree, recv_file_transfer
@@ -40,7 +41,7 @@ def handle_read_file_request(host_obj, connection, address, msg_obj):
                                   , do_client_read_file)
 
 
-def do_client_read_file(host_obj, connection, address, msg_obj, client, cloud):
+def do_client_read_file(host_obj, connection, address, msg_obj, client, cloud, lookup_permissions=True):
     db = host_obj.get_db()
     _log = get_mylog()
     client_uuid = client.uuid if client is not None else None
@@ -78,14 +79,15 @@ def do_client_read_file(host_obj, connection, address, msg_obj, client, cloud):
         # connection.close()
         return
 
-    rd = host_obj.client_access_check_or_close(connection
-                                               , client_uuid
-                                               , cloud
-                                               , rel_path
-                                               , READ_ACCESS)
-    if not rd.success:
-        host_obj.log_client(client, 'read', cloud, rel_path, 'error')
-        return
+    if lookup_permissions:
+        rd = host_obj.client_access_check_or_close(connection
+                                                   , client_uuid
+                                                   , cloud
+                                                   , rel_path
+                                                   , READ_ACCESS)
+        if not rd.success:
+            host_obj.log_client(client, 'read', cloud, rel_path, 'error')
+            return
 
     req_file_is_dir = S_ISDIR(req_file_stat.st_mode)
     if req_file_is_dir:
@@ -645,6 +647,12 @@ def do_client_read_link(host_obj, connection, address, msg_obj, client, cloud):
     # TODO: how do we handle seperate link permissions here?
     # We're just translating it straight to a normal readfile message
 
+    rd = host_obj.client_link_access_check_or_close(connection, session_id, cloud,
+                                                    link_str, READ_ACCESS)
+    if not rd.success:
+        # conn was closed by client_access_check_or_close
+        return
+
     # get the path rom the link
     rel_path = RelativePath()
     path = private_data.get_path_from_link(link_str)
@@ -659,8 +667,8 @@ def do_client_read_link(host_obj, connection, address, msg_obj, client, cloud):
     rel_path.from_relative(path)
     # construct a ReadFile message, using the path from the link
     translated = ReadFileRequestMessage(session_id, cloud.uname(), cloud.cname(), rel_path.to_string())
-    # return do_read_file
-    return do_client_read_file(host_obj, connection, address, translated, client, cloud)
+
+    return do_client_read_file(host_obj, connection, address, translated, client, cloud, lookup_permissions=False)
 
 
 def handle_client_read_link(host_obj, connection, address, msg_obj):
@@ -788,8 +796,9 @@ def do_client_remove_dir(host_obj, connection, address, msg_obj, client, cloud):
 
 def handle_client_remove_dir(host_obj, connection, address, msg_obj):
     return client_message_wrapper(host_obj, connection, address, msg_obj,
-                               do_client_remove_dir)
+                                  do_client_remove_dir)
 ################################################################################
+
 
 ################################################################################
 def do_client_set_link_permissions(host_obj, connection, address, msg_obj, client, cloud):
@@ -804,7 +813,7 @@ def do_client_set_link_permissions(host_obj, connection, address, msg_obj, clien
         msg = 'Somehow the cloud doesn\'t have a privatedata associated with it'
         err = InvalidStateMessage(msg)
         mylog(err.message, '31')
-        host_obj.log_client(client, 'share-link', cloud, link_str, 'error')
+        host_obj.log_client(client, 'chmod-link', cloud, RelativeLink(link_str), 'error')
         send_error_and_close(err, connection)
         return Error(msg)
 
@@ -815,9 +824,10 @@ def do_client_set_link_permissions(host_obj, connection, address, msg_obj, clien
         msg = 'The link {} is not valid for this cloud'.format(link_str)
         err = LinkDoesNotExistMessage(msg)
         _log.error(err.message)
-        host_obj.log_client(client, 'share-link', cloud, link_str, 'error')
+        host_obj.log_client(client, 'chmod-link', cloud, RelativeLink(link_str), 'error')
         send_error_and_close(err, connection)
         return
+    rel_path.from_relative(path)
 
     # Using the actual file, check if the client has access to share the file.
     rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
@@ -827,9 +837,9 @@ def do_client_set_link_permissions(host_obj, connection, address, msg_obj, clien
 
     rd = private_data.set_link_permissions(link_str, permissions)
     if rd.success:
-        privatedata.commit()
+        private_data.commit()
     response = ClientSetLinkPermissionsSuccessMessage() if rd.success else LinkDoesNotExistMessage()
-    host_obj.log_client(client, 'share-link', cloud, link_str, 'success' if rd.success else 'error')
+    host_obj.log_client(client, 'chmod-link', cloud, RelativeLink(link_str), 'success' if rd.success else 'error')
     connection.send_obj(response)
 
 
@@ -851,7 +861,7 @@ def do_client_add_user_to_link(host_obj, connection, address, msg_obj, client, c
         msg = 'Somehow the cloud doesn\'t have a privatedata associated with it'
         err = InvalidStateMessage(msg)
         mylog(err.message, '31')
-        host_obj.log_client(client, 'share-link', cloud, link_str, 'error')
+        host_obj.log_client(client, 'chown+link', cloud, RelativeLink(link_str), 'error')
         send_error_and_close(err, connection)
         return Error(msg)
 
@@ -862,9 +872,10 @@ def do_client_add_user_to_link(host_obj, connection, address, msg_obj, client, c
         msg = 'The link {} is not valid for this cloud'.format(link_str)
         err = LinkDoesNotExistMessage(msg)
         _log.error(err.message)
-        host_obj.log_client(client, 'share-link', cloud, link_str, 'error')
+        host_obj.log_client(client, 'chown+link', cloud, RelativeLink(link_str), 'error')
         send_error_and_close(err, connection)
         return
+    rel_path.from_relative(path)
 
     # Using the actual file, check if the client has access to share the file.
     rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
@@ -874,9 +885,9 @@ def do_client_add_user_to_link(host_obj, connection, address, msg_obj, client, c
 
     rd = private_data.add_user_to_link(link_str, new_uid)
     if rd.success:
-        privatedata.commit()
+        private_data.commit()
     response = ClientSetLinkPermissionsSuccessMessage() if rd.success else LinkDoesNotExistMessage()
-    host_obj.log_client(client, 'share-link', cloud, link_str, 'success' if rd.success else 'error')
+    host_obj.log_client(client, 'chown+link', cloud, RelativeLink(link_str), 'success' if rd.success else 'error')
     connection.send_obj(response)
 
 
@@ -899,7 +910,7 @@ def do_client_remove_user_from_link(host_obj, connection, address, msg_obj, clie
         msg = 'Somehow the cloud doesn\'t have a privatedata associated with it'
         err = InvalidStateMessage(msg)
         mylog(err.message, '31')
-        host_obj.log_client(client, 'share-link', cloud, link_str, 'error')
+        host_obj.log_client(client, 'chown-link', cloud, RelativeLink(link_str), 'error')
         send_error_and_close(err, connection)
         return Error(msg)
 
@@ -910,9 +921,10 @@ def do_client_remove_user_from_link(host_obj, connection, address, msg_obj, clie
         msg = 'The link {} is not valid for this cloud'.format(link_str)
         err = LinkDoesNotExistMessage(msg)
         _log.error(err.message)
-        host_obj.log_client(client, 'share-link', cloud, link_str, 'error')
+        host_obj.log_client(client, 'chown-link', cloud, RelativeLink(link_str), 'error')
         send_error_and_close(err, connection)
         return
+    rel_path.from_relative(path)
 
     # Using the actual file, check if the client has access to share the file.
     rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
@@ -922,13 +934,64 @@ def do_client_remove_user_from_link(host_obj, connection, address, msg_obj, clie
 
     rd = private_data.remove_user_from_link(link_str, new_uid)
     if rd.success:
-        privatedata.commit()
+        private_data.commit()
     response = ClientSetLinkPermissionsSuccessMessage() if rd.success else LinkDoesNotExistMessage()
-    host_obj.log_client(client, 'share-link', cloud, link_str, 'success' if rd.success else 'error')
+    host_obj.log_client(client, 'chown-link', cloud, RelativeLink(link_str), 'success' if rd.success else 'error')
     connection.send_obj(response)
 
 
 def handle_client_remove_user_from_link(host_obj, connection, address, msg_obj):
     return client_link_wrapper(host_obj, connection, address, msg_obj,
                                do_client_remove_user_from_link)
+################################################################################
+
+
+################################################################################
+def do_client_get_link_permissions(host_obj, connection, address, msg_obj, client, cloud):
+    _log = get_mylog()
+    user_id = client.user_id if client else PUBLIC_USER_ID
+    session_id = client.uuid if client else None
+    link_str = msg_obj.link_string
+
+    private_data = host_obj.get_private_data(cloud)
+    if private_data is None:
+        msg = 'Somehow the cloud doesn\'t have a privatedata associated with it'
+        err = InvalidStateMessage(msg)
+        mylog(err.message, '31')
+        # host_obj.log_client(client, 'chown+link', cloud, RelativeLink(link_str), 'error')
+        send_error_and_close(err, connection)
+        return Error(msg)
+
+    # get the path from the link
+    rel_path = RelativePath()
+    path = private_data.get_path_from_link(link_str)
+    if path is None:
+        msg = 'The link {} is not valid for this cloud'.format(link_str)
+        err = LinkDoesNotExistMessage(msg)
+        _log.error(err.message)
+        # host_obj.log_client(client, 'chown+link', cloud, RelativeLink(link_str), 'error')
+        send_error_and_close(err, connection)
+        return
+    rel_path.from_relative(path)
+
+    # TODO: Get the permissions of the backing file too, and OR them with the permissions on the link.
+    rd = host_obj.client_access_check_or_close(connection, session_id, cloud,
+                                               rel_path, NO_ACCESS)
+    if not rd.success:
+        return rd
+    file_perms = rd.data
+    rd = private_data.get_link_full_permissions(link_str)
+    if rd.success:
+        link_perms = rd.data[0]
+        users = rd.data[1]
+        response = ClientGetLinkPermissionsResponseMessage(link_perms | file_perms, users)
+    else:
+        response = LinkDoesNotExistMessage()
+    # host_obj.log_client(client, 'chown+link', cloud, RelativeLink(link_str), 'success' if rd.success else 'error')
+    connection.send_obj(response)
+
+
+def handle_client_get_link_permissions(host_obj, connection, address, msg_obj):
+    return client_link_wrapper(host_obj, connection, address, msg_obj,
+                               do_client_get_link_permissions)
 ################################################################################

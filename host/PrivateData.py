@@ -7,7 +7,7 @@ import base64
 import posixpath
 import uuid
 
-from common_util import mylog, ResultAndData, get_path_elements, PUBLIC_USER_ID, RelativePath
+from common_util import mylog, ResultAndData, get_path_elements, PUBLIC_USER_ID, RelativePath, Error, Success
 import os
 import json
 
@@ -26,7 +26,8 @@ READ_ACCESS = 1
 WRITE_ACCESS = 2
 RDWR_ACCESS = READ_ACCESS | WRITE_ACCESS
 SHARE_ACCESS = 4
-FULL_ACCESS = SHARE_ACCESS | WRITE_ACCESS | READ_ACCESS
+APPEND_ACCESS = 8
+FULL_ACCESS = APPEND_ACCESS | SHARE_ACCESS | WRITE_ACCESS | READ_ACCESS
 
 PUBLIC_ID = 0
 OWNERS_ID = 1
@@ -96,7 +97,12 @@ class Link(object):
         return PUBLIC_USER_ID in self._user_ids or user_id in self._user_ids
 
     def get_access(self):
+        # type: () -> int
         return self._access
+
+    def get_users(self):
+        # type: () -> [int]
+        return self._user_ids
 
     def get_path(self):
         return self._path
@@ -299,6 +305,12 @@ class PrivateData(object):
             rel_path.from_relative(matching_link.get_path())
             return self.get_permissions(user_id, rel_path)
 
+    def get_link_full_permissions(self, link_str):
+        matching_link = self._find_link(link_str)
+        if matching_link is None:
+            return Error()
+        return Success((matching_link.get_access(), matching_link.get_users()))
+
     def set_link_permissions(self, link_str, permissions):
         # type: (str, int) -> ResultAndData
         matching_link = self._find_link(link_str)
@@ -333,13 +345,13 @@ class PrivateData(object):
     def _find_link(self, link_id):
         # type: (str) -> Link
         for link in self._links:
-            if link.id == link_str:
+            if link.id == link_id:
                 return link
         return None
 
     def has_link(self, link_id):
         # type: (str) -> bool
-        return self._find_link(link_str) is not None
+        return self._find_link(link_id) is not None
 
     def add_link(self, rel_path, link_str):
         # type: (RelativePath, str) -> Link

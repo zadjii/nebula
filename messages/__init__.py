@@ -1,4 +1,4 @@
-# last generated 2018-05-15 01:49:42.530000
+# last generated 2018-05-15 13:51:36.595000
 from messages.BaseMessage import BaseMessage
 from messages.LinkDoesNotExistMessage import LinkDoesNotExistMessage
 from messages.DirIsNotEmptyMessage import DirIsNotEmptyMessage
@@ -95,4 +95,6 @@ from messages.ClientSetLinkPermissionsMessage import ClientSetLinkPermissionsMes
 from messages.ClientAddUserToLinkMessage import ClientAddUserToLinkMessage
 from messages.ClientRemoveUserFromLinkMessage import ClientRemoveUserFromLinkMessage
 from messages.ClientSetLinkPermissionsSuccessMessage import ClientSetLinkPermissionsSuccessMessage
+from messages.ClientGetLinkPermissionsRequestMessage import ClientGetLinkPermissionsRequestMessage
+from messages.ClientGetLinkPermissionsResponseMessage import ClientGetLinkPermissionsResponseMessage
 

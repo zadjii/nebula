@@ -1,4 +1,4 @@
-# last generated 2018-05-15 01:49:44.306000
+# last generated 2018-05-15 13:51:37.415000
 import json
 from msg_codes import *
 from messages import *
@@ -99,6 +99,8 @@ _decoder_table = {
     , CLIENT_ADD_USER_TO_LINK: ClientAddUserToLinkMessage.deserialize # 73
     , CLIENT_REMOVE_USER_FROM_LINK: ClientRemoveUserFromLinkMessage.deserialize # 74
     , CLIENT_SET_LINK_PERMISSIONS_SUCCESS: ClientSetLinkPermissionsSuccessMessage.deserialize # 75
+    , CLIENT_GET_LINK_PERMISSIONS_REQUEST: ClientGetLinkPermissionsRequestMessage.deserialize # 76
+    , CLIENT_GET_LINK_PERMISSIONS_RESPONSE: ClientGetLinkPermissionsResponseMessage.deserialize # 77
 }
 
 
