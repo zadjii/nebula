@@ -8,8 +8,8 @@ import shutil
 from common_util import mylog, send_error_and_close, Success, Error, PUBLIC_USER_ID, RelativePath, get_mylog, \
     ResultAndData, RelativeLink
 from connections.AbstractConnection import AbstractConnection
-from host.PrivateData import READ_ACCESS, SHARE_ACCESS, NO_ACCESS, WRITE_ACCESS
-from host.function.recv_files import recv_file_tree, recv_file_transfer
+from host.PrivateData import READ_ACCESS, SHARE_ACCESS, NO_ACCESS, WRITE_ACCESS, APPEND_ACCESS
+from host.function.recv_files import recv_file_transfer, do_recv_file_transfer
 from host.models.Cloud import Cloud
 from host.models.Client import Client
 from host.util import check_response, validate_or_get_client_session, \
@@ -19,6 +19,8 @@ from messages.util import make_ls_array, make_stat_dict
 from msg_codes import *
 
 
+################################################################################
+# CLIENT_FILE_TRANSFER
 def handle_recv_file_from_client(host_obj, connection, address, msg_obj):
     return client_message_wrapper(host_obj, connection, address, msg_obj
                                   , do_recv_file_from_client)
@@ -26,16 +28,106 @@ def handle_recv_file_from_client(host_obj, connection, address, msg_obj):
 
 def do_recv_file_from_client(host_obj, connection, address, msg_obj, client, cloud):
     db = host_obj.get_db()
+    _log = get_mylog()
+    client_uuid = client.uuid if client is not None else None
+    client_uid = client.user_id if client else PUBLIC_USER_ID
+    file_isdir = msg_obj.isdir
+    file_size = msg_obj.fsize
+    file_path = msg_obj.fpath
+
     # todo: maybe add a quick response to tell the client the transfer is okay.
-    resp_obj = connection.recv_obj()
-    resp_type = resp_obj.type
-    check_response(CLIENT_FILE_TRANSFER, resp_type)
+    #   Originally, there was a ClientFilePut followed by a ClientFileTransfer.
 
-    recv_file_tree(host_obj, resp_obj, cloud, connection, db)
-    mylog('[{}]bottom of handle_recv_file_from_client(...,{})'
-          .format(client.uuid, msg_obj.__dict__))
+    rel_path = RelativePath()
+    rd = rel_path.from_relative(file_path)
+    if not rd.success:
+        msg = '{} is not a valid cloud path'.format(file_path)
+        err = InvalidStateMessage(msg)
+        _log.debug(err)
+        host_obj.log_client(client, 'write', cloud, rel_path, 'error')
+        send_error_and_close(err, connection)
+        return Error(err)
+
+    # make sure that it's not the private data file
+    # make sure we have appropriate permissions
+    #   if it's a existing file, we'll need to make sure we have write access on that file
+    #   otherwise, the next existing parent must have either write or append permission
+    #   if we're creating a new file, and the parent only has append permission, then we should
+    # SHOULD WE? make the child write access?
+    # or should it be the responsibility of the client to also set that permission?
+    # The user will likely not be able to modify the permissions of the cloud,
+    #   so they likely wont be able to append the file then chmod the file to
+    #   have write-access. However, there'd also be no way for the owner (of the
+    #   append-only dir) to pre-authorize any changes in ownership.
+    # lets give them write permissions. Yes. Lets.
+    # but then they could append a new dir, and then that would have write
+    #   access, and then they could go and write whatever the hell they want
+    # But I guess that's not technically any worse than letting them append as
+    #   many children as they want.
+
+    full_path = rel_path.to_absolute(cloud.root_directory)
+
+    if host_obj.is_private_data_file(full_path, cloud):
+        msg = 'Clients are not allowed to modify the {} file'.format(rel_path.to_string())
+        err = SystemFileWriteErrorMessage(msg)
+        _log.debug(err)
+        host_obj.log_client(client, 'write', cloud, rel_path, 'error')
+        send_error_and_close(err, connection)
+        return Error(err)
+
+    appending_new = False
+    if os.path.exists(full_path):
+        rd = host_obj.client_access_check_or_close(connection, client_uuid, cloud,
+                                                   rel_path, WRITE_ACCESS)
+    else:
+        # get_client_permissions will call private_data.get_permissions, which
+        #   will traverse top-down to build the users's permissions. If there
+        #   are intermediate paths that dont exist, but at least one parent has
+        #   append access, get_client_permisssions will know
+        permissions = host_obj.get_client_permissions(client_uuid, cloud, rel_path)
+
+        if not permissions_are_sufficient(permissions, WRITE_ACCESS):
+            if not permissions_are_sufficient(permissions, APPEND_ACCESS):
+                msg = 'Session does not have sufficient permission to access <{}>'.format(rel_path.to_string())
+                _log.debug(msg)
+                err = InvalidPermissionsMessage(msg)
+                host_obj.log_client(client, 'write', cloud, rel_path, 'error')
+                send_error_and_close(err, connection)
+                return Error(err)
+            else:
+                # user does have append permission
+                appending_new = True
+                rd = Success()
+        else:
+            #user does have write access, this is good
+            pass
+            rd = Success()
+
+    if rd.success:
+        rd = do_recv_file_transfer(host_obj, cloud, connection, rel_path, file_isdir, file_size)
+
+    if rd.success and appending_new:
+
+        private_data = host_obj.get_private_data(cloud)
+        if private_data is None:
+            msg = 'Somehow the cloud doesn\'t have a privatedata associated with it'
+            err = InvalidStateMessage(msg)
+            _log.debug(err)
+            host_obj.log_client(client, 'write', cloud, rel_path, 'error')
+            send_error_and_close(err, connection)
+            return Error(err)
+        private_data.add_user_permission(client_uid, rel_path, WRITE_ACCESS)
+        private_data.commit()
+        _log.debug('Added permission {} for user [{}] to file {}:{} while appending_new'.format(
+            WRITE_ACCESS, client_uid, cloud.cname(), rel_path.to_string()
+        ))
+
+    host_obj.log_client(client, 'write', cloud, rel_path, 'success' if rd.success else 'error')
+    connection.send_obj(rd.data)
 
 
+################################################################################
+# READ_FILE_REQUEST
 def handle_read_file_request(host_obj, connection, address, msg_obj):
     return client_message_wrapper(host_obj, connection, address, msg_obj
                                   , do_client_read_file)
@@ -133,6 +225,7 @@ def do_client_read_file(host_obj, connection, address, msg_obj, client, cloud, l
           .format(client.uuid, msg_obj))
 
 
+################################################################################
 def client_message_wrapper(host_obj, connection, address, msg_obj
                            , callback  # type: (HostController, AbstractConnection, object, BaseMessage, Client, Cloud) -> ResultAndData
                            ):
@@ -185,6 +278,7 @@ def client_message_wrapper(host_obj, connection, address, msg_obj
         return callback(host_obj, connection, address, msg_obj, client, cloud)
 
 
+################################################################################
 def client_link_wrapper(host_obj, connection, address, msg_obj
                        , callback  # type: (HostController, AbstractConnection, object, BaseMessage, Client, Cloud) -> ResultAndData
                        ):
@@ -224,6 +318,7 @@ def client_link_wrapper(host_obj, connection, address, msg_obj
     return callback(host_obj, connection, address, msg_obj, client, cloud)
 
 
+################################################################################
 def list_files_handler(host_obj, connection, address, msg_obj):
     mylog('list_files_handler')
     return client_message_wrapper(host_obj, connection, address, msg_obj,
@@ -286,8 +381,8 @@ def do_client_list_files(host_obj, connection, address, msg_obj, client, cloud):
         host_obj.log_client(client, 'ls', cloud, rel_path, 'error')
         pass
 
-################################################################################
 
+################################################################################
 def stat_files_handler(host_obj, connection, address, msg_obj):
     return client_message_wrapper(host_obj, connection, address, msg_obj,
                                   do_client_stat_files)
@@ -494,7 +589,8 @@ def do_client_make_directory(host_obj, connection, address, msg_obj, client, clo
                                              , 0
                                              , True)
     _log.debug('converted={}'.format(real_message.serialize()))
-    return recv_file_transfer(host_obj, real_message, cloud, connection, host_obj.get_db(), True)
+    return do_recv_file_from_client(host_obj, connection, address, real_message, client, cloud)
+    # return recv_file_transfer(host_obj, real_message, cloud, connection, host_obj.get_db(), True)
 
 
 def handle_client_make_directory(host_obj, connection, address, msg_obj):

@@ -80,7 +80,7 @@ def send_file_to_other(other_id, cloud, filepath, socket_conn, recurse=True):
     # print 'relpath({}) in \'{}\' is <{}>'.format(filepath, cloud.name, relative_pathname)
 
     req_file_is_dir = S_ISDIR(req_file_stat.st_mode)
-    mylog('filepath<{}> is_dir={}'.format(filepath, req_file_is_dir))
+    # mylog('filepath<{}> is_dir={}'.format(filepath, req_file_is_dir))
     if req_file_is_dir:
         if relative_pathname != '.':
             msg = HostFileTransferMessage(
@@ -92,10 +92,10 @@ def send_file_to_other(other_id, cloud, filepath, socket_conn, recurse=True):
                 , req_file_is_dir
             )
             socket_conn.send_obj(msg)
-
+            # TODO#23: The other host should reply with FileTransferSuccessMessage
         if recurse:
             subdirectories = os.listdir(filepath)
-            mylog('Sending children of <{}>={}'.format(filepath, subdirectories))
+            # mylog('Sending children of <{}>={}'.format(filepath, subdirectories))
             for f in subdirectories:
                 send_file_to_other(other_id, cloud, os.path.join(filepath, f), socket_conn)
     else:
@@ -115,10 +115,10 @@ def send_file_to_other(other_id, cloud, filepath, socket_conn, recurse=True):
         while l:
             new_data = requested_file.read(1024)
             l = socket_conn.send_next_data(new_data)
-            mylog(
-                '[{}]Sent {}B of file<{}> data'
-                .format(cloud.my_id_from_remote, l, filepath)
-            )
+            # mylog(
+            #     '[{}]Sent {}B of file<{}> data'
+            #     .format(cloud.my_id_from_remote, l, filepath)
+            # )
         mylog(
             '[{}]Sent <{}> data to [{}]'
             .format(cloud.my_id_from_remote, filepath, other_id)

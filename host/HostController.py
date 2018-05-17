@@ -582,6 +582,8 @@ class HostController:
             elif msg_type == LIST_FILES_REQUEST:
                 list_files_handler(self, connection, address, msg_obj)
             elif msg_type == CLIENT_FILE_PUT:
+                mylog('Received a CLIENT_FILE_PUT. We\'re deprecating that message, use CLIENT_FILE_TRANSFER instead')
+            elif msg_type == CLIENT_FILE_TRANSFER:
                 handle_recv_file_from_client(self, connection, address, msg_obj)
             elif msg_type == READ_FILE_REQUEST:
                 handle_read_file_request(self, connection, address, msg_obj)
