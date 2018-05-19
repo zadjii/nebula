@@ -201,6 +201,7 @@ class FilePermissions(object):
 
 class PrivateData(object):
     def __init__(self, cloud, owner_ids):
+        _log = get_mylog()
         # self._cloud = cloud
         self._cloud_id = cloud.id
         self._cloud_root = cloud.root_directory
@@ -212,18 +213,18 @@ class PrivateData(object):
         # try reading the .nebs from the cloud.
         # if it doesn't exist, then write out the defaults.
         if self._file_exists():
-            mylog('Reading .nebs for cloud: '
+            _log.debug('Reading .nebs for cloud: '
                   '[{}]"{}"'.format(cloud.my_id_from_remote, cloud.name))
             rd = self.read_backend()
             if rd.success:
-                mylog('read backend data')
+                _log.debug('read backend data')
                 self.read_json(rd.data)
             else:
-                mylog('Error reading backend data: {}'.format(rd.data))
+                _log.debug('Error reading backend data: {}'.format(rd.data))
                 raise Exception  # todo:fixme
         else:
             if owner_ids is None:
-                mylog('We\'re creating the .nebs for the cloud, but we '
+                _log.debug('We\'re creating the .nebs for the cloud, but we '
                       'specified no owners. \n'
                       'This will prevent anyone from accessing this cloud. \n'
                       'This is likely a programming error. \n'
@@ -231,7 +232,7 @@ class PrivateData(object):
                       'owner_ids, and that if this file accidentally gets \n'
                       'deleted, we recover it intelligently.', '31')
                 # assert?
-            mylog('Creating .nebs for cloud: '
+            _log.debug('Creating .nebs for cloud: '
                   '[{}]"{}"'.format(cloud.my_id_from_remote, cloud.name))
             root_path = os.path.join(cloud.root_directory, './')
 

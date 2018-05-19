@@ -21,3 +21,4 @@ trollius>=2.1
 watchdog
 netifaces
 pynacl
+service_identity

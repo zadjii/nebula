@@ -97,8 +97,6 @@ def nebs_main(argv):
 
     nebs_argparse = get_nebs_argparser()
     args = nebs_argparse.parse_args()
-    working_dir = Instance.get_working_dir_from_args(args, is_remote=False)
-    nebs_instance = NebsInstance(working_dir)
     log_path = args.log
     log_level = get_level_from_string(args.verbose)
 
@@ -109,6 +107,9 @@ def nebs_main(argv):
     if log_path is not None:
         _log.info('Configured logging {}, {}'.format(log_path, log_level))
         print('Writing log to {}'.format(log_path))
+
+    working_dir = Instance.get_working_dir_from_args(args, is_remote=False)
+    nebs_instance = NebsInstance(working_dir)
 
     if args.func:
         result = args.func(nebs_instance, args)

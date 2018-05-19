@@ -19,7 +19,7 @@ class SimpleDB(object):
     def create_all_and_repo(self, migrate_repo):
         self.create_all()
 
-        print('The database ({}) should have been created here'.format(self.db_uri))
+        # print('The database ({}) should have been created here'.format(self.db_uri))
 
         if not os.path.exists(migrate_repo):
             api.create(migrate_repo, 'database repository')
@@ -27,4 +27,4 @@ class SimpleDB(object):
         else:
             api.version_control(self.db_uri, migrate_repo, api.version(migrate_repo))
 
-        print 'The migration repo should have been created here'
+        # print 'The migration repo should have been created here'

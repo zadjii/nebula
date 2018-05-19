@@ -286,7 +286,6 @@ def lookup_remote(db, remote_address, remote_port):
     _log.debug('Matching remotes:')
     for remote in remotes.all():
         _log.debug(remote.debug_str())
-    print()
 
     if remotes.count() > 1:
         msg = 'Found more than one remote entry matching {}:{}'.format(remote_address, remote_port)

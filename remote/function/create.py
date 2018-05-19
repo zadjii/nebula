@@ -130,7 +130,6 @@ def do_create_cloud(db, creator, cloudname, max_size=INFINITE_SIZE):
     :param max_size:
     :return:
     """
-    # todo:31 change the other functions here to use this function
     if creator is None:
         return Error('Cloud creator was None')
     created_clouds = creator.created_clouds

@@ -68,16 +68,16 @@ def handle_fetch(host_obj, connection, address, msg_obj):
         err = HostVerifyHostFailureMessage(rd.data)
         send_error_and_close(err, connection)
         return
-    mylog('handle_fetch 2')
+    _log.debug('handle_fetch 2')
 
     matching_mirror = rd.data
 
     their_ip = address[0]
-    mylog('The connected host is via IP="{}"'.format(their_ip))
+    _log.debug('The connected host is via IP="{}"'.format(their_ip))
 
     send_tree(db, other_id, matching_mirror, requested_root, connection)
-    mylog('Bottom of handle_fetch', '32')
-    mylog('handle_fetch 3')
+    _log.debug('Bottom of handle_fetch')
+    _log.debug('handle_fetch 3')
 
 
 def handle_file_change(host_obj, connection, address, msg_obj):

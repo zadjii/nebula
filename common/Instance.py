@@ -90,6 +90,7 @@ class Instance(object):
         return self._pid_name + self.get_instance_name()
 
     def init_dir(self):
+        _log = get_mylog()
         """
         1. creates the WD if it doesn't exist
         2. Reads data from the working dir
@@ -109,6 +110,10 @@ class Instance(object):
         self._db.engine.echo = False
         if not exists:
             self._db.create_all_and_repo(self._db_migrate_repo())
+        _log.debug('The database ({}) should have been created here'.format(self._db_path()))
+        _log.debug('The migration repo should have been created here')
+
+
 
     def load_conf(self):
         raise Exception("You shouldn't be using a raw Instance, you should "

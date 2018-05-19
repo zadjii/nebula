@@ -143,7 +143,7 @@ def finish_request_cloud(remote, cloud, db, connection):
 
 def handle_go_retrieve(response, remote, cloud, db):
     # type: (GoRetrieveHereMessage, Remote, Cloud, SimpleDB) -> ResultAndData
-
+    _log = get_mylog()
     check_response(GO_RETRIEVE_HERE, response.type)
     other_address = response.ip
     other_port = response.port
@@ -158,7 +158,7 @@ def handle_go_retrieve(response, remote, cloud, db):
     db.session.commit()
 
     if other_address == '0' and other_port == 0:
-        mylog('No other hosts in cloud')
+        _log.debug('No other hosts in cloud')
         # note: falling out of this function takes us to the code that
         #       sends the MIRRORING_COMPLETE message.
         # Set up the private data for this cloud. We do this here, because this
@@ -169,7 +169,7 @@ def handle_go_retrieve(response, remote, cloud, db):
         # just instantiating the private data is enough to write the backend
         return Success()
 
-    mylog('requesting host at [{}]({},{})'.format(other_id, other_address, other_port))
+    _log.debug('requesting host at [{}]({},{})'.format(other_id, other_address, other_port))
     is_ipv6 = ':' in other_address
     sock_type = socket.AF_INET6 if is_ipv6 else socket.AF_INET
     sock_addr = (other_address, other_port, 0, 0) if is_ipv6 else (other_address, other_port)
@@ -185,21 +185,21 @@ def handle_go_retrieve(response, remote, cloud, db):
     my_id = cloud.my_id_from_remote
     msg = HostHostFetchMessage(my_id, other_id, cloud_uname, cname, '/')
     host_conn.send_obj(msg)
-    mylog('Sent HOST_HOST_FETCH as a mirror request.')
+    _log.debug('Sent HOST_HOST_FETCH as a mirror request.')
 
     resp_obj = host_conn.recv_obj()
     resp_type = resp_obj.type
 
     rd = Error()
     if resp_type == HOST_VERIFY_HOST_FAILURE:
-        mylog('Other host failed to verify our request, "{}"'.format(resp_obj.message), '31')
+        _log.debug('Other host failed to verify our request, "{}"'.format(resp_obj.message), '31')
     elif resp_type != HOST_FILE_TRANSFER:
-        mylog('Other host did not respond successfully, \n\t response was="{}"'.format(resp_obj))
+        _log.debug('Other host did not respond successfully, \n\t response was="{}"'.format(resp_obj))
     else:
         # Here we recv a whole bunch of files from the host
         recv_file_tree(None, resp_obj, cloud, host_conn, db)
         rd = Success()
-    mylog('Bottom of go_retrieve')
+    _log.debug('Bottom of go_retrieve')
     return rd
 
 
@@ -226,7 +226,8 @@ def complete_mirroring(db, cloud):
 def attempt_wakeup(instance):
     # type: (NebsInstance) -> None
     # TODO: M0.4 - Suport multiple mirrors
-    mylog('Attempting to alert any existing nebs')
+    _log = get_mylog()
+    _log.debug('Attempting to alert any existing nebs')
     my_addr = instance.get_existing_ip()
     port = instance.get_existing_port()
 
@@ -239,16 +240,16 @@ def attempt_wakeup(instance):
 
             host_sock = socket.socket(sock_type, socket.SOCK_STREAM)
             host_sock.connect(sock_addr)
-            mylog('connected to a nebs')
+            _log.debug('connected to a nebs')
             conn = RawConnection(host_sock)
             msg = RefreshMessageMessage()
             conn.send_obj(msg)
-            mylog('refreshed host')
+            _log.debug('refreshed host')
             conn.recv_obj()
             conn.close()
         except Exception, e:
-            mylog('Failed to alert any other hosts on this machine:')
-            mylog(e.message, '31')
+            _log.debug('Failed to alert any other hosts on this machine:')
+            _log.debug(e.message)
     # todo: Will this work with miniupnp?
     # try:
     #     local_sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
@@ -284,7 +285,7 @@ def acquire_remote(instance, address, port):
     if rd.success:
         ssl_socket = rd.data
         raw_conn = RawConnection(ssl_socket)
-        _log.info('Acquiring remote... (sending initial CSR for {})'.format(ip))
+        _log.debug('Acquiring remote... (sending initial CSR for {})'.format(ip))
         raw_conn.send_obj(message)
         resp_obj = raw_conn.recv_obj()
         if resp_obj.type == HOST_MOVE_RESPONSE:
@@ -299,7 +300,7 @@ def acquire_remote(instance, address, port):
         else:
             msg = 'Failed to create the new host with the remote - got bad response.'
             _log.error(msg)
-            _log.error('response was "{}"'.format(resp_obj.serialize()))
+            _log.debug('response was "{}"'.format(resp_obj.serialize()))
             rd = Error(msg)
     return rd
 
@@ -328,6 +329,7 @@ def _do_mirror(instance, remote_address, remote_port, cloud_uname, cloudname, di
 
     real_root = './{}/{}'.format(cloud_uname, cloudname) if directory is None else directory
     abs_root = os.path.abspath(real_root)
+    print('Mirroing into {}'.format(abs_root))
     if not os.path.exists(abs_root):
         try:
             os.makedirs(abs_root)
@@ -335,7 +337,7 @@ def _do_mirror(instance, remote_address, remote_port, cloud_uname, cloudname, di
             return Error('Failed to create the directory {}'.format(abs_root))
     elif not os.path.isdir(abs_root):
         return Error('target ({}) should be a directory'.format(real_root))
-    elif os.listdir(abs_root) is not []:
+    elif not (len(os.listdir(abs_root)) == 0):
         return Error('Target directory should be empty')
 
     _log.debug('attempting to get cloud named "{}" from remote at [{}]:{} into '
