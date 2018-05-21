@@ -251,6 +251,7 @@
 -18  , FILE_ALREADY_EXISTS    , string:message
 -19  , DIR_IS_NOT_EMPTY, string:message
 -20  , LINK_DOES_NOT_EXIST, string:message
+-21  , UNKNOWN_MESSAGE_ERROR
 
 # ideas for this file:
 # superclasses. Let messages extend from abstract base messages.

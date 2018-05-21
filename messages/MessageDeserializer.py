@@ -1,10 +1,11 @@
-# last generated 2018-05-15 13:51:37.415000
+# last generated 2018-05-21 02:02:44.249000
 import json
 from msg_codes import *
 from messages import *
 from common_util import *
 _decoder_table = {
-    LINK_DOES_NOT_EXIST: LinkDoesNotExistMessage.deserialize # -20
+    UNKNOWN_MESSAGE_ERROR: UnknownMessageErrorMessage.deserialize # -21
+    , LINK_DOES_NOT_EXIST: LinkDoesNotExistMessage.deserialize # -20
     , DIR_IS_NOT_EMPTY: DirIsNotEmptyMessage.deserialize # -19
     , FILE_ALREADY_EXISTS: FileAlreadyExistsMessage.deserialize # -18
     , ADD_CONTRIBUTOR_FAILURE: AddContributorFailureMessage.deserialize # -17
@@ -110,8 +111,12 @@ class MessageDeserializer(object):
         # _log = get_mylog()
         # if _log is not None:
         #     _log.debug('->decoding "{}"'.format(json_string))
-        json_dict = json.loads(json_string)
-        if 'type' not in json_dict.keys():
-            raise Exception()
-        msg_type = json_dict['type']
-        return _decoder_table[msg_type](json_dict)
+        msg = UnknownMessageErrorMessage()
+        try:
+            json_dict = json.loads(json_string)
+            if 'type' in json_dict.keys():
+                msg_type = json_dict['type']
+                msg = _decoder_table[msg_type](json_dict)
+        except Exception as e:
+            pass
+        return msg

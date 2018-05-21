@@ -197,14 +197,18 @@ def make_message_deserializer(messages):
 class MessageDeserializer(object):
     @staticmethod
     def decode_msg(json_string):
-        _log = get_mylog()
-        if _log is not None:
-            _log.debug('->decoding "{}"'.format(json_string))
-        json_dict = json.loads(json_string)
-        if 'type' not in json_dict.keys():
-            raise Exception()
-        msg_type = json_dict['type']
-        return _decoder_table[msg_type](json_dict)
+        # _log = get_mylog()
+        # if _log is not None:
+        #     _log.debug('->decoding "{}"'.format(json_string))
+        msg = UnknownMessageErrorMessage()
+        try:
+            json_dict = json.loads(json_string)
+            if 'type' in json_dict.keys():
+                msg_type = json_dict['type']
+                msg = _decoder_table[msg_type](json_dict)
+        except Exception as e:
+            pass
+        return msg
 """)
     handle.close()
     print 'wrote MessageDeserializer.py'

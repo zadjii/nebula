@@ -59,8 +59,6 @@ def nebr_main(argv):
 
     nebr_argparse = get_nebr_argparser()
     args = nebr_argparse.parse_args()
-    working_dir = Instance.get_working_dir_from_args(args, is_remote=True)
-    nebs_instance = NebrInstance(working_dir)
     log_path = args.log
     log_level = get_level_from_string(args.verbose)
 
@@ -71,6 +69,9 @@ def nebr_main(argv):
     if log_path is not None:
         _log.info('Configured logging {}, {}'.format(log_path, log_level))
         print('Writing log to {}'.format(log_path))
+
+    working_dir = Instance.get_working_dir_from_args(args, is_remote=True)
+    nebs_instance = NebrInstance(working_dir)
 
     if args.func:
         result = args.func(nebs_instance, args)
