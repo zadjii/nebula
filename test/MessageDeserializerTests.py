@@ -5,8 +5,8 @@ import json
 from messages import *
 from messages.MessageDeserializer import MessageDeserializer
 
+BAD_MSG = UnknownMessageErrorMessage()
 class MessageDeserializerTests(unittest.TestCase):
-
     def test_easy(self):
         msg_obj = ClientSessionRequestMessage('asdf', 'asdf')
         roundtrip = MessageDeserializer.decode_msg(msg_obj.serialize())
@@ -22,13 +22,13 @@ class MessageDeserializerTests(unittest.TestCase):
         expected_msg = ClientSessionRequestMessage('asdf', 'asdf')
         test_text = '{"type":27, "uname":"asdf", "passw":"asdf"}'
         roundtrip = MessageDeserializer.decode_msg(test_text)
-        self.assertEqual(expected_msg.__dict__, roundtrip.__dict__)
+        self.assertEqual(BAD_MSG.__dict__, roundtrip.__dict__)
 
     def test_bad_key(self):
         expected_msg = ClientSessionRequestMessage('asdf', 'asdf')
         test_text = '{"type":26, "cname":"asdf", "passw":"asdf"}'
         roundtrip = MessageDeserializer.decode_msg(test_text)
-        self.assertEqual(expected_msg.__dict__, roundtrip.__dict__)
+        self.assertEqual(BAD_MSG.__dict__, roundtrip.__dict__)
 
 
 def main():
