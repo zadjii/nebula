@@ -24,9 +24,9 @@ def get_user_from_session(db, session_id):
 
 def get_user_by_name(db, username):
     # type: (SimpleDB, str) -> User
-    _log = get_mylog()
+    # _log = get_mylog()
     query = db.session.query(User).filter(User.username.ilike(username))
-    _log.debug('{}'.format(query.all()))
+    # _log.debug('{}'.format(query.all()))
     return query.first()
 
 def get_cloud_by_name(db, uname, cname):

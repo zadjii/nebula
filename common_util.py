@@ -39,6 +39,8 @@ _log = None
 
 def get_mylog():
     global _log
+    if _log is None:
+        config_logger()
     return _log
 
 

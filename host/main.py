@@ -113,8 +113,15 @@ def nebs_main(argv):
 
     if args.func:
         result = args.func(nebs_instance, args)
-        result = 0 if result is None else result
-        sys.exit(result)
+        if result is not None:
+            if result.success:
+                sys.exit(0)
+            else:
+                sys.exit(-1)
+        else:
+            sys.exit(-1)
+        # result = 0 if result is None else result
+        # sys.exit(result)
     else:
         print('Programming error - The command you entered didnt supply a implementation')
         print('Go add a `set_defaults(func=DO_THE_THING)` to {}'.format(args.command))

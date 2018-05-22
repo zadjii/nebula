@@ -110,8 +110,8 @@ class Instance(object):
         self._db.engine.echo = False
         if not exists:
             self._db.create_all_and_repo(self._db_migrate_repo())
-        _log.debug('The database ({}) should have been created here'.format(self._db_path()))
-        _log.debug('The migration repo should have been created here')
+            _log.debug('The database ({}) should have been created here'.format(self._db_path()))
+            _log.debug('The migration repo should have been created here')
 
 
 

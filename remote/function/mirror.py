@@ -88,6 +88,20 @@ def host_request_cloud(remote_obj, connection, address, msg_obj):
         connection.close()
         return
 
+    cloud_hosts = match.all_hosts()
+    _log.debug('Cloud {} has {} other hosts'.format(match.full_name(), len(cloud_hosts)))
+    has_other_host = len(cloud_hosts) > 0
+    multiple_hosts_enabled = remote_obj.nebr_instance.is_multiple_hosts_enabled()
+    _log.debug('Multiple hosts is {}'.format('enabled' if multiple_hosts_enabled else 'disabled'))
+    if has_other_host and (not multiple_hosts_enabled):
+        msg = '{} already has a host. Multiple hosts for a single cloud are not enabled for this remote.'.format(match.full_name())
+        resp = MirrorFailureMessage(msg)
+        connection.send_obj(resp)
+        connection.close()
+        return
+    else:
+        _log.debug('{}, {}'.format(has_other_host, (not multiple_hosts_enabled)))
+
     respond_to_mirror_request(db, connection, address, matching_host, match)
 
 
@@ -145,7 +159,7 @@ def client_mirror(remote_obj, connection, address, msg_obj):
         connection.close()
         return
 
-    has_other_host = len(match.active_hosts()) > 0
+    has_other_host = len(match.all_hosts()) > 0
     if has_other_host and not remote_obj.nebr_instance.is_multiple_hosts_enabled():
         msg = '{} already has a host. Multiple hosts for a single cloud are not enabled for this remote.'.format(full_name)
         resp = MirrorFailureMessage(msg)

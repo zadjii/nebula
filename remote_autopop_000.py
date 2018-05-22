@@ -71,5 +71,6 @@ def repop(instance):
 if __name__ == '__main__':
     argv = sys.argv
     working_dir, argv = Instance.get_working_dir(argv, True)
+    print('autopop_000 for working dir {}'.format(working_dir))
     nebr_instance = NebrInstance(working_dir)
     repop(nebr_instance)

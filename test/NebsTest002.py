@@ -82,6 +82,7 @@ class MyTestCase(unittest.TestCase):
         # os.mkdir(nebs_working_dir)
         os.makedirs(nebs_working_dir)
         with open(os.path.join(nebs_working_dir, 'nebs.conf'), mode='wb') as f:
+            f.write('[root]')
             f.write('LOCAL_DEBUG = True')
 
         global remote_proc, host_proc

@@ -19,26 +19,24 @@ You'll need to drop it in `dep/win64`, and `NetworkController` will automaticall
 
 I started doing some ssl work and then gave up on it to get the prototype
 working, but there are still remnants. In order for anything to work, you'll
-need to  generate a `key` and `cert` using OpenSSL and drop them into the
-`remote` directory for using TLS/SSL.
+need to generate a key and cert using OpenSSL for the remote for it to be able to run.
 
-This can be done as follows:
+The "correct" way of doing this involves generating CA certs for the remote to use for signing host certs. Unfortunately, I haven't been able to get that working in a way that works in production (the host certs get rejected by browsers), so that code is mostly ignored for now.
 
-``` bash
-openssl genrsa 1024 > remote/key
+The "development" way of doing this is by disabling SSL for your test instances, and running the `gen_certs.py` script. You'll need to have openssl in your PATH for this to work.
 
-openssl req -new -x509 -nodes -sha1 -days 365 -key remote/key > remote/cert
+In `instances/remote/<instance name>/nebr.conf`:
+``` conf
+[root]
+DISABLE_SSL=1
 ```
 
-TODO: Find out how do do this w/in python.
-
-  The host will definitely need certs/keys too. I'll give the host come as well.
-
-``` bash
-openssl genrsa 1024 > host/host.key
-
-openssl req -new -x509 -nodes -sha1 -days 365 -key host/host.key > host/host.crt
+then:
+``` python
+python -m remote.gen_certs.py <instance name>
 ```
+
+(You can omit the instance name to use the `default` instance)
 
 ## Running nebula
 
@@ -75,6 +73,10 @@ out why yet.
 
 The tests clean up startup of the test, and leave the database after running
 them, so you can use them as repopulation script for testing.
+
+I'm finally starting to right some real unit tests, those you can run with
+
+`python -m test.all_unit_tests`
 
 ### Instances
 

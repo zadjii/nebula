@@ -7,7 +7,7 @@ import base64
 import posixpath
 import uuid
 
-from common_util import mylog, ResultAndData, get_path_elements, PUBLIC_USER_ID, RelativePath, Error, Success
+from common_util import get_mylog, mylog, ResultAndData, get_path_elements, PUBLIC_USER_ID, RelativePath, Error, Success
 import os
 import json
 

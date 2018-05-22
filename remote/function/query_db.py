@@ -25,7 +25,7 @@ class ListUsersCommand(BaseCommand):
 ################################################################################
 class ListCloudsCommand(BaseCommand):
     def add_parser(self, subparsers):
-        list_users = subparsers.add_parser('list-users', description='list all current clouds')
+        list_users = subparsers.add_parser('list-clouds', description='list all current clouds')
         return list_users
 
     def do_command_with_args(self, instance, args):

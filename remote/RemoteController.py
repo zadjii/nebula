@@ -30,7 +30,7 @@ __author__ = 'Mike'
 
 ###############################################################################
 HOST = ''                 # Symbolic name meaning all available interfaces
-PORT = 12345              # Arbitrary non-privileged port
+# PORT = 12345              # Arbitrary non-privileged port
 ###############################################################################
 
 
@@ -207,8 +207,11 @@ def client_add_owner(remote_obj, connection, address, msg_obj):
 
 def do_host_move(remote_obj, host, ip, csr):
     # type: (RemoteController, Host, str, crypto.X509Req) -> ResultAndData
-    new_cert = remote_obj.sign_host_csr(csr, ip)
-    host.last_certificate = crypto.dump_certificate(crypto.FILETYPE_PEM, new_cert)
+    if remote_obj.nebr_instance.is_ssl_enabled():
+        new_cert = remote_obj.sign_host_csr(csr, ip)
+        host.last_certificate = crypto.dump_certificate(crypto.FILETYPE_PEM, new_cert)
+    else:
+        host.last_certificate = None
     return Success(host)
 
 
@@ -246,7 +249,10 @@ def host_move(remote_obj, connection, address, msg_obj):
     if rd.success:
         host = rd.data
         new_host_id = host.id
-        new_host_crt = host.last_certificate + open(remote_obj.nebr_instance.get_cert_file(), 'rt').read()
+        new_host_crt = None
+        if remote_obj.nebr_instance.is_ssl_enabled():
+            # TODO#55: Definitely don't read the file from disk every time, that's ridiculous
+            new_host_crt = host.last_certificate + open(remote_obj.nebr_instance.get_cert_file(), 'rt').read()
         response = HostMoveResponseMessage(new_host_id, new_host_crt)
         connection.send_obj(response)
     else:
@@ -413,6 +419,9 @@ class RemoteController(object):
         _log = get_mylog()
         enable_vt_support()
 
+        # Even if SSL is disabled, we're going to use rudimentary SSL for host connections.
+        # (We won't be doing any signing or anything though)
+        # if self.nebr_instance.is_ssl_enabled():
         if not os.path.exists(self.nebr_instance.get_key_file()):
             msg = 'SSL Key file "{}" does not exist'.format(self.nebr_instance.get_key_file())
             _log.error(msg)
@@ -423,6 +432,11 @@ class RemoteController(object):
             return Error(msg)
 
         _log.info('Loaded SSL key and cert')
+        if not self.nebr_instance.is_ssl_enabled():
+            _log.error('Disabling SSL signing, because the nebr.conf has DISABLE_SSL=1. This should not be used in production.')
+
+        multiple_hosts_enabled = self.nebr_instance.is_multiple_hosts_enabled()
+        _log.debug('Multiple hosts is {}'.format('enabled' if multiple_hosts_enabled else 'disabled'))
 
         # register the shutdown callback
         atexit.register(self.shutdown)
@@ -436,16 +450,19 @@ class RemoteController(object):
 
     def network_updates(self):
         _log = get_mylog()
-        # context = SSL.Context(SSL.SSLv23_METHOD)
+
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # Even if SSL is disabled, we're going to use rudimentary SSL for host connections.
+        # (We won't be doing any signing or anything though)
+        # if self.nebr_instance.is_ssl_enabled():
         context = SSL.Context(SSL.TLSv1_2_METHOD)
         mylog(self.nebr_instance.get_key_file())
         mylog(self.nebr_instance.get_cert_file())
         context.use_privatekey_file(self.nebr_instance.get_key_file())
         context.use_certificate_file(self.nebr_instance.get_cert_file())
-
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s = SSL.Connection(context, s)
-        address = (HOST, PORT)  # ipv4
+
+        address = (HOST, self.nebr_instance.get_port())  # ipv4
         attempts = 0
         succeeded = False
         while attempts < 5 and not succeeded:
@@ -453,11 +470,10 @@ class RemoteController(object):
             try:
                 s.bind(address)
                 succeeded = True
-            except Exception, e:
+            except Exception as e:
                 _log.error('Failed to bind to address ({}), {}'.format(address, e))
         if not succeeded:
             return Error('Failed to bind to network (is the socket already in use?)')
-
 
         _log = get_mylog()
         _log.info('Listening on {}'.format(address))
@@ -470,9 +486,11 @@ class RemoteController(object):
 
             try:
                 self.filter_func(raw_connection, address)
-            except Exception, e:
+            except Exception as e:
                 _log.error('Error handling connection')
                 _log.error(e.message)
+
+            connection.close()
 
             # echo_func(connection, address)
             # todo: possible that we might want to thread.join here.
@@ -523,7 +541,6 @@ class RemoteController(object):
             client_get_link_host(self, connection, address, msg_obj)
         else:
             print 'I don\'t know what to do with', msg_obj
-        connection.close()
 
     def shutdown(self):
         mylog('RemoteController.shutdown')
@@ -532,6 +549,10 @@ class RemoteController(object):
 
     def sign_host_csr(self, certificate_request, ip):
         # type: (crypto.X509Req, str) -> crypto.X509
+
+        #TODO#55: This is SO SO SO bad.
+        # Every time the remote needs to sign a cert, it reads them off disk?
+        # jesus christ that's poorly written prototype shit.
         my_key = crypto.load_privatekey(crypto.FILETYPE_PEM, open(self.nebr_instance.get_key_file(), 'rt').read())
         my_crt = crypto.load_certificate(crypto.FILETYPE_PEM, open(self.nebr_instance.get_cert_file(), 'rt').read())
 

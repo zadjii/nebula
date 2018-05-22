@@ -126,11 +126,11 @@ def finish_request_cloud(remote, cloud, db, connection):
     # type: (Remote, Cloud, SimpleDB, AbstractConnection) -> ResultAndData
     resp_obj = connection.recv_obj()
     if resp_obj.type == INVALID_STATE:
-        rd = Error(resp_obj.msg)
+        rd = Error(resp_obj.message)
     elif resp_obj.type == MIRROR_FAILURE:
-        rd = Error(resp_obj.msg)
+        rd = Error(resp_obj.message)
     elif resp_obj.type == AUTH_ERROR:
-        rd = Error(resp_obj.msg)
+        rd = Error('Failed to authenticate with the remote')
     elif resp_obj.type == GO_RETRIEVE_HERE:
         rd = handle_go_retrieve(resp_obj, remote, cloud, db)
         # attempt_wakeup()
@@ -268,7 +268,7 @@ def attempt_wakeup(instance):
     #     mylog('Failed to alert any other hosts on this machine')
 
 
-def acquire_remote(instance, address, port):
+def acquire_remote(instance, address, port, disable_ssl=False):
     # type: (NebsInstance, str, int) -> ResultAndData
     _log = get_mylog()
     db = instance.get_db()
@@ -280,7 +280,7 @@ def acquire_remote(instance, address, port):
     req = create_cert_request(new_key, CN=ip)
     certificate_request_string = crypto.dump_certificate_request(crypto.FILETYPE_PEM, req)
     message = HostMoveRequestMessage(INVALID_HOST_ID, ip, certificate_request_string)
-
+    _log.debug('Initializing ssl connection to remote')
     rd = setup_ssl_socket_for_address(address, port)
     if rd.success:
         ssl_socket = rd.data
@@ -305,7 +305,7 @@ def acquire_remote(instance, address, port):
     return rd
 
 
-def locate_remote(instance, address, port):
+def locate_remote(instance, address, port, disable_ssl=False):
     # type: (NebsInstance, str, int) -> ResultAndData
     _log = get_mylog()
     rd = lookup_remote(instance.get_db(), address, port)
@@ -314,15 +314,15 @@ def locate_remote(instance, address, port):
         if remote is not None:
             rd = Success(remote)
         else:
-            rd = acquire_remote(instance, address, port)
+            rd = acquire_remote(instance, address, port, disable_ssl=disable_ssl)
     _log.debug('Found remote for {},{}'.format(address, port))
     return rd
 
 
 
-def _do_mirror(instance, remote_address, remote_port, cloud_uname, cloudname, directory, session_id, test=False):
+def _do_mirror(instance, remote_address, remote_port, cloud_uname, cloudname, directory, session_id, test=False, disable_ssl=False):
     _log = get_mylog()
-    rd = locate_remote(instance, remote_address, remote_port)
+    rd = locate_remote(instance, remote_address, remote_port, disable_ssl=disable_ssl)
     if not rd.success:
         return Error('Failed to locate the remote for remote address "{}:{}"'.format(remote_address, remote_port))
     remote = rd.data
@@ -411,7 +411,7 @@ class MirrorCommand(BaseCommand):
         remote_address = args.remote
         cloud_name = args.cloud_name
         directory = args.directory
-        remote_port = args.port
+        remote_port = int(args.port)
         session_id = args.session_id
         test = args.test
         if cloud_name.find('/') == -1:
@@ -425,7 +425,12 @@ class MirrorCommand(BaseCommand):
             print('mirror: error: cloud name must be in the format <username>/<cloudname>')
             return
 
-        rd = _do_mirror(instance, remote_address, remote_port, uname, cname, directory, session_id, test)
+        # if disable_ssl:
+        #     print('Disabling SSL when connecting to the remote. This should not be used outside of nebula development')
+
+        rd = _do_mirror(instance, remote_address, remote_port, uname, cname, directory, session_id, test, disable_ssl=False)
         if not rd.success:
             print(rd.data)
+        else:
+            print('Successfully mirrored {}. Use `nebr.py start` to start the nebula server.'.format(cloud_name))
         return rd

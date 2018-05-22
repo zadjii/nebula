@@ -53,13 +53,12 @@ class NebsInstance(Instance):
 
         config = ConfigParser.RawConfigParser()
         with open(conf_file) as stream:
-            stream = StringIO("[root]\n" + stream.read())
             config.readfp(stream)
 
             self.host_port = get_from_conf(config, 'PORT', self.host_port)
             self.host_ws_port = get_from_conf(config, 'WS_PORT', self.host_ws_port)
             self.host_internal_port = get_from_conf(config, 'INTERNAL_PORT', self.host_internal_port)
-            self.local_debug = get_from_conf(config, 'LOCAL_DEBUG', self.local_debug)
+            self.local_debug = bool(get_from_conf(config, 'LOCAL_DEBUG', self.local_debug))
 
             self.key_file = get_from_conf(config, 'HOST_KEY', self.key_file)
             self.cert_file = get_from_conf(config, 'HOST_CERT', self.cert_file)
