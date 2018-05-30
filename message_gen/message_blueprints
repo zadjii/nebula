@@ -83,7 +83,7 @@
 31  , CLIENT_GET_CLOUDS_REQUEST     , sid
 
 # these two args get arrays of strings filled with the cnames for a user's clouds
-32  , CLIENT_GET_CLOUDS_RESPONSE    , sid, blob:owned, blob:contrib
+32  , CLIENT_GET_CLOUDS_RESPONSE    , sid, blob:owned, blob:shared
 
 33  , CLIENT_GET_CLOUD_HOST_REQUEST      , sid, string:cloud_uname, string:cname
 34  , CLIENT_GET_CLOUD_HOST_RESPONSE     , sid, string:cloud_uname, string:cname, ip, int:port  , int:wsport

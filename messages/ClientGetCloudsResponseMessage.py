@@ -5,18 +5,18 @@ __author__ = 'Mike'
 
 
 class ClientGetCloudsResponseMessage(BaseMessage):
-    def __init__(self, sid=None, owned=None, contrib=None):
+    def __init__(self, sid=None, owned=None, shared=None):
         super(ClientGetCloudsResponseMessage, self).__init__()
         self.type = CLIENT_GET_CLOUDS_RESPONSE
         self.sid = sid
         self.owned = owned
-        self.contrib = contrib
+        self.shared = shared
 
     @staticmethod
     def deserialize(json_dict):
         msg = ClientGetCloudsResponseMessage()
         msg.sid = json_dict['sid']
         msg.owned = json_dict['owned']
-        msg.contrib = json_dict['contrib']
+        msg.shared = json_dict['shared']
         return msg
 

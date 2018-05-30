@@ -26,8 +26,6 @@ class NebrInstance(Instance):
         self.enable_multiple_hosts = False
         self.disable_ssl = False
         self.port = 12345
-        # self.host_ws_host = '127.0.0.1'
-        # self.host_ws_port = 34567
 
         self._db_name = 'remote.db'
         self._db_models = models.nebr_base
@@ -46,23 +44,16 @@ class NebrInstance(Instance):
         with open(conf_file) as stream:
             config.readfp(stream)
 
-            # has_enable = config.has_option('root', 'ENABLE_MULTIPLE_HOSTS')
-            # if has_enable:
-            #     _log.debug('Has ENABLE_MULTIPLE_HOSTS')
-            #     mult_hosts = config.get('root', 'ENABLE_MULTIPLE_HOSTS')
-            #     _log.debug(mult_hosts)
-            #     _log.debug(False if mult_hosts == '0' else True)
-            #     _log.debug(bool(mult_hosts))
-            # else:
-            #     _log.debug('Doesnt have ENABLE_MULTIPLE_HOSTS')
-
             self.key_file = get_from_conf(config, 'KEY', self.key_file)
+
             self.cert_file = get_from_conf(config, 'CERT', self.cert_file)
+
             _enable_multiple_hosts = get_from_conf(config, 'ENABLE_MULTIPLE_HOSTS', self.enable_multiple_hosts)
             self.enable_multiple_hosts = _enable_multiple_hosts in ['1', 'True', 'true']
+
             _disable_ssl = get_from_conf(config, 'DISABLE_SSL', self.enable_multiple_hosts)
             self.disable_ssl = _disable_ssl in ['1', 'True', 'true']
-            # self.disable_ssl = bool(get_from_conf(config, 'DISABLE_SSL', self.disable_ssl))
+
             self.port = int(get_from_conf(config, 'PORT', self.port))
 
     def get_key_file(self):
