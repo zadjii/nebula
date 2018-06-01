@@ -265,14 +265,13 @@ class HostController:
         # Part 1: Legacy
         # Handshake the remote for each mirror on this host.
         # This does not update our cert, or really our IP.
-        # todo: In the future, have one Remote object in the host DB for each remote
+        # todo#63: In the future, have one Remote object in the host DB for each remote
         #   and handshake that remote once.
-        # todo: And then update that Remote's handshake
+        # todo: And then update that Remote's handshake (#63?)
         mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
         all_mirrored_clouds = mirrored_clouds.all()
         for cloud in all_mirrored_clouds:
             self.send_remote_handshake(cloud)
-        # map(self.send_remote_handshake, all_mirrored_clouds)
 
         return Success()
 
@@ -285,13 +284,16 @@ class HostController:
         db = self._nebs_instance.get_db()
         all_remotes = db.session.query(Remote).all()
         for remote in all_remotes:
-            # todo: Check the return value here
+            # todo#62: Check the return value here.
+            # TODO#62: If we fail to handshake even one remote, we set ourselves to offlne mode.
+            #   If the next remote we DO connect to successfully, we'll be set back into online mode.
+            #   This could be due to one remote being offline but another being online.
+            #   Our online state should probably be an OR of each remote's individual online states.
             self.send_host_move(remote)
-            # todo: Hey, now there's handshake_remotes and refresh_remotes.
+            # todo#64: Hey, now there's handshake_remotes and refresh_remotes.
             #   These do different things, but _really_ they do the same thing.
             #   Maybe we should do something about that.. like consolidate them.
 
-        # self.active_net_thread_obj.ssl_context_factory.cacheContext()
         self.active_net_thread_obj.refresh_context()
 
         return Success()
@@ -312,7 +314,7 @@ class HostController:
             )
 
             remote_conn.send_obj(msg)
-            # todo
+            # todo#65: implement REM_HANDSHAKE_GO_FETCH
             # response = remote_conn.recv_obj()
         except gaierror, e:
             mylog('Failed to connect to remote')
@@ -320,14 +322,10 @@ class HostController:
             mylog('Even more likely, network disconnected.')
             mylog(e.message)
             return Error(e.message)
-            # self.shutdown()
-            # mylog('I\'m shutting it down, because I don\'t know how to recover quite yet.')
         except Exception, e:
             mylog('some other error handshaking remote')
             mylog(e.message)
             return Error(e.message)
-            # self.shutdown()
-            # mylog('I\'m shutting it down, because I don\'t know how to recover quite yet.')
         finally:
             if remote_conn is not None:
                 remote_conn.close()
@@ -416,25 +414,6 @@ class HostController:
         else:
             self.set_online()
         return rd
-        # rd = remote.setup_socket()
-        # if rd.success:
-        #     ssl_socket = rd.data
-        #     raw_conn = RawConnection(ssl_socket)
-        #     _log.info('Host [{}] is moving to new address "{}"'.format(remote.my_id_from_remote, ip))
-        #     raw_conn.send_obj(message)
-        #     resp_obj = raw_conn.recv_obj()
-        #     if resp_obj.type == HOST_MOVE_RESPONSE:
-        #         remote.set_certificate(ip, resp_obj.crt)
-        #         remote.my_id_from_remote = resp_obj.host_id
-        #         remote.key = crypto.dump_privatekey(crypto.FILETYPE_PEM, new_key)
-        #         db.session.add(remote)
-        #         rd = Success(remote)
-        #     else:
-        #         msg = 'Failed to move the host on the remote - got bad response.'
-        #         _log.error(msg)
-        #         _log.error('response was "{}"'.format(resp_obj.serialize()))
-        #         rd = Error(msg)
-        # return rd
 
     def process_connections(self):
         num_conns = len(self.active_net_thread_obj.connection_queue)

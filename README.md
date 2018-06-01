@@ -4,6 +4,18 @@ Nebula is a platform for personal, private clouds. It enables users to host thei
 
 Nebula is about so much more than just plain file storage. Applications built on top of nebula can guarentee that their user's data remains private to the user. Imagine a social media site, where you can be sure that your post is only visible to you and your friends, and impossible for the site operator to scrape your data, or knowing that when you delete a post (or even all your profile information) it's really gone for good! Imagine a web email service where the contents of your email aren't scraped to better serve you advertising. This is what nebula is for.
 
+## Installing
+
+At the moment there aren't any pip packages yet, so you'll have to clone the repo and install the dependencies manually with
+
+```sh
+git clone https://github.com/zadjii/nebula
+cd zadjii/nebula
+pip install -r requirements.txt
+```
+
+See `CONTRIBUTING.md` for more specifics on installing.
+
 ## How it Works
 
 Nebula is a system mainly comprised of three parts: the Remote, the Host, and the Client.
@@ -69,7 +81,7 @@ Nebula as come quite a long way since work started on it in 2015, but there's st
   This is probably the biggest remaining hurdle for a proper nebula implentation. The remote needs to be able to authenticate the hosts and issue signed certs for them, in a way that will be trusted by any old browser, without any other system coniguration.
 
 - [ ] **v0.6 Email Support**
-  Running a mail server is definitely non-trivial
+  Running a mail server is definitely non-trivial, but I think it would be an absolutely perfect application of the technology. Imagine, all of the benefits of a webmail client, all while you know that your emails are safe on a device you control, and not subject to the operator being able to scan their contents.
 
 - [ ] **v0.7 Application Isolation**
   Right now, once you've logged in to a lient application, it has free reign to do whatever it wants to your cloud, including reading and writing all over the entire tree. This is obviously *not ideal*. Applications need to have permissions only over a subset of the tree, and granting an application access needs to be an explicit action by the user.

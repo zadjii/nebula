@@ -20,7 +20,7 @@
 2   , HOST_HANDSHAKE        , int:id    , string:ipv6   , int:port      , int:wsport    , update , string:hostname, int:used_space, int:remaining_space
 
 3   , REMOTE_HANDSHAKE      , int:id    , string:key    , string:cert
-4   , REM_HANDSHAKE_GO_FETCH #todo not done
+4   , REM_HANDSHAKE_GO_FETCH # todo#65 not done
 
 5   , REQUEST_CLOUD         , int:id    , string:cloud_uname  , string:cname  , string:username  , string:passw
 # note: purposefully no wsport, this is for H->H only.

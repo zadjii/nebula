@@ -26,13 +26,13 @@ The "correct" way of doing this involves generating CA certs for the remote to u
 The "development" way of doing this is by disabling SSL for your test instances, and running the `gen_certs.py` script. You'll need to have openssl in your PATH for this to work.
 
 In `instances/remote/<instance name>/nebr.conf`:
-``` conf
+```conf
 [root]
 DISABLE_SSL=1
 ```
 
 then:
-``` python
+```sh
 python -m remote.gen_certs.py <instance name>
 ```
 
@@ -107,7 +107,7 @@ You'll probably want to add the following aliases to your `.bashrc`
 I generally place the "installed" nebula at `var/lib/nebula`, I don't know if that
   really makes any sense but that's what I like.
 
-``` sh
+```sh
 alias nebs='python /var/lib/nebula/nebs.py'
 
 alias nebr='python /var/lib/nebula/nebr.py'
@@ -164,7 +164,7 @@ simple bool indicating if the function succeeded. `data` is the tricky bit -
  is supposed to be.
 
 Here's an example, from RemoteController.py,
-``` python
+```python
 
 def do_client_get_clouds(db, session_id):
     # type: (SimpleDB, str) -> ResultAndData
