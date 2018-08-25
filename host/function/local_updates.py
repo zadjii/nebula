@@ -116,7 +116,6 @@ def local_file_create(host_obj, directory_path, dir_node, filename, db):
     #   where (int, str): (FILE_CREATE, full_path)
     _log = get_mylog()
     _log.debug('Adding {} to filenode for the directory node {}'.format(filename, dir_node.name))
-    # print '\t\tAdding',filename,'to filenode for',dir_node.name
     file_pathname = os.path.join(directory_path, filename)
     file_stat = os.stat(file_pathname)
     file_modified = file_stat.st_mtime

@@ -422,7 +422,7 @@ class HostController:
             # for (conn, addr) in self.active_network_obj.connection_queue[:]:
             try:
                 self.filter_func(conn, addr)
-            except Exception, e:
+            except Exception as e:
                 mylog('Error handling connection')
                 mylog(e.message)
             num_conns -= 1

@@ -88,10 +88,7 @@ class Cloud(base):
     def create_or_update_node(self, relative_path, db):
         curr_children = self.children
         curr_parent_node = None
-        # curr_path = '.'
         dirs = os.path.normpath(relative_path).split(os.sep)
-        # mylog('create or update dirs={}'.format(dirs))
-        # print 'create/update for all of {}'.format(dirs)
         while len(dirs) > 0:
             # find the node in children if it exists, else make it
             if curr_parent_node is not None:
@@ -103,21 +100,12 @@ class Cloud(base):
                 child.name = dirs[0]
                 child.created_on = datetime.utcnow()
                 child.last_modified = child.created_on
-                # child.cloud = self
                 db.session.add(child)
                 if curr_parent_node is not None:
                     curr_parent_node.children.append(child)
-                    # mylog('[{}] {} attached to node {}'.format(self.my_id_from_remote, child.name, curr_parent_node.name))
                 else:
                     self.children.append(child)
-                    # mylog('[{}] {} attached to mirror'.format(self.my_id_from_remote, child.name,))
                 db.session.commit()
-                # mylog('\tcreated node for <{}>, parent:<{}>'\
-                #     .format(
-                #         child.name
-                #         , curr_parent_node.name if curr_parent_node is not None else 'None'
-                #     )
-                # )
             curr_parent_node = child
             curr_children = child.children
             dirs.pop(0)

@@ -55,18 +55,12 @@ class WatchdogWorker(object):
 
     def __init__(self, host):
         self.shutdown_requested = False
-
         # maps cloud roots -> the observer for that root
         self.observers = {}
         self.observer = Observer()
         self.observer.start()
-
         self.event_handler = HostEventHandler(host)
 
-    def work_thread(self):
-        # I don;t think I need this
-        # It's possible that the observers manage their own threads
-        pass
 
     def watch_path(self, cloud_root):
         mylog('Watching path <{}>'.format(cloud_root))
@@ -74,15 +68,8 @@ class WatchdogWorker(object):
             self.observer.schedule(self.event_handler, cloud_root, recursive=True)
 
     def watch_all_clouds(self, clouds):
-        # mylog('unschedule_all 0')
-        # self.observer.stop()
-
-        # mylog('unschedule_all 1')
-        # self.observer.unschedule_all()
         for mirror in clouds:
             if not (mirror.root_directory in self.observers.keys()):
                 self.watch_path(mirror.root_directory)
-
-        # mylog('unschedule_all 2')
 
 
