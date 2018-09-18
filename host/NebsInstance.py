@@ -46,22 +46,16 @@ class NebsInstance(Instance):
 
         self.init_dir()
 
-    def load_conf(self):
-        conf_file = self.get_config_file_path()
-        if not os.path.exists(conf_file):
-            return
+    def _parse_config(self, config=None):
+        config = config or self._config
 
-        config = ConfigParser.RawConfigParser()
-        with open(conf_file) as stream:
-            config.readfp(stream)
+        self.host_port = get_from_conf(config, 'PORT', self.host_port)
+        self.host_ws_port = get_from_conf(config, 'WS_PORT', self.host_ws_port)
+        self.host_internal_port = get_from_conf(config, 'INTERNAL_PORT', self.host_internal_port)
+        self.local_debug = bool(get_from_conf(config, 'LOCAL_DEBUG', self.local_debug))
 
-            self.host_port = get_from_conf(config, 'PORT', self.host_port)
-            self.host_ws_port = get_from_conf(config, 'WS_PORT', self.host_ws_port)
-            self.host_internal_port = get_from_conf(config, 'INTERNAL_PORT', self.host_internal_port)
-            self.local_debug = bool(get_from_conf(config, 'LOCAL_DEBUG', self.local_debug))
-
-            self.key_file = get_from_conf(config, 'HOST_KEY', self.key_file)
-            self.cert_file = get_from_conf(config, 'HOST_CERT', self.cert_file)
+        self.key_file = get_from_conf(config, 'HOST_KEY', self.key_file)
+        self.cert_file = get_from_conf(config, 'HOST_CERT', self.cert_file)
 
     def get_existing_port(self):
         port = None

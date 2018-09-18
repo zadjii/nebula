@@ -113,12 +113,24 @@ class Instance(object):
             _log.debug('The database ({}) should have been created here'.format(self._db_path()))
             _log.debug('The migration repo should have been created here')
 
-
-
-    def load_conf(self):
+    def _parse_config(self, config=None):
+        """
+        config param exists so we can test this. Use the config param if it
+        exists, otherwise default to the self._config.
+        """
         raise Exception("You shouldn't be using a raw Instance, you should "
                         "extend it or use NebsInstance/NebrInstance")
-        # return os.path.join(self._working_dir, 'host.db')
+
+    def load_conf(self):
+        conf_file = self.get_config_file_path()
+        if not os.path.exists(conf_file):
+            return
+
+        config = ConfigParser.RawConfigParser()
+        with open(conf_file) as stream:
+            config.readfp(stream)
+            self._config = config
+        self._parse_config()
 
     def _db_uri(self):
         return 'sqlite:///' + self._db_path()

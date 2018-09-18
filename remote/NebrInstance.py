@@ -34,27 +34,16 @@ class NebrInstance(Instance):
 
         self.init_dir()
 
-    def load_conf(self):
-        _log = get_mylog()
-        conf_file = self.get_config_file_path()
-        if not os.path.exists(conf_file):
-            return
+    def _parse_config(self, config=None):
+        config = config or self._config
 
-        config = ConfigParser.RawConfigParser()
-        with open(conf_file) as stream:
-            config.readfp(stream)
-
-            self.key_file = get_from_conf(config, 'KEY', self.key_file)
-
-            self.cert_file = get_from_conf(config, 'CERT', self.cert_file)
-
-            _enable_multiple_hosts = get_from_conf(config, 'ENABLE_MULTIPLE_HOSTS', self.enable_multiple_hosts)
-            self.enable_multiple_hosts = _enable_multiple_hosts in ['1', 'True', 'true']
-
-            _disable_ssl = get_from_conf(config, 'DISABLE_SSL', self.enable_multiple_hosts)
-            self.disable_ssl = _disable_ssl in ['1', 'True', 'true']
-
-            self.port = int(get_from_conf(config, 'PORT', self.port))
+        self.key_file = get_from_conf(config, 'KEY', self.key_file)
+        self.cert_file = get_from_conf(config, 'CERT', self.cert_file)
+        _enable_multiple_hosts = get_from_conf(config, 'ENABLE_MULTIPLE_HOSTS', self.enable_multiple_hosts)
+        self.enable_multiple_hosts = _enable_multiple_hosts in ['1', 'True', 'true']
+        _disable_ssl = get_from_conf(config, 'DISABLE_SSL', self.enable_multiple_hosts)
+        self.disable_ssl = _disable_ssl in ['1', 'True', 'true']
+        self.port = int(get_from_conf(config, 'PORT', self.port))
 
     def get_key_file(self):
         return self.key_file
