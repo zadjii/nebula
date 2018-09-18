@@ -55,6 +55,8 @@ We'd add a `IPublicAddressProvider` that gets the public IP the remote should us
 
 ``` python
 class IPublicAddressProvider(object):
+    def configure(self, config):
+        pass
     def get_public_address(self, host):
         # type: (remote.models.Host) -> str
         """
@@ -115,7 +117,7 @@ The host looks at the values of it's privatekey and cert. Seeing that they aren'
 * [ ] Hook up the remote to a `IPublicAddressProvider`, to get public addresses on host moves. Use the `DefaultPublicAddressProvider` by default.
 * [ ] Hook up the host to look at the public address given to it by the remote
     - It might not actually need to do anything with that by default...
-* [ ] Determine how to configure the IPublicAddressProvider, such that an
+* [x] Determine how to configure the IPublicAddressProvider, such that an
       instance can pick the provider, and specify args to the provider as well.
 * [ ] Add a `DnsAddressForwarder` implementation that simply adds the IP to a configurable domain
 * [ ] Add a `IRemoteKeypairProvider` interface
