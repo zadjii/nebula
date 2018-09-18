@@ -25,7 +25,7 @@ Nebula as come quite a long way since work started on it in 2015, but there's st
 - [ ] **v0.5 Improved security (SSL/HTTPS)**
   If no one has told you yet, you should be using https. While it's relatively trivial to get a SSL cert for a domain you control, it's very hard to issue valid, trusted SSL certificates for arbitrary host computers.
   This is probably the biggest remaining hurdle for a proper nebula implentation. The remote needs to be able to authenticate the hosts and issue signed certs for them, in a way that will be trusted by any old browser, without any other system coniguration.
-  See [https-thoughts.md](./https-thoughts.md) for colleted thoughts on implementation.
+  See [https-thoughts.md](./https-thoughts.md) for collected thoughts on implementation.
 
 - [ ] **v0.6 Email Support**
   Running a mail server is definitely non-trivial, but I think it would be an absolutely perfect application of the technology. Imagine, all of the benefits of a webmail client, all while you know that your emails are safe on a device you control, and not subject to the operator being able to scan their contents.
