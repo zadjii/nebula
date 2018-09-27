@@ -18,11 +18,11 @@ We implement a `SingularKeypairProvider` that basically gives every host the sam
 For this to work in production, that cert would need to be a wildcard cert, for a domain like `*.host.starmap.io`.
 The remote is configured to use this as it's keypair provider somehow.
 
-> **TODO**: How? Via the commandline? Via a python module passed on the commadline/via a .conf file? It'd need to be configured somehow,
+> **TODO**: How? Via the commandline? Via a python module passed on the commandline/via a .conf file? It'd need to be configured somehow,
 
 I think these providers should be configured using our existing `.conf` file setup. When a host or remote is parsing the config for it's default/root settings, we should keep the config object on the instance. During the default parsing during startup (`Neb.Instance::load_conf`), we'd see if a `KEYPAIR_PROVIDER` is configured, and if it is, we'll set that up. During the provider's initialization, we'd pass the provider the config object from the instance, and it can query it's own members.
 
-``` python
+```python
 class IRemoteKeypairProvider(object):
     def configure(self, config):
         pass
@@ -53,7 +53,7 @@ In fact, having records in the DNS server for each host is probably a terrible i
 We'd add a `IPublicAddressProvider` that gets the public IP the remote should use for that host. By default, it's unimplemented, and the remote uses the host's IP as the public IP. But with the `DNSIpRegistrar`, then the the provider registers the IP with the DNS service and returns the full name for that IP. Alternatively, the `DnsAddressForwarder` can be configured with just a top-level domain (`.host.starmap.io`) and it'll prepend the IP to it and return that, no registration involved.
 `DNSIpRegistrar` would probably be a subclass of `DnsIpProvider`, but
 
-``` python
+```python
 class IPublicAddressProvider(object):
     def configure(self, config):
         pass

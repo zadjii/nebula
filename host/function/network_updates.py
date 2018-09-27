@@ -19,21 +19,17 @@ def verify_host(db, cloud_uname, cname, local_id, other_id):
     Returns either (False, error_string) or (True, matching_mirror)
     """
     rd = ResultAndData(False, None)
-    mylog('verify_host 0')
     # I'm naming this a mirror because that's what it is.
     # The other host was told to come look for a particular mirror here.
     # if that mirror isn't here, (but another mirror of that cloud is), don't
     # process this request.
     mirror = db.session.query(Cloud).filter_by(my_id_from_remote=local_id).first()
-    mylog('verify_host 1')
     if mirror is None:
         err = 'That mirror isn\'t on this host.'
         rd = ResultAndData(False, err)
-        mylog('verify_host 2')
     else:
         rd = mirror.get_remote_conn()
         if rd.success:
-            mylog('verify_host 3')
             rem_conn = rd.data
             msg = HostVerifyHostRequestMessage(local_id, other_id, cloud_uname, cname)
             try:
@@ -47,7 +43,6 @@ def verify_host(db, cloud_uname, cname, local_id, other_id):
                     rd = ResultAndData(False, 'Unknown error while attempting to verify host')
             except Exception, e:
                 rd = ResultAndData(False, e)
-    mylog('verify_host 4')
     return rd
 
 

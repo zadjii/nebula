@@ -33,6 +33,9 @@ Nebula as come quite a long way since work started on it in 2015, but there's st
 - [ ] **v0.7 Application Isolation**
   Right now, once you've logged in to a lient application, it has free reign to do whatever it wants to your cloud, including reading and writing all over the entire tree. This is obviously *not ideal*. Applications need to have permissions only over a subset of the tree, and granting an application access needs to be an explicit action by the user.
 
+- [ ] **v0.8 Remote HTTP(s) Access**
+  Currently I'm having the web client act as a wrapper for the remote socket connection, but that's dumb. The remote should just expose HTTP(s) endpoints that you can use to write client applications against. Possibly also WSS endpoints, but that seems like too much extra overhead - HTTP should be fine.
+
 After this point, the platform will be "Beta-Complete", and hopefully should only require minor bugfixes to be "feature-complete" - though I'm sure there's a long list of features I'd love to continue to add.
 
 ## Post-Alpha Roadmap
