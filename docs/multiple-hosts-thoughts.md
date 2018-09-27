@@ -17,7 +17,7 @@ They can then respond with one of three messages:
 
 ```python
 class FileChange(host_db.Model):
-  origin_timestamp: datetime
+    origin_timestamp: datetime
     relative_path: str
     change_type: {create, update, delete, move}
     is_dir: bool
