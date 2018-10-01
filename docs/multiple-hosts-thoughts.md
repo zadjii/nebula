@@ -326,7 +326,7 @@ H_b asks H_a what changes it has since t_0. It knows that it has one, since it's
 So we could have a last_all_sync member in the remote handshake, tracking the state of the most out-of-date mirror.
 When we delete a file, we mark it deleted in the DB with the timestamp t_1, and we tell the remote.
 It replies by saying that the last_all_sync was t_0.
-We purge all the deleted nodes <=t_9.
+We purge all the deleted nodes <=t_0.
 
 That seems better...
 

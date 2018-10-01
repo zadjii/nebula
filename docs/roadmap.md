@@ -48,3 +48,6 @@ After this point, the platform will be "Beta-Complete", and hopefully should onl
 
 - [ ] **v1.3 Pure HTTP access**
   Enable client applications to use HTTP verbs to access and manipulate data on the cloud. Imagine a web application being able to issue a `GET https://<cloud_url>/zadjii/home/hello_world.txt` and retrieve the file `hello_world.txt` from the cloud `zadjii/home`. This would greatly simplify a lot of web applications, allowing them to issue HTTP requests instead of using the websocket API.
+
+- [ ] **v1.4 File Opening and Locking**
+  Allow client's to "open" a file such that no other clients can make changes to the file during that duration, and other clients can be instantly notified of changes to that file. This will enable multiple users to collaboratively edit a file simultaneously.
