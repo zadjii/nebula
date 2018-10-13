@@ -1,13 +1,13 @@
 import os
 from datetime import datetime
 
-from common_util import ResultAndData, send_error_and_close, Error, Success, get_mylog
+from common_util import ResultAndData, send_error_and_close, Error, Success, get_mylog, RelativePath
 from host import Cloud
 # from host.function.network.ls_handler import list_files_handler
 from host.function.recv_files import recv_file_tree
 from host.function.send_files import send_tree
 from host.util import check_response, mylog, validate_host_id, find_deletable_children
-from messages import HostVerifyHostFailureMessage, HostVerifyHostRequestMessage
+from messages import HostVerifyHostFailureMessage, HostVerifyHostRequestMessage, InvalidStateMessage
 from msg_codes import *
 from remote.util import get_cloud_by_name
 
@@ -70,7 +70,13 @@ def handle_fetch(host_obj, connection, address, msg_obj):
     their_ip = address[0]
     _log.debug('The connected host is via IP="{}"'.format(their_ip))
 
-    send_tree(db, other_id, matching_mirror, requested_root, connection)
+    rel_path = RelativePath()
+    rd = rel_path.from_relative(requested_root)
+    if not rd.success:
+        err = InvalidStateMessage('{} is not a valid path'.format(requested_root))
+        send_error_and_close(err, connection)
+
+    send_tree(db, other_id, matching_mirror, rel_path, connection)
     _log.debug('Bottom of handle_fetch')
     _log.debug('handle_fetch 3')
 

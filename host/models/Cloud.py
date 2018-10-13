@@ -2,7 +2,7 @@ import os
 import platform
 from datetime import datetime
 
-from common_util import ResultAndData, mylog, get_free_space_bytes, INFINITE_SIZE
+from common_util import ResultAndData, mylog, get_free_space_bytes, INFINITE_SIZE, RelativePath
 from connections.RawConnection import RawConnection
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table, Boolean
 from sqlalchemy.orm import relationship, backref
@@ -71,24 +71,17 @@ class Cloud(base):
                 rd = ResultAndData(True, conn)
             else:
                 return rd
-        except Exception, e:
+        except Exception as e:
             rd = ResultAndData(False, e)
         return rd
 
-    def translate_relative_path(self, rel_path):
-        # todo make sure all paths are actually relative paths.
-        if rel_path == '/':
-            return self.root_directory
-        if rel_path[0] == '/':
-            rel_path = '.' + rel_path
-        full_path = os.path.join(self.root_directory, rel_path)
-        return full_path
-
     # we might end up needing the message
     def create_or_update_node(self, relative_path, db):
+        # type: (RelativePath, SimpleDB) -> FileNode
         curr_children = self.children
         curr_parent_node = None
-        dirs = os.path.normpath(relative_path).split(os.sep)
+        # dirs = os.path.normpath(relative_path).split(os.sep)
+        dirs = relative_path.to_elements()
         while len(dirs) > 0:
             # find the node in children if it exists, else make it
             if curr_parent_node is not None:

@@ -268,10 +268,10 @@ class HostController:
         # todo#63: In the future, have one Remote object in the host DB for each remote
         #   and handshake that remote once.
         # todo: And then update that Remote's handshake (#63?)
-        mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
-        all_mirrored_clouds = mirrored_clouds.all()
-        for cloud in all_mirrored_clouds:
-            self.send_remote_handshake(cloud)
+        mirrors = db.session.query(Cloud).filter_by(completed_mirroring=True)
+        all_mirrors = mirrors.all()
+        for mirror in all_mirrors:
+            self.send_remote_handshake(mirror)
 
         return Success()
 

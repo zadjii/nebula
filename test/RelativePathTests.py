@@ -71,12 +71,37 @@ class RelativePathTests(unittest.TestCase):
         self.assertTrue(rd.success)
         self.assertEqual('hello', rp.to_string())
 
-    def elements(self):
+    def test_elements(self):
         rp = RelativePath()
         rd = rp.from_relative('foo/bar')
         self.assertTrue(rd.success)
         dirs = get_path_elements(rp.to_string())
         self.assertEqual(['foo', 'bar'], dirs)
+
+    def test_from_absolute_basic(self):
+        rp = RelativePath()
+        rd = rp.from_absolute('/mnt/c/Users/mike/', '/mnt/c/Users/mike/docs')
+        self.assertTrue(rd.success)
+        self.assertEqual('docs', rp.to_string())
+
+        rd = rp.from_absolute('/mnt/c/Users/mike/', '/mnt/c/Users/mike/docs/foo/bar')
+        self.assertTrue(rd.success)
+        self.assertEqual('docs/foo/bar', rp.to_string())
+
+        rd = rp.from_absolute('/mnt/c/Users/mike/', '/mnt/c/Users/mike/docs/foo/bar/../..')
+        self.assertTrue(rd.success)
+        self.assertEqual('docs', rp.to_string())
+
+        rd = rp.from_absolute('/mnt/c/Users/mike/', '/mnt/c/Users/claire/docs/')
+        self.assertFalse(rd.success)
+
+        rd = rp.from_absolute('/mnt/c/Users/mike/', '/mnt/c/Users/mike/../claire')
+        self.assertFalse(rd.success)
+
+        # TODO: THis should fail
+        rd = rp.from_absolute('/mnt/c/Users/mike/', '/mnt/c/Users/claire/../mike/docs')
+        self.assertTrue(rd.success)
+
 
 
 def main():

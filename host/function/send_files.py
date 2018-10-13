@@ -4,14 +4,15 @@ from stat import S_ISDIR
 
 from datetime import datetime
 
-from common_util import Error, Success
+from common_util import Error, Success, RelativePath, ResultAndData
 from host.util import mylog
 from messages import HostFileTransferMessage
 
 __author__ = 'Mike'
 
 
-def send_tree(db, other_id, cloud, requested_root, connection):
+def send_tree(db, other_id, cloud, rel_path, connection):
+    # type: (SimpleDB, int, Cloud, RelativePath, AbstractConnection) -> None
     """
     Note: This can't be used to send a tree of files over the network
     to a mirror on the same host process. It blocks and is bad.
@@ -24,27 +25,29 @@ def send_tree(db, other_id, cloud, requested_root, connection):
     :param connection:
     :return:
     """
-    mylog('They requested the file {}'.format(requested_root))
-    # find the file on the system, get it's size.
-    requesting_all = requested_root == '/'
-    filepath = None
-    # if the root is '/', send all of the children of the root
-    if requesting_all:
-        filepath = cloud.root_directory
-    else:
-        filepath = os.path.join(cloud.root_directory, requested_root)
-    mylog('The translated request path was {}'.format(filepath))
+    # mylog('They requested the file {}'.format(requested_root))
+    # # find the file on the system, get it's size.
+    # requesting_all = requested_root == '/'
+    # filepath = None
+    # # if the root is '/', send all of the children of the root
+    # if requesting_all:
+    #     filepath = cloud.root_directory
+    # else:
+    #     filepath = os.path.join(cloud.root_directory, requested_root)
+    # mylog('The translated request path was {}'.format(rel_path.to_absolute(cloud.root_directory)))
 
-    send_file_to_other(other_id, cloud, filepath, connection)
-    complete_sending_files(other_id, cloud, filepath, connection)
+    send_file_to_other(other_id, cloud, rel_path, connection)
+    complete_sending_files(other_id, cloud, rel_path, connection)
     connection.close()
 
 
 def send_file_to_local(db, src_mirror, tgt_mirror, relative_pathname):
-    # type: (SimpleDB, Cloud, Cloud, str) -> ResultAndData
+    # type: (SimpleDB, Cloud, Cloud, RelativePath) -> ResultAndData
     rd = Error()
-    full_src_path = os.path.join(src_mirror.root_directory, relative_pathname)
-    full_tgt_path = os.path.join(tgt_mirror.root_directory, relative_pathname)
+    full_src_path = relative_pathname.to_absolute(src_mirror.root_directory)
+    full_tgt_path = relative_pathname.to_absolute(src_mirror.root_directory)
+    # full_src_path = os.path.join(src_mirror.root_directory, relative_pathname)
+    # full_tgt_path = os.path.join(tgt_mirror.root_directory, relative_pathname)
 
     src_file_stat = os.stat(full_src_path)
     src_file_is_dir = S_ISDIR(src_file_stat.st_mode)
@@ -71,41 +74,45 @@ def send_file_to_local(db, src_mirror, tgt_mirror, relative_pathname):
     return rd
 
 
-def send_file_to_other(other_id, cloud, filepath, socket_conn, recurse=True):
+def send_file_to_other(other_id, cloud, rel_path, socket_conn, recurse=True):
+    # type: (int, Cloud, RelativePath, AbstractConnection, bool) -> None
     """
     Assumes that the other host was already verified, and the cloud is non-null
     """
-    req_file_stat = os.stat(filepath)
-    relative_pathname = os.path.relpath(filepath, cloud.root_directory)
+    full_path = rel_path.to_absolute(cloud.root_directory)
+    req_file_stat = os.stat(full_path)
+    # relative_pathname = os.path.relpath(filepath, cloud.root_directory)
     # print 'relpath({}) in \'{}\' is <{}>'.format(filepath, cloud.name, relative_pathname)
 
     req_file_is_dir = S_ISDIR(req_file_stat.st_mode)
     # mylog('filepath<{}> is_dir={}'.format(filepath, req_file_is_dir))
     if req_file_is_dir:
-        if relative_pathname != '.':
+        if rel_path.to_string() != '.':
             msg = HostFileTransferMessage(
                 other_id
                 , cloud.uname()
                 , cloud.cname()
-                , relative_pathname
+                , rel_path.to_string()
                 , 0
                 , req_file_is_dir
             )
             socket_conn.send_obj(msg)
             # TODO#23: The other host should reply with FileTransferSuccessMessage
         if recurse:
-            subdirectories = os.listdir(filepath)
+            subdirectories = os.listdir(full_path)
             # mylog('Sending children of <{}>={}'.format(filepath, subdirectories))
             for f in subdirectories:
-                send_file_to_other(other_id, cloud, os.path.join(filepath, f), socket_conn)
+                child_rel_path = RelativePath()
+                child_rel_path.from_relative(os.path.join(rel_path.to_string(), f))
+                send_file_to_other(other_id, cloud, child_rel_path, socket_conn)
     else:
         req_file_size = req_file_stat.st_size
-        requested_file = open(filepath, 'rb')
+        requested_file = open(full_path, 'rb')
         msg = HostFileTransferMessage(
             other_id
             , cloud.uname()
             , cloud.cname()
-            , relative_pathname
+            , rel_path.to_string()
             , req_file_size
             , req_file_is_dir
         )
@@ -119,10 +126,10 @@ def send_file_to_other(other_id, cloud, filepath, socket_conn, recurse=True):
             #     '[{}]Sent {}B of file<{}> data'
             #     .format(cloud.my_id_from_remote, l, filepath)
             # )
-        mylog(
-            '[{}]Sent <{}> data to [{}]'
-            .format(cloud.my_id_from_remote, filepath, other_id)
-        )
+        # mylog(
+        #     '[{}]Sent <{}> data to [{}]'
+        #     .format(cloud.my_id_from_remote, full_path, other_id)
+        # )
 
         requested_file.close()
 

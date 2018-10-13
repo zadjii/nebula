@@ -333,7 +333,7 @@ def _do_mirror(instance, remote_address, remote_port, cloud_uname, cloudname, di
     if not os.path.exists(abs_root):
         try:
             os.makedirs(abs_root)
-        except Exception, e:
+        except Exception as e:
             return Error('Failed to create the directory {}'.format(abs_root))
     elif not os.path.isdir(abs_root):
         return Error('target ({}) should be a directory'.format(real_root))

@@ -203,6 +203,7 @@ def send_error_and_close(message, connection):
 
 
 def get_path_elements(filepath):
+    # type: (str) -> [str]
     drive, path = os.path.splitdrive(filepath)
     # note: Don't do these two.
     # path, ext = os.path.splitext(path)
@@ -286,7 +287,7 @@ class RelativePath(object):
             working = os.path.join('/', working)
         try:
             working = os.path.relpath(working, os.path.normpath('/'))
-        except ValueError, e:
+        except ValueError as e:
             return Error(e.message)
         working = posixpath.normpath(working)
 
@@ -299,11 +300,29 @@ class RelativePath(object):
         is_child = working == '.' or os.path.abspath(working).startswith(os.path.abspath('.')+os.sep)
         return ResultAndData(is_child, None)
 
+    def from_absolute(self, root, full_path):
+        # type: (str, str) -> ResultAndData
+        dirpath = posixpath.normpath(root)
+        childpath = posixpath.normpath(full_path)
+        # print(dirpath)
+        # print(childpath)
+        self._path = os.path.relpath(childpath, dirpath)
+        # print(self._path)
+        rd = ResultAndData(childpath.startswith(dirpath), None)
+        if rd.success:
+            rd = self.from_relative(self._path)
+            # print(self._path)
+        return rd
+
     def to_string(self):
         return self._path
 
     def to_absolute(self, root):
         return os.path.join(root, self._path)
+
+    def to_elements(self):
+        # type: () -> [str]
+        return os.path.split(self._path)
 
 
 class RelativeLink(object):

@@ -47,7 +47,7 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
         #   We DO want to tell other mirrors about this change, so don't change the DB>
         #   The local thread will find the change and alert the other mirrors.
         # if not is_client:
-        updated_node = cloud.create_or_update_node(rel_path.to_string(), db)
+        updated_node = cloud.create_or_update_node(rel_path, db)
         if updated_node is not None:
             old_modified_on = updated_node.last_modified
             updated_node.last_modified = datetime.utcfromtimestamp(os.path.getmtime(full_path))

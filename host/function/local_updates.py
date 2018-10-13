@@ -85,20 +85,26 @@ def update_peer(host_obj, db, cloud, host, updates):
 
     for update in updates:
         file_path = update[1]
-        relative_pathname = os.path.relpath(file_path, cloud.root_directory)
+        rel_path = RelativePath()
+        rd = rel_path.from_absolute(cloud.root_directory, file_path)
+        if not rd.success:
+            # We found an update that isn't actually under the mirror's root.
+            # TODO: log an error?
+            continue
+
         if update[0] == FILE_CREATE or update[0] == FILE_UPDATE:
             if local_peer:
-                send_file_to_local(db, cloud, matching_local_mirror, relative_pathname)
+                send_file_to_local(db, cloud, matching_local_mirror, rel_path)
             else:
                 send_file_to_other(
                     host_id
                     , cloud
-                    , os.path.join(cloud.root_directory, relative_pathname)
+                    , rel_path
                     , raw_connection
                     , recurse=False)
 
         elif update[0] == FILE_DELETE:
-            msg = RemoveFileMessage(host_id, cloud.uname(), cloud.cname(), relative_pathname)
+            msg = RemoveFileMessage(host_id, cloud.uname(), cloud.cname(), rel_path.to_string())
             if local_peer:
                 handle_remove_file(host_obj, msg, matching_local_mirror, raw_connection, db)
                 mylog('LOCALLY deleted', '32')
