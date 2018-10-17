@@ -1,3 +1,4 @@
+import ConfigParser
 import os
 import imp
 import thread
@@ -82,6 +83,7 @@ class Instance(object):
         self._conf_file_name = None
         self._db_map = {}
         self._pid_name = None
+        self._config = None
 
     def get_instance_name(self):
         return os.path.split(self._working_dir)[1]
