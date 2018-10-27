@@ -62,7 +62,7 @@ def send_file_to_local(db, src_mirror, tgt_mirror, relative_pathname):
         rd = Error(e)
 
     if rd.success:
-        updated_node = tgt_mirror.create_or_update_node(relative_pathname, db)
+        updated_node = tgt_mirror.make_tree(relative_pathname, db)
         if updated_node is not None:
             old_modified_on = updated_node.last_modified
             updated_node.last_modified = datetime.utcfromtimestamp(os.path.getmtime(full_tgt_path))

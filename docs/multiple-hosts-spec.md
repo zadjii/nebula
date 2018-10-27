@@ -96,20 +96,22 @@ add it to our runtime list of changes to be sync'd.
 - [H] When we wake up,
   Determine if we have any changes:
   `changes = [f for f in mirror.files if f.last_modified>f.last_sync]`.
-  If we do, then out last_updates is the greatest of those last_modified timestamps.
+  If we do, then our last_updates is the greatest of those last_modified timestamps.
+  If we don't have any changes, we're still going to handshake the remote. It's possible it's been 30s since our last handshake.
+  In this case, new_updates will be None.
+  If we haven't ever synced, then last_sync will be None.
 
-    - [H] Handshake the remote `HostHandshake(last_update=t_0, last_updates=t_2)`
+    - [H] Handshake the remote `HostHandshake(last_sync=t_0, new_updates=t_2)`
         - [R] Recieve a HostHandshake.
-          Their last_sync was t_0.
-          Their last_update was t_2.
+          Their last_sync was t_0. (possibly None)
+          Their last_update was t_2. (possibly None)
           The cloud's last_update is t_1.
           The current time is t_3.
           The mirror for this cloud with the oldest last_sync is t_4.
 
-        - [R] `if (t_0 < t_1):` Their last_sync was before the last_update for
+        - [R] `if (t_0 is None or t_0 < t_1):` Their last_sync was before the last_update for
           the cloud. They are out of date and need to sync updates.
             - [R] Reply to the host with a list of hosts it can sync with
-              <!-- `RemoteHandshake(last_sync=t_0, sync_end=t_1, hosts=[hosts])` -->
               `RemoteHandshake(sync_end=t_1, hosts=[hosts])`
                 - [H] Using my last_sync time (t_0), and the remote's response
                   (sync_end(=t_1) is not None),
@@ -132,11 +134,6 @@ add it to our runtime list of changes to be sync'd.
                                 - if we ack,
                                   `(file.last_sync == proposed.last_sync)`
                                   We have whatever change they're talking about. ACK.
-                                  <!-- Actually maybe not that weird of a state.
-                                  We could have gotten that file from another host earlier in the syncing process.
-                                  We'll need to compare the sync timestamps. If the file's last_sync is less than the
-                                  Possibly we have a change at the exact same time as the other? **TODO**
-                                    - This does seem improbable, but not impossible. I'd think that as a policy, in the case of an ack, we'd instead accespt the other host's change. The other host is more up-to-date with the remote, so it's possible there are other hosts that also have H_i's state. -->
                                 - if weird case: `(file.last_sync > proposed.last_sync)`:
                                   Reject. Our version is newer than the other's.
                                   The other should know that... *TODO?*
@@ -155,25 +152,21 @@ add it to our runtime list of changes to be sync'd.
 
         - [R] `elif (t_0 == t_1):` Their last_sync is the cloud's last_sync.
           (The host's response to these messages is detailed below.)
-            - [R] `if (t_2 > t_1):`
+            - [R] `if (t_2 is None or t_2 == t_1):`
+                - [R] This is fine. Their last update was at the last sync time,
+                  or they have no updates.
+                  reply `RemoteHandshake(new_sync=t_2, last_all_sync=t_4)`
+            - [R] `elif (t_2 > t_1):`
                 - [R] This host has a new update.
                   Mark the others as out-of-date.
-                  Set the clouds last_update to t_2.
-                  <!-- Reply `RemoteHandshake(last_sync=t_1, new_sync=t_2, hosts=[hosts])` -->
-                  Reply `RemoteHandshake(new_sync=t_2, last_all_sync=t4, hosts=[hosts])`
-            - [R] `elif (t_2 == t_1):`
-                - [R] This is fine. Their last update was at the last sync time.
-                  <!-- recall that here t_0==t_1==t_2 -->
-                  <!-- reply `RemoteHandshake(last_sync=t_1, new_sync=t_2)` -->
-                  reply `RemoteHandshake(new_sync=t_2, last_all_sync=t4)`
+                  Set the cloud's last_update to t_2.
+                  Reply `RemoteHandshake(new_sync=t_2, last_all_sync=t_4, hosts=[hosts])`
             - [R] `elif (t_2 < t_1):`
                 - [R] This host has updates from before our current latest sync,
                   but we're tracking them with a new sync timestamp, t_3.
                   Mark the others as out-of-date.
                   Set the clouds last_update to t_3.
-                  <!-- Reply `RemoteHandshake(last_sync=t_1, new_sync=t_3, hosts=[hosts])` -->
-                  Reply `RemoteHandshake(new_sync=t_3, last_all_sync=t4, hosts=[hosts])`
-
+                  Reply `RemoteHandshake(new_sync=t_3, last_all_sync=t_4, hosts=[hosts])`
 
         - [R] `elif (t_0 > t_1):` Their last_sync is after the cloud's last_sync
             - [R] This is definitely an error. The host can't have possibly synced at a later time than what we have. Log an error, and reply with an error message.
@@ -197,6 +190,8 @@ add it to our runtime list of changes to be sync'd.
                 - [H] Send the file data.
             - [H] if (reject)
                 - [H] *TODO* Nothing? do we instead recieve the other hosts view of the file?
+                  They have changes that are newer or unsynced since our change.
+                  They'll eventually handshake the remote, and be told to send the update to us.
             - [H] if (acknowledge)
                 - [H] Nothing, they already have this change.
 
@@ -251,24 +246,41 @@ With only one of the two of `sync_end` or `new_sync` timestamps being set.
 
 
 ## To-Do
-- [ ] Add a last_sync to the `FileNode`s in a cloud
-- [ ] Add fields to `FileNode` to be able to
-    - [ ] mark as deleted
-    - [ ] mark as moved
-- [ ] Add a last_sync to the host.models.Mirror
-- [ ] Add a last_sync to the remote.models.Cloud
-- [ ] Spec messages
-    - [ ] `HostHandshakeMessage`
-    - [ ] `RemoteHandshakeMessage`
-    - [ ] `FileSyncRequest`
-    - [ ] `FileSyncProposal`
-    - [ ] `FileSyncComplete`
-- [ ] msg_blueprints for messages
+- [x] Add a last_sync to the `FileNode`s in a cloud
+- [x] Add fields to `FileNode` to be able to
+    - [x] mark as deleted
+    - [x] mark as moved
+- [x] Add a last_sync() to the host.models.Cloud (The host mirror model)
+    - [x] Does the mirror need to have a separate last_sync timestamp? or can it derive it from the latest last_sync of all it's children?
+        - It can derive it I believe
+    - [x]  Does the remote.Mirror AND remote.Cloud need a last_sync? or can it be figured out?
+<!-- - [ ] Add a last_sync to the remote.models.Mirror -->
+- [x] Rename the remote.mirror's last_update to last_sync
+- [x] Add a last_sync_time() to the remote.models.Cloud
+- [ ] host.models.Cloud needs a `last_modified()` function to find the newest modification to a child, or None if none have been modified after their last_sync
+- [x] msg_blueprints for messages
+    - [x] `HostHandshakeMessage` needs extra members, last_sync and new_updates
+    - [x] `RemoteHandshakeMessage`
+    - [x] `FileSyncRequest`
+    - [x] `FileSyncProposal`
+    - [x] `FileSyncComplete`
 - [ ] watchdog makes modifications straight to db, then notifies main thread
+    <!-- - This actually doesn't seem right - what if the main thread
+      Nevermind, the watchdog thread owns the lock when it notices a change. Disregard that. -->
     - [ ] Adds files to db when created
     - [ ] Marks files as modified when they change
     - [ ] Marks files as deleted when they are deleted
     - [ ] Creates a new filenode, and marks the old one moved when a file is moved.
+- [ ] Update Host to be able to handle a `FileChangeProposal` Message
+    - [ ] Verify the other host with the remote
+    - [ ] ack their change
+    - [ ] reject their change
+    - [ ] accept their change (FileChangeResponse, followed by (HOST_FILE_TRANSFER, file_data))
+    - [ ] modify our DB appropriately to match their change
+        - [ ] Creates
+        - [ ] modifies
+        - [ ] deletes
+        - [ ] moves
 - [ ] Host deletes filenodes that have been deleted before last_all_handshake
 - [ ] rewrite host to use proposed change method
     - [ ] calculate pending changes from the files with modifications since our last sync.
@@ -280,7 +292,6 @@ With only one of the two of `sync_end` or `new_sync` timestamps being set.
     - [ ] Remote can tell the host it's up to data
     - [ ] Remote can tell the host it's up to data and should send updates
     - [ ] Remote can tell the host when others last_sync'd
-- [ ] Update Host to be able to handle a `FileChangeProposal` Message
 - [ ] Update the host to be able to handle a `FileSyncRequest`
     - [ ] Generate all the `FileChangeProposals` between sync_start and sync_end
     - [ ] send them to the other host, reusing the code above

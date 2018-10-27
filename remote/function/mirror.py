@@ -130,7 +130,6 @@ def client_mirror(remote_obj, connection, address, msg_obj):
         connection.close()
         return
 
-    # match = db.session.query(Cloud).filter_by(name=cloudname).first()
     match = creator.created_clouds.filter_by(name=cloudname).first()
     if match is None:
         msg = 'No cloud with name {}'.format(full_name)
@@ -150,9 +149,6 @@ def client_mirror(remote_obj, connection, address, msg_obj):
     user = session.user
     cloud_user = match.owners.filter_by(username=user.username).first()
     if cloud_user is None:
-        # send_generic_error_and_close(connection)
-        # print [owner.username for owner in match.owners.all()]
-        # raise Exception(user.name + ' is not an owner of ' + cloudname)
         msg = '{} is not an owner of {}'.format(user.username, full_name)
         resp = MirrorFailureMessage(msg)
         connection.send_obj(resp)
@@ -178,10 +174,8 @@ def respond_to_mirror_request(db, connection, address, new_host, cloud):
 
     has_other_host = len(cloud.active_hosts()) > 0
 
-    new_mirror = Mirror()
+    new_mirror = Mirror(cloud=cloud, host=new_host)
     db.session.add(new_mirror)
-    cloud.mirrors.append(new_mirror)
-    new_host.mirrors.append(new_mirror)
     db.session.commit()
 
     rand_mirror = None

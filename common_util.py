@@ -322,7 +322,26 @@ class RelativePath(object):
 
     def to_elements(self):
         # type: () -> [str]
-        return os.path.split(self._path)
+        working_path = self._path
+        dirs = []
+        while True:
+            head, tail = os.path.split(working_path)
+            if tail != '':
+                dirs.append(tail)
+            else:
+                if head != '':
+                    dirs.append(head)
+                break
+            working_path= head
+        dirs.reverse()
+        return dirs
+
+    def is_root(self):
+        # type: () -> bool
+        """
+        Returns true if this RelativePath represents the root directory the path is relative to.
+        """
+        return self._path == '.'
 
 
 class RelativeLink(object):

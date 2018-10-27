@@ -238,7 +238,7 @@ def local_file_delete(host_obj, directory_path, dir_node, filename, filenode, db
     # recursive_child_delete(db, filenode)
 
     # fortunately, filenode isn't ever the root of the cloud, so delete it too.
-    _log.debug('Deleting file node {} ({})'.format(filenode.name, filenode.full_path()))
+    _log.debug('Deleting file node {} ({})'.format(filenode.name, filenode.relative_path()))
     db.session.delete(filenode)
 
     # The .nebs also needs to be updated.

@@ -343,11 +343,8 @@ def _do_mirror(instance, remote_address, remote_port, cloud_uname, cloudname, di
     _log.debug('attempting to get cloud named "{}" from remote at [{}]:{} into '
                'root directory <{}>'.format(cloudname, remote_address, remote_port, abs_root))
 
-    cloud = Cloud()
-    cloud.mirrored_on = datetime.utcnow()
-    cloud.name = cloudname
-    cloud.username = cloud_uname
-    cloud.root_directory = abs_root
+    cloud = Cloud(cloud_uname, cloudname, abs_root)
+
     # At this point, the cloud is not yet in the DB.
     rd = Error()
     db = instance.get_db()

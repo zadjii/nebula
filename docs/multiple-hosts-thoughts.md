@@ -540,3 +540,7 @@ With only one of the two timestamps being set.
 any files that have a modification after their last sync timestamp
 
 okay that's not much of an algorithim but that's it.
+
+Is that it? Sure seems like it.
+
+Does the mirror need to have a separate last_sync timestamp? or can it derive it from the latest last_sync of all it's children? *TODO*

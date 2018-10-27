@@ -2,6 +2,7 @@ import os
 import platform
 from datetime import datetime
 
+from common.SimpleDB import SimpleDB
 from common_util import ResultAndData, mylog, get_free_space_bytes, INFINITE_SIZE, RelativePath
 from connections.RawConnection import RawConnection
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table, Boolean
@@ -21,16 +22,12 @@ class Cloud(base):
     """
     id = Column(Integer, primary_key=True)
     remote_id = Column(ForeignKey('remote.id'))
-
     name = Column(String)  # cloudname
     username = Column(String)  # uname
     my_id_from_remote = Column(Integer)
     created_on = Column(DateTime)
     mirrored_on = Column(DateTime)
-
-    last_update = Column(DateTime)
     max_size = Column(Integer)  # Cloud size in bytes
-
     root_directory = Column(String)
 
     # If you find yourself setting the cloud value of a FileNode, you're
@@ -47,6 +44,13 @@ class Cloud(base):
     # todo this needs to be a many-many, sessions have lots of clouds, clouds
     # cont have lots of sessions.
     clients = relationship('Client', backref='cloud', lazy='dynamic')
+
+    def __init__(self, uname, cname, root_dir):
+        # type: (str, str, str) -> None
+        self.mirrored_on = datetime.utcnow()
+        self.username = uname
+        self.name = cname
+        self.root_directory = root_dir
 
     def full_name(self):
         return '{}/{}'.format(self.uname(), self.cname())
@@ -75,35 +79,39 @@ class Cloud(base):
             rd = ResultAndData(False, e)
         return rd
 
-    # we might end up needing the message
-    def create_or_update_node(self, relative_path, db):
+    def make_tree(self, relative_path, db):
         # type: (RelativePath, SimpleDB) -> FileNode
+        node, new_nodes = self._make_tree_get_all(relative_path, db)
+        return node
+
+    def _make_tree_get_all(self, relative_path, db):
+        # type: (RelativePath, SimpleDB) -> (FileNode, [FileNode])
+        """
+        Either retreives the existing FileNode corresponding to the given path,
+        or creates the tree for the given path.
+        return: the FileNode for the given relative_path
+                and any new nodes we created
+        """
         curr_children = self.children
         curr_parent_node = None
-        # dirs = os.path.normpath(relative_path).split(os.sep)
         dirs = relative_path.to_elements()
+        new_nodes = []
         while len(dirs) > 0:
             # find the node in children if it exists, else make it
-            if curr_parent_node is not None:
-                child = curr_children.filter_by(name=dirs[0]).first()
-            else:
-                child = self.children.filter_by(name=dirs[0]).first()
+            child = curr_children.filter_by(name=dirs[0]).first()
             if child is None:
-                child = FileNode()
-                child.name = dirs[0]
-                child.created_on = datetime.utcnow()
-                child.last_modified = child.created_on
+                child = FileNode(dirs[0])
                 db.session.add(child)
                 if curr_parent_node is not None:
                     curr_parent_node.children.append(child)
                 else:
                     self.children.append(child)
-                db.session.commit()
+                new_nodes.append(child)
             curr_parent_node = child
             curr_children = child.children
             dirs.pop(0)
         # at this point, the curr_parent_node is the node that is the file we created
-        return curr_parent_node
+        return curr_parent_node, new_nodes
 
     def get_child_node(self, relative_path):
         # type: (str) -> Any(Cloud, FileNode)
@@ -163,6 +171,53 @@ class Cloud(base):
 
     def get_my_id_from_remote(self):
         return self.my_id_from_remote
+
+    def all_children(self):
+        # type: () -> [FileNode]
+        return self.children.all()
+
+    def last_sync(self):
+        # type: () -> datetime
+        """
+        Determines the last_sync timestamp of this cloud, by looking for the
+        newest last_sync of our children.
+        This can return None if we have no children, or if we only have children
+            that haven't yet been synced.
+        :return:
+        """
+        newest = None
+        for child in self.all_children():
+            child_last_recursive = child.last_sync_recursive()
+            if newest is None or child_last_recursive > newest:
+                newest = child_last_recursive
+        return newest
+
+    def last_modified(self):
+        # type: () -> datetime
+        """
+        Returns the last_modified timestamp of this cloud, by looking for the
+        newest modified child of all it's children
+        """
+        newest = None
+        for child in self.children.all():
+            child_recursive = child.last_modified_recursive()
+            if newest is None or child_recursive > newest:
+                newest = child_recursive
+        return newest
+
+    def modified_since_last_sync(self):
+        # type () -> [FileNode]
+        """
+        Returns all child nodes that have been modified since they were last sync'd.
+        If everyone's most recent state has been sync'd, then this returns an empty list.
+        If a node was added, then it should be in this list (it's last_sync will be None)
+        :return:
+        """
+        nodes = []
+        for child in self.children.all():
+            child_unsynced = child.unsynced_children_inclusive()
+            nodes.extend(child_unsynced)
+        return nodes
 
 
 

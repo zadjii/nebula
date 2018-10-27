@@ -4,9 +4,6 @@ import unittest
 from host import models
 from common.SimpleDB import SimpleDB
 from common_util import RelativePath, get_path_elements
-from host.models.Remote import *
-from host.models.Cloud import *
-from host.models.FileNode import *
 
 
 class HostDbTestBase(unittest.TestCase):

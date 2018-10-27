@@ -18,13 +18,21 @@ class Mirror(base):
     id = Column(Integer, primary_key=True)
     cloud_id = Column(ForeignKey('cloud.id'))
     host_id = Column(ForeignKey('host.id'))
-    last_update = Column(DateTime)
+    created_on = Column(DateTime)
+    last_sync = Column(DateTime)
     last_handshake = Column(DateTime)
     curr_size = Column(Integer)  # Cloud size in bytes
     remaining_size = Column(Integer)  # remaining free space on host (in bytes)
 
     client_mappings = relationship('ClientCloudHostMapping', backref='mirror', lazy='dynamic')
     completed_mirroring = Column(Boolean)
+
+    def __init__(self, cloud, host):
+        # type: (Cloud, Host) -> None
+        self.created_on = datetime.utcnow()
+        self.cloud_id = cloud.id
+        self.last_sync = cloud.created_on
+        self.host_id = host.id
 
     def is_active(self):
         if not self.completed_mirroring:
@@ -50,7 +58,7 @@ class Mirror(base):
             , 'ws_port': self.host.ws_port
             , 'hostname': self.host.hostname
             , 'remaining_size': self.remaining_size
-            , 'last_update': (self.last_update.isoformat() + 'Z') if self.last_update else None
+            , 'last_sync': (self.last_sync.isoformat() + 'Z') if self.last_sync else None
             , 'last_handshake': (self.last_handshake.isoformat() + 'Z') if self.last_handshake else None
         }
         return self_dict

@@ -56,7 +56,6 @@ class Cloud(base):
         , backref=backref('contributed_clouds', lazy='dynamic')
         , lazy='dynamic'
         )
-    # hosts = relationship('Host', backref='cloud', lazy='dynamic')
     mirrors = relationship('Mirror', backref='cloud', lazy='dynamic')
     last_update = Column(DateTime)
     max_size = Column(Integer, default=INFINITE_SIZE)  # Cloud size in bytes
@@ -76,7 +75,6 @@ class Cloud(base):
         self.max_size = -1
 
     def is_hidden(self):
-        # return self.privacy == HIDDEN_CLOUD
         # The cloud has been shared with no one.
         return self.contributors.count() == 0 and self.privacy == PRIVATE_CLOUD
 
@@ -125,11 +123,7 @@ class Cloud(base):
         return self.mirrors.all()
 
     def creator_name(self):
-        # todo/fixme: this is temporary until I add uname properly to the DB
-        # first_owner = self.owners.first()
-        # if first_owner is not None:
-        #     return first_owner.username
-        # return None
+        # type: () -> str
         return self.uname()
 
     def uname(self):
@@ -196,3 +190,34 @@ class Cloud(base):
             }
             mirror_dicts.append(mirror_obj)
         return mirror_dicts
+
+    def last_sync_time(self):
+        # type: () -> datetime
+        """
+        Returns the newest of the cloud's mirrors last_sync times. Any mirrors
+            with the newest sync time are up-to-date
+        if the returned value is self.created_on, then no hosts have had new
+            syncs since the cloud's creation
+        """
+        newest_sync_time, _ = self.last_sync_and_mirrors()
+        return newest_sync_time
+
+    def up_to_date_mirrors(self):
+        # type: () -> [Mirror]
+        _, up_to_date_mirrors = self.last_sync_and_mirrors()
+        return up_to_date_mirrors
+
+    def last_sync_and_mirrors(self):
+        # type: () -> (datetime, [Mirror])
+        newest_sync_time = self.created_on
+        up_to_date_mirrors = []
+        # todo: use a sql query to sort the mirrors by last_sync, then get the newest one
+        for mirror in self.mirrors.all():
+            mirror_last_sync = mirror.last_sync()
+            if newest_sync_time is None or mirror_last_sync > newest_sync_time:
+                newest_sync_time = mirror_last_sync
+                up_to_date_mirrors = []
+            if mirror_last_sync == newest_sync_time:
+                up_to_date_mirrors.append(mirror)
+        return newest_sync_time, up_to_date_mirrors
+
