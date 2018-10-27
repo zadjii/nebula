@@ -11,7 +11,7 @@ from common_util import ResultAndData, Error, Success, INSTANCES_ROOT, mylog
 
 class NebsInstance(Instance):
 
-    def __init__(self, working_dir=None):
+    def __init__(self, working_dir=None, unittesting=False):
         """
         Creates a instance of nebs.
         Attempts to use nebs.conf in the working dir to initialize
@@ -21,7 +21,7 @@ class NebsInstance(Instance):
         """
         if working_dir is None:
             working_dir = '{}/host/default'.format(INSTANCES_ROOT)
-        super(NebsInstance, self).__init__(working_dir)
+        super(NebsInstance, self).__init__(working_dir, unittesting)
 
         self.host_host = ''
         self.host_ws_host = '127.0.0.1'
@@ -37,7 +37,7 @@ class NebsInstance(Instance):
 
         self.local_debug = False
 
-        self._db_name = 'host.db'
+        self._db_name = 'host.db' if not self._unittesting else ''
         self._db_models = models.nebs_base
         self._conf_file_name = 'nebs.conf'
         self._port_file_name = 'nebs.port'

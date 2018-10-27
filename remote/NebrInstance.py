@@ -9,7 +9,7 @@ from common.SimpleDB import SimpleDB
 from common_util import ResultAndData, Error, Success, INSTANCES_ROOT, get_mylog
 
 class NebrInstance(Instance):
-    def __init__(self, working_dir=None):
+    def __init__(self, working_dir=None, unittesting=False):
         """
         Creates a instance of nebr.
         Attempts to use nebr.conf in the working dir to initialize
@@ -19,7 +19,7 @@ class NebrInstance(Instance):
         """
         if working_dir is None:
             working_dir = '{}/remote/default'.format(INSTANCES_ROOT)
-        super(NebrInstance, self).__init__(working_dir)
+        super(NebrInstance, self).__init__(working_dir, unittesting)
 
         self.key_file = os.path.join(working_dir, './remote.ca.key')
         self.cert_file = os.path.join(working_dir, './remote.ca.chain.crt')
@@ -27,7 +27,7 @@ class NebrInstance(Instance):
         self.disable_ssl = False
         self.port = 12345
 
-        self._db_name = 'remote.db'
+        self._db_name = 'remote.db' if not self._unittesting else ''
         self._db_models = models.nebr_base
         self._conf_file_name = 'nebr.conf'
         self._pid_name = 'nebr'

@@ -64,7 +64,7 @@ class Instance(object):
             working_dir = os.path.join('{}/{}/'.format(INSTANCES_ROOT, instance_type), args.instance)
         return working_dir
 
-    def __init__(self, working_dir=None):
+    def __init__(self, working_dir=None, unittesting=False):
         """
         Creates a instance of nebs.
         Attempts to use nebs.conf in the working dir to initialize
@@ -84,6 +84,7 @@ class Instance(object):
         self._db_map = {}
         self._pid_name = None
         self._config = None
+        self._unittesting = unittesting
 
     def get_instance_name(self):
         return os.path.split(self._working_dir)[1]
@@ -99,21 +100,32 @@ class Instance(object):
         3. creates the db if it doesn't exist
         """
         # 1.
-        exists = os.path.exists(self._working_dir)
-        if not exists:
-            os.makedirs(self._working_dir)
-        else:
-            # 2.
-            self.load_conf()
+        if not self._unittesting:
+            exists = os.path.exists(self._working_dir)
+            if not exists:
+                os.makedirs(self._working_dir)
+            else:
+                # 2.
+                self.load_conf()
 
         # 3.
-        exists = os.path.exists(self._db_path())
+        doesnt_exist = self._unittesting or not os.path.exists(self._db_path())
         self._db = self.make_db_session()
         self._db.engine.echo = False
-        if not exists:
-            self._db.create_all_and_repo(self._db_migrate_repo())
-            _log.debug('The database ({}) should have been created here'.format(self._db_path()))
-            _log.debug('The migration repo should have been created here')
+        if doesnt_exist:
+            if self._unittesting:
+                # Don't create the database here:
+                # For whatever reason, if you create the database here, (during TestCase.setUp),
+                # then try to access it later, (using HostController.get_instance().get_db()), its
+                # as if the DB doesn't exist at all. I don't know why, I feel like it should work.
+                # In unittests, you should make sure to create the DB manually.
+                # see HostControllerTests.
+                # self._db.create_all()
+                _log.debug('The database should have already been created manually for unittesting.')
+            else:
+                self._db.create_all_and_repo(self._db_migrate_repo())
+                _log.debug('The database ({}) should have been created here'.format(self._db_path()))
+                _log.debug('The migration repo should have been created here')
 
     def _parse_config(self, config=None):
         """
@@ -135,7 +147,8 @@ class Instance(object):
         self._parse_config()
 
     def _db_uri(self):
-        return 'sqlite:///' + self._db_path()
+        # type: () -> str
+        return 'sqlite:///' + ('' if self._unittesting else self._db_path())
 
     def _db_migrate_repo(self):
         return os.path.join(self._working_dir, 'db_repository')
@@ -150,6 +163,7 @@ class Instance(object):
         return self._db_map[thread_id]
 
     def make_db_session(self):
+        # type: () -> SimpleDB
         db = SimpleDB(self._db_uri(), self._db_models)
         db.engine.echo = False
         return db

@@ -41,7 +41,6 @@ __author__ = 'Mike'
 class HostController:
     def __init__(self, nebs_instance):
         # type: (NebsInstance) -> None
-
         self.active_net_thread_obj = None
         self.active_network_thread = None
         self.active_ws_thread = None
@@ -49,20 +48,18 @@ class HostController:
         self._shutdown_requested = False
         self._local_update_thread = None
         self._private_data = {}  # cloud.my_id_from_remote -> PrivateData mapping
-        # self._private_data = collections.MutableMapping()
         self.network_signal = Event()
-        # self.network_signal = Semaphore()
         self._io_lock = Lock()
         self.watchdog_worker = WatchdogWorker(self)
         self._nebs_instance = nebs_instance
         self._network_controller = None
-        # if we've failed to send to the network, then we'll set this to false.
+        # if we've failed to send to the network, then set _is_online to false.
         #   Next time we've handshaken the remotes, we'll set this back to true.
         self._is_online = True
         self._client_log = get_mylog()
 
     def start(self, force_kill=False, access_log=None):
-        # type: (bool, srt) -> None
+        # type: (bool, str) -> None
         _log = get_mylog()
         set_mylog_name('nebs')
 
@@ -100,19 +97,6 @@ class HostController:
 
         if rd.success:
             self.update_network_status()
-            # rd = self._network_controller.refresh_external_ip()
-            # if rd.success:
-            #     connected = rd.data
-            #     if connected:
-            #         self.spawn_net_thread()
-            #         break here
-            #         # FIXME:
-            #         # The host needs to tell all the remotes that it's online here
-            #
-            # else:
-            #     err_msg = rd.data
-            #     _log.error(err_msg)
-
             try:
                 self.do_local_updates()
             finally:
@@ -316,7 +300,7 @@ class HostController:
             remote_conn.send_obj(msg)
             # todo#65: implement REM_HANDSHAKE_GO_FETCH
             # response = remote_conn.recv_obj()
-        except gaierror, e:
+        except gaierror as e:
             mylog('Failed to connect to remote')
             mylog('likely a network failure.')
             mylog('Even more likely, network disconnected.')
@@ -534,7 +518,7 @@ class HostController:
     def filter_func(self, connection, address):
         try:
             msg_obj = connection.recv_obj()
-        except Exception, e:
+        except Exception as e:
             mylog('ERROR: nebs failed to decode a connection from ({})'.format(address), '31')
             connection.close()
             return
@@ -690,31 +674,12 @@ class HostController:
 
     def acquire_lock(self):
         self._io_lock.acquire()
-        # frameinfo = getframeinfo(currentframe().f_back)
-        # caller = getframeinfo(currentframe().f_back.f_back)
-        # mylog('Locking - {}/{}:{}'.format(
-        #     os.path.basename(caller.filename)
-        #     , os.path.basename(frameinfo.filename)
-        #     , frameinfo.lineno))
 
     def release_lock(self):
         self._io_lock.release()
-        # frameinfo = getframeinfo(currentframe().f_back)
-        # caller = getframeinfo(currentframe().f_back.f_back)
-        # mylog('Unlocking - {}/{}:{}'.format(
-        #     os.path.basename(caller.filename)
-        #     , os.path.basename(frameinfo.filename)
-        #     , frameinfo.lineno))
 
     def signal(self):
         self.network_signal.set()
-        # frameinfo = getframeinfo(currentframe().f_back)
-        # caller = getframeinfo(currentframe().f_back.f_back)
-        # mylog('Signaling Host - {}/{}:{}'.format(
-        #     os.path.basename(caller.filename)
-        #     , os.path.basename(frameinfo.filename)
-        #     , frameinfo.lineno))
-        # self.network_signal.release()
 
     def get_instance(self):
         # type: () -> NebsInstance
@@ -773,3 +738,33 @@ class HostController:
         _log.addHandler(hdlr)
         _log.propagate = False
         self._client_log = _log
+
+    def _find_mirror_for_file(self, full_path):
+        # type: (str) -> Cloud
+        db = self.get_db()
+        all_clouds = db.session.query(Cloud).all()
+        for c in all_clouds:
+            norm_root = os.path.normpath(c.root_directory + os.sep)
+            norm_path = os.path.normpath(full_path)
+            if norm_path.startswith(norm_root):
+                return c
+        return None
+
+    def local_create_file(self, path):
+        # type: (str) -> ResultAndData
+        cloud = self._find_mirror_for_file(path)
+        if cloud is None:
+            # we noticed a file creation for a path that isn't under an existing
+            #   cloud. We should just ignore this.
+            return Success()
+        pass
+
+    def local_modify_file(self, path):
+        # type: (str) -> ResultAndData
+        pass
+    def local_delete_file(self, path):
+        # type: (str) -> ResultAndData
+        pass
+    def local_move_file(self, src_path, target_path):
+        # type: (str, str) -> ResultAndData
+        pass

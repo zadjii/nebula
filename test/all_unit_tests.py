@@ -5,6 +5,7 @@ from RelativePathTests import RelativePathTests
 from CommandLineTests import CommandLineTests
 from MessageDeserializerTests import MessageDeserializerTests
 from HostMirrorTests import HostMirrorTests
+from HostControllerTests import HostControllerTests
 
 def main():
     unittest.main()

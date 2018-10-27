@@ -304,14 +304,10 @@ class RelativePath(object):
         # type: (str, str) -> ResultAndData
         dirpath = posixpath.normpath(root)
         childpath = posixpath.normpath(full_path)
-        # print(dirpath)
-        # print(childpath)
         self._path = os.path.relpath(childpath, dirpath)
-        # print(self._path)
         rd = ResultAndData(childpath.startswith(dirpath), None)
         if rd.success:
             rd = self.from_relative(self._path)
-            # print(self._path)
         return rd
 
     def to_string(self):

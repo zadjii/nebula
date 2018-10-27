@@ -326,6 +326,7 @@ class HostMirrorTests(HostDbTestBase):
         self.assertEqual(1, len(modified))
         self.assertEqual(two.id, modified[0].id)
 
+
 def main():
     unittest.main()
 
