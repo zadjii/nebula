@@ -310,6 +310,14 @@ class RelativePath(object):
             rd = self.from_relative(self._path)
         return rd
 
+
+    @staticmethod
+    def make_relative(relative_path_string):
+        # type: (str) -> (ResultAndData, RelativePath)
+        rp = RelativePath()
+        rd = rp.from_relative(relative_path_string)
+        return rd, rp
+
     def to_string(self):
         return self._path
 
@@ -330,6 +338,13 @@ class RelativePath(object):
                 break
             working_path= head
         dirs.reverse()
+        return dirs
+
+    def to_elements_no_root(self):
+        # type: () -> [str]
+        dirs = self.to_elements()
+        if len(dirs) > 0 and dirs[0] == '.':
+            dirs.pop(0)
         return dirs
 
     def is_root(self):

@@ -98,6 +98,59 @@ class RelativePathTests(unittest.TestCase):
         dirs = rp.to_elements()
         self.assertEqual(['foo', 'bar', 'baz'], dirs)
 
+        rd = rp.from_relative('./')
+        self.assertTrue(rd.success)
+        dirs = rp.to_elements()
+        self.assertEqual(['.'], dirs)
+
+        rd = rp.from_relative('.')
+        self.assertTrue(rd.success)
+        dirs = rp.to_elements()
+        self.assertEqual(['.'], dirs)
+
+        rd = rp.from_relative('/')
+        self.assertTrue(rd.success)
+        dirs = rp.to_elements()
+        self.assertEqual(['.'], dirs)
+
+    def test_elements_no_root(self):
+        rp = RelativePath()
+
+        rd = rp.from_relative('./baz/bar')
+        self.assertTrue(rd.success)
+        dirs = rp.to_elements_no_root()
+        self.assertEqual(['baz', 'bar'], dirs)
+
+        rd = rp.from_relative('foo/bar')
+        self.assertTrue(rd.success)
+        dirs = rp.to_elements_no_root()
+        self.assertEqual(['foo', 'bar'], dirs)
+
+        rd = rp.from_relative('/bingo/bango/bongo')
+        self.assertTrue(rd.success)
+        dirs = rp.to_elements_no_root()
+        self.assertEqual(['bingo', 'bango', 'bongo'], dirs)
+
+        rd = rp.from_relative('.\\foo\\bar\\baz')
+        self.assertTrue(rd.success)
+        dirs = rp.to_elements_no_root()
+        self.assertEqual(['foo', 'bar', 'baz'], dirs)
+
+        rd = rp.from_relative('./')
+        self.assertTrue(rd.success)
+        dirs = rp.to_elements_no_root()
+        self.assertEqual([], dirs)
+
+        rd = rp.from_relative('.')
+        self.assertTrue(rd.success)
+        dirs = rp.to_elements_no_root()
+        self.assertEqual([], dirs)
+
+        rd = rp.from_relative('/')
+        self.assertTrue(rd.success)
+        dirs = rp.to_elements_no_root()
+        self.assertEqual([], dirs)
+
     def test_from_absolute_basic(self):
         rp = RelativePath()
         rd = rp.from_absolute('/mnt/c/Users/mike/', '/mnt/c/Users/mike/docs')

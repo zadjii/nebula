@@ -3,7 +3,7 @@ import platform
 from datetime import datetime
 
 from common.SimpleDB import SimpleDB
-from common_util import ResultAndData, mylog, get_free_space_bytes, INFINITE_SIZE, RelativePath
+from common_util import ResultAndData, mylog, get_free_space_bytes, INFINITE_SIZE, RelativePath, Error
 from connections.RawConnection import RawConnection
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table, Boolean
 from sqlalchemy.orm import relationship, backref
@@ -79,13 +79,13 @@ class Cloud(base):
             rd = ResultAndData(False, e)
         return rd
 
-    def make_tree(self, relative_path, db):
-        # type: (RelativePath, SimpleDB) -> FileNode
-        node, new_nodes = self._make_tree_get_all(relative_path, db)
+    def make_tree(self, relative_path, db, created_on=None):
+        # type: (RelativePath, SimpleDB, datetime) -> FileNode
+        node, new_nodes = self._make_tree_get_all(relative_path, db, created_on=created_on)
         return node
 
-    def _make_tree_get_all(self, relative_path, db):
-        # type: (RelativePath, SimpleDB) -> (FileNode, [FileNode])
+    def _make_tree_get_all(self, relative_path, db, created_on=None):
+        # type: (RelativePath, SimpleDB, datetime) -> (FileNode, [FileNode])
         """
         Either retreives the existing FileNode corresponding to the given path,
         or creates the tree for the given path.
@@ -94,13 +94,13 @@ class Cloud(base):
         """
         curr_children = self.children
         curr_parent_node = None
-        dirs = relative_path.to_elements()
+        dirs = relative_path.to_elements_no_root()
         new_nodes = []
         while len(dirs) > 0:
             # find the node in children if it exists, else make it
             child = curr_children.filter_by(name=dirs[0]).first()
             if child is None:
-                child = FileNode(dirs[0])
+                child = FileNode(dirs[0], created_on=created_on)
                 db.session.add(child)
                 if curr_parent_node is not None:
                     curr_parent_node.children.append(child)
@@ -114,18 +114,15 @@ class Cloud(base):
         return curr_parent_node, new_nodes
 
     def get_child_node(self, relative_path):
-        # type: (str) -> Any(Cloud, FileNode)
-        target_path_elems = os.path.normpath(relative_path).split(os.sep)
-        if target_path_elems[0] == '.':
-            target_path_elems.pop(0)
+        # type: (RelativePath) -> Any(Cloud, FileNode)
+        target_path_elems = relative_path.to_elements_no_root()
 
         curr_child = self
         while len(target_path_elems) > 0:
             curr_file = target_path_elems[0]
-            child = curr_child.children.filter_by(name=curr_file).first()
-            curr_child = child
+            curr_child = curr_child.children.filter_by(name=curr_file).first()
             target_path_elems.pop(0)
-            if child is not None:
+            if curr_child is not None:
                 # This is a match to the current path elem. Continue on it's children.
                 pass
             else:
@@ -219,6 +216,72 @@ class Cloud(base):
             nodes.extend(child_unsynced)
         return nodes
 
+    def create_file(self, full_path, db, timestamp=None):
+        # type: (str) -> ResultAndData
 
+        rel_path = RelativePath()
+        rd = rel_path.from_absolute(self.root_directory, full_path)
+        if not rd.success:
+            return rd
+        node = self.make_tree(relative_path=rel_path, db=db, created_on=timestamp)
+        # Caller will commit the DB changes
+        rd = ResultAndData(node is not None, node)
+        return rd
+
+    def modify_file(self, full_path, db, timestamp=None):
+        # type: (str) -> ResultAndData
+        rel_path = RelativePath()
+        rd = rel_path.from_absolute(self.root_directory, full_path)
+        if not rd.success:
+            return rd
+
+        child_node = self.get_child_node(rel_path)
+        if child_node.is_root():
+            # TODO: you can't modify the root, right? that doesn't make sense
+            return Error('Cant modify the root')
+        child_node.modify(timestamp)
+        # Caller will commit the DB changes
+        return ResultAndData(True, child_node)
+
+    def delete_file(self, full_path, db, timestamp=None):
+        # type: (str) -> ResultAndData
+        rel_path = RelativePath()
+        rd = rel_path.from_absolute(self.root_directory, full_path)
+        if not rd.success:
+            return rd
+
+        child_node = self.get_child_node(rel_path)
+        if child_node.is_root():
+            # TODO: you can't modify the root, right? that doesn't make sense
+            return Error('Cant modify the root')
+        child_node.delete(timestamp=timestamp)
+        # Caller will commit the DB changes
+        return ResultAndData(True, child_node)
+
+    def move_file(self, full_src_path, full_target_path, db):
+        # type: (str, str) -> ResultAndData
+
+        rel_src_path = RelativePath()
+        rd = rel_src_path.from_absolute(self.root_directory, full_src_path)
+        if not rd.success:
+            return rd
+
+        rel_tgt_path = RelativePath()
+        rd = rel_tgt_path.from_absolute(self.root_directory, full_target_path)
+        if not rd.success:
+            return rd
+
+        child_src_node = self.get_child_node(rel_src_path)
+        if child_src_node.is_root():
+            # TODO: you can't modify the root, right? that doesn't make sense
+            return Error('Cant modify the root')
+
+        child_tgt_node = self.make_tree(rel_tgt_path, db)
+        if child_tgt_node.is_root():
+            # TODO: you can't modify the root, right? that doesn't make sense
+            return Error('Cant modify the root')
+        child_src_node.move(child_tgt_node)
+        # Caller will commit the DB changes
+        return ResultAndData(child_tgt_node is not None, child_tgt_node)
 
 

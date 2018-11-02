@@ -19,36 +19,20 @@ class HostEventHandler(FileSystemEventHandler):
 
     def on_moved(self, event):
         super(HostEventHandler, self).on_moved(event)
-        # print event.event_type
-
-        what = 'directory' if event.is_directory else 'file'
-        # logging.info("Moved %s: from %s to %s", what, event.src_path,
-        #              event.dest_path)
-        mylog('$$$$$$$ MOVED $$$$$$$$$$ {} $$$$$$$$$$$$$$$$$$$$'.format(event.src_path), '7')
+        self._host.local_move_file(event.src_path, event.dest_path)
 
     def on_created(self, event):
         super(HostEventHandler, self).on_created(event)
-        # print event.event_type
+        self._host.local_create_file(event.src_path)
 
-        what = 'directory' if event.is_directory else 'file'
-        # logging.info("Created %s: %s", what, event.src_path)
-        mylog('$$$$$$$ Created $$$$$$$$$$ {} $$$$$$$$$$$$$$$$$$$$'.format(event.src_path), '7')
 
     def on_deleted(self, event):
         super(HostEventHandler, self).on_deleted(event)
-        # print event.event_type
-
-        what = 'directory' if event.is_directory else 'file'
-        # logging.info("Deleted %s: %s", what, event.src_path)
-        mylog('$$$$$$$ Deleted $$$$$$$$$$ {} $$$$$$$$$$$$$$$$$$$$'.format(event.src_path), '7')
+        self._host.local_delete_file(event.src_path)
 
     def on_modified(self, event):
         super(HostEventHandler, self).on_modified(event)
-        # print event.event_type
-
-        what = 'directory' if event.is_directory else 'file'
-        # logging.info("Modified %s: %s", what, event.src_path)
-        mylog('$$$$$$$ Modified $$$$$$$$$$ {} $$$$$$$$$$$$$$$$$$$$'.format(event.src_path), '7')
+        self._host.local_modify_file(event.src_path)
 
 
 class WatchdogWorker(object):
@@ -60,7 +44,6 @@ class WatchdogWorker(object):
         self.observer = Observer()
         self.observer.start()
         self.event_handler = HostEventHandler(host)
-
 
     def watch_path(self, cloud_root):
         mylog('Watching path <{}>'.format(cloud_root))

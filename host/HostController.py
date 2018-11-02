@@ -741,6 +741,7 @@ class HostController:
 
     def _find_mirror_for_file(self, full_path):
         # type: (str) -> Cloud
+        # type: (str) -> Optional[Cloud]
         db = self.get_db()
         all_clouds = db.session.query(Cloud).all()
         for c in all_clouds:
@@ -750,21 +751,74 @@ class HostController:
                 return c
         return None
 
-    def local_create_file(self, path):
+    def local_create_file(self, path, timestamp=None):
         # type: (str) -> ResultAndData
         cloud = self._find_mirror_for_file(path)
         if cloud is None:
             # we noticed a file creation for a path that isn't under an existing
             #   cloud. We should just ignore this.
-            return Success()
-        pass
+            return Error()
+        db = self.get_db()
+        rd = cloud.create_file(path, db=db, timestamp=timestamp)
+        if rd.success:
+            db.session.commit()
+        else:
+            # todo rollback? error?
+            pass
+        return rd
 
-    def local_modify_file(self, path):
+    def local_modify_file(self, full_path, timestamp=None):
         # type: (str) -> ResultAndData
-        pass
-    def local_delete_file(self, path):
+        cloud = self._find_mirror_for_file(full_path)
+        if cloud is None:
+            # we noticed a file creation for a path that isn't under an existing
+            #   cloud. We should just ignore this.
+            return Error()
+        db = self.get_db()
+        rd = cloud.modify_file(full_path, db=db, timestamp=timestamp)
+        if rd.success:
+            db.session.commit()
+        else:
+            # todo rollback? error?
+            pass
+        return rd
+
+    def local_delete_file(self, full_path, timestamp=None):
         # type: (str) -> ResultAndData
-        pass
+        cloud = self._find_mirror_for_file(full_path)
+        if cloud is None:
+            # we noticed a file creation for a path that isn't under an existing
+            #   cloud. We should just ignore this.
+            return Error()
+        db = self.get_db()
+        rd = cloud.delete_file(full_path, db=db, timestamp=timestamp)
+        if rd.success:
+            db.session.commit()
+        else:
+            # todo rollback? error?
+            pass
+        return rd
+
     def local_move_file(self, src_path, target_path):
         # type: (str, str) -> ResultAndData
-        pass
+        src_cloud = self._find_mirror_for_file(src_path)
+        if src_cloud is None:
+            # we noticed a file creation for a path that isn't under an existing
+            #   cloud. We should just ignore this.
+            return Error()
+        tgt_cloud = self._find_mirror_for_file(target_path)
+        if tgt_cloud is None:
+            # we noticed a file creation for a path that isn't under an existing
+            #   cloud. We should just ignore this.
+            return Error()
+        if src_cloud.id is not tgt_cloud.id:
+            # TODO: this does seem like an error we should maybe do something with
+            return Error()
+        db = self.get_db()
+        rd = src_cloud.move_file(src_path, target_path, db=db)
+        if rd.success:
+            db.session.commit()
+        else:
+            # todo rollback? error?
+            pass
+        return rd

@@ -135,7 +135,12 @@ def handle_remove_file(host_obj, msg_obj, mirror, connection, db):
                      # Should be == mirror.my_id_from_remote fixme test this assumption.
     cloud_uname = msg_obj.cloud_uname
     cname = msg_obj.cname
-    relative_path = msg_obj.fpath
+    # relative_path = msg_obj.fpath
+    relative_path = RelativePath()
+    rd = relative_path.from_relative(msg_obj.fpath)
+    if not rd.success:
+        return rd
+
     rd = do_remove_file(host_obj, mirror, relative_path, db)
     if not rd.success:
         mylog('[{}] Failed to delete {}'.format(mirror.my_id_from_remote, relative_path))
@@ -144,15 +149,15 @@ def handle_remove_file(host_obj, msg_obj, mirror, connection, db):
 
 
 def do_remove_file(host_obj, mirror, relative_path, db):
-    # type: (HostController, Cloud, str, SimpleDB) -> ResultAndData
+    # type: (HostController, Cloud, RelativePath, SimpleDB) -> ResultAndData
     rd = Error()
     timestamp = datetime.utcnow()
     # Things to do:
     #  - remove all children nodes from DB older than timestamp
     #  - remove same set of child files
     #  - DON'T clean up .nebs - The host who sent this delete should also send that update.
-    full_path = os.path.join(mirror.root_directory, relative_path)
 
+    full_path = relative_path.to_absolute(mirror.root_directory)
     file_node = mirror.get_child_node(relative_path)
     if file_node is None:
         err = 'There was no node in the tree for path:{}'.format(relative_path)
