@@ -4,7 +4,8 @@ from stat import S_ISDIR
 
 from datetime import datetime
 
-from common_util import Error, Success, RelativePath, ResultAndData
+from common_util import Error, Success, ResultAndData
+from common.RelativePath import RelativePath
 from host.util import mylog
 from messages import HostFileTransferMessage
 

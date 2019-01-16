@@ -3,13 +3,14 @@ import platform
 from datetime import datetime
 
 from common.SimpleDB import SimpleDB
-from common_util import ResultAndData, mylog, get_free_space_bytes, INFINITE_SIZE, RelativePath, Error
+from common_util import ResultAndData, get_mylog, get_free_space_bytes, INFINITE_SIZE, Error
+from common.RelativePath import RelativePath
 from connections.RawConnection import RawConnection
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship, backref
-from FileNode import FileNode
+from FileNode import FileNode, FILE_MOVED
 from host.models import nebs_base as base
-from messages import HostHandshakeMessage
+from messages import HostHandshakeMessage, FileSyncProposalMessage
 
 __author__ = 'Mike'
 

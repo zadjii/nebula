@@ -3,7 +3,8 @@ import os
 
 import errno
 
-from common_util import ResultAndData, RelativePath, get_mylog, send_error_and_close, Error, Success
+from common_util import ResultAndData, get_mylog, send_error_and_close, Error, Success
+from common.RelativePath import RelativePath
 from host.PrivateData import WRITE_ACCESS
 from host.models import Cloud
 from host.util import mylog, get_client_session

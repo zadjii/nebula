@@ -3,9 +3,14 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table
 from sqlalchemy.orm import relationship, backref
 from host.models import nebs_base as base
 import os
-from common_util import RelativePath
+from common.RelativePath import RelativePath
+
 __author__ = 'Mike'
 
+FILE_CREATED = 0
+FILE_MODIFIED = 1
+FILE_MOVED = 2
+FILE_DELETED = 3
 
 class FileNode(base):
     __tablename__ = 'filenode'

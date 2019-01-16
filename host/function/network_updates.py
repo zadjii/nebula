@@ -1,15 +1,15 @@
 import os
 from datetime import datetime
 
-from common_util import ResultAndData, send_error_and_close, Error, Success, get_mylog, RelativePath
+from common_util import ResultAndData, send_error_and_close, Error, Success, get_mylog
+from common.RelativePath import RelativePath
 from host import Cloud
 # from host.function.network.ls_handler import list_files_handler
 from host.function.recv_files import recv_file_tree
 from host.function.send_files import send_tree
-from host.util import check_response, mylog, validate_host_id, find_deletable_children
+from host.util import check_response, mylog, find_deletable_children, get_matching_clouds
 from messages import HostVerifyHostFailureMessage, HostVerifyHostRequestMessage, InvalidStateMessage
 from msg_codes import *
-from remote.util import get_cloud_by_name
 
 __author__ = 'Mike'
 
@@ -48,7 +48,7 @@ def verify_host(db, cloud_uname, cname, local_id, other_id):
 
 def handle_fetch(host_obj, connection, address, msg_obj):
     _log = get_mylog()
-    db = host_obj.get_instance().make_db_session ()
+    db = host_obj.get_instance().make_db_session()
     _log.debug('handle_fetch 1')
     # the id's are swapped because they are named from the origin host's POV.
     other_id = msg_obj.my_id

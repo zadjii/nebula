@@ -3,7 +3,8 @@ import os
 import unittest
 
 from common.Instance import Instance
-from common_util import RelativePath, get_path_elements, get_log_path, get_log_verbosity
+from common_util import get_path_elements, get_log_path, get_log_verbosity
+from common.RelativePath import RelativePath
 from host.NebsInstance import NebsInstance
 
 

@@ -5,8 +5,9 @@ from stat import S_ISDIR
 
 import shutil
 
-from common_util import mylog, send_error_and_close, Success, Error, PUBLIC_USER_ID, RelativePath, get_mylog, \
+from common_util import mylog, send_error_and_close, Success, Error, PUBLIC_USER_ID, get_mylog, \
     ResultAndData, RelativeLink
+from common.RelativePath import RelativePath
 from connections.AbstractConnection import AbstractConnection
 from host.PrivateData import READ_ACCESS, SHARE_ACCESS, NO_ACCESS, WRITE_ACCESS, APPEND_ACCESS
 from host.function.recv_files import recv_file_transfer, do_recv_file_transfer

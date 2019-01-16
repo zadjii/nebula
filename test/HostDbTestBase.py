@@ -3,7 +3,8 @@ import os
 import unittest
 from host import models
 from common.SimpleDB import SimpleDB
-from common_util import RelativePath, get_path_elements
+from common_util import get_path_elements
+from common.RelativePath import RelativePath
 
 
 class HostDbTestBase(unittest.TestCase):

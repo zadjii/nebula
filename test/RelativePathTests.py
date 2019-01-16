@@ -1,7 +1,8 @@
 import logging
 import os
 import unittest
-from common_util import RelativePath, get_path_elements
+from common_util import get_path_elements
+from common.RelativePath import RelativePath
 
 
 class RelativePathTests(unittest.TestCase):

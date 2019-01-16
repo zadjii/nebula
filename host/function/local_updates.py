@@ -1,9 +1,8 @@
 from datetime import datetime
-import os
 import socket
 from stat import S_ISDIR
-import time
 
+from common.RelativePath import RelativePath
 from common.SimpleDB import SimpleDB
 from connections.RawConnection import RawConnection
 from host.HostController import HostController
@@ -12,7 +11,7 @@ from host.models.Cloud import Cloud
 from host.function.network_updates import handle_remove_file
 from host.function.send_files import send_file_to_other, complete_sending_files, send_file_to_local
 from common_util import *
-from host.util import check_response, setup_remote_socket, get_ipv6_list, find_deletable_children
+from host.util import check_response, setup_remote_socket, find_deletable_children
 from msg_codes import *
 from messages import *
 
