@@ -47,13 +47,13 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
         # else (this came from a client):
         #   We DO want to tell other mirrors about this change, so don't change the DB>
         #   The local thread will find the change and alert the other mirrors.
-        # if not is_client:
-        updated_node = cloud.make_tree(rel_path, db)
-        if updated_node is not None:
-            old_modified_on = updated_node.last_modified
-            updated_node.last_modified = datetime.utcfromtimestamp(os.path.getmtime(full_path))
-            # mylog('update mtime {}=>{}'.format(old_modified_on, updated_node.last_modified))
-            db.session.commit()
+        if not is_client:
+            updated_node = cloud.make_tree(rel_path, db)
+            if updated_node is not None:
+                old_modified_on = updated_node.last_modified
+                updated_node.last_modified = datetime.utcfromtimestamp(os.path.getmtime(full_path))
+                # mylog('update mtime {}=>{}'.format(old_modified_on, updated_node.last_modified))
+                db.session.commit()
 
 
 def do_recv_file_transfer(host_obj, cloud, socket_conn, rel_path, is_dir, fsize):
