@@ -264,24 +264,34 @@ With only one of the two of `sync_end` or `new_sync` timestamps being set.
     - [x] `FileSyncRequest`
     - [x] `FileSyncProposal`
     - [x] `FileSyncComplete`
-- [ ] watchdog makes modifications straight to db, then notifies main thread
+- [x] watchdog makes modifications straight to db, then notifies main thread
     <!-- - This actually doesn't seem right - what if the main thread
       Nevermind, the watchdog thread owns the lock when it notices a change. Disregard that. -->
-    - [ ] Adds files to db when created
-    - [ ] Marks files as modified when they change
-    - [ ] Marks files as deleted when they are deleted
-    - [ ] Creates a new filenode, and marks the old one moved when a file is moved.
+    - [x] Adds files to db when created
+    - [x] Marks files as modified when they change
+    - [x] Marks files as deleted when they are deleted
+    - [x] Creates a new filenode, and marks the old one moved when a file is moved.
 - [ ] Update Host to be able to handle a `FileChangeProposal` Message
     - [ ] Verify the other host with the remote
-    - [ ] ack their change
-    - [ ] reject their change
-    - [ ] accept their change (FileChangeResponse, followed by (HOST_FILE_TRANSFER, file_data))
+        * see `host_verify_host` in `remote/.../mirror.py`
+        * see `verify_host` in `network_updates.py`
+          * We need something with the same form, but more general purpose. HOST_VERIFY_HOST really should be HOST_VERIFY_HOST_FOR_FETCH, because it's used specifically when the mirror needs to verify the requesting mirror was approved to mirror the cloud.
+          * Since each mirror has uniquely one cloud, we can remove the uname/cname params from host_verify_host
+          * ~~~We'll need another message type, HostVerifyHostSync~~~
+          * If we do this, then the remote needs another set of mappings, for hosts that have been told to sync messages from another host. Is this necessary? Or coud we just overload the existing mapping?
+          * We'll need to make sure to remove these mappings when we're done mirroring and done syncing
+    - [x] ack their change
+    - [x] reject their change
+    - [x] accept their change (`FileChangeResponse`, followed by (HOST_FILE_TRANSFER, file_data))
     - [ ] modify our DB appropriately to match their change
-        - [ ] Creates
-        - [ ] modifies
+        * We need to make sure to update the last_sync of any new files, and that's new. Before host_file_transfer's wouldn't nclude the sync timestamp the file belonged to
+            - [ ] `HOST_FILE_TRANSFER` needs to add the `last_sync` timestamp to the message, so both transfers during a sync and during the initial mirroring will update the last_sync timestamp
+              * Actually though, are we even keeping `HostFileTransfer`? -> yes, that's used for actually transfering the files
+        - [x] Creates
+        - [x] modifies
         - [ ] deletes
         - [ ] moves
-- [ ] Host deletes filenodes that have been deleted before last_all_handshake
+- [ ] Host deletes filenodes that have been deleted before `last_all_handshake`
 - [ ] rewrite host to use proposed change method
     - [ ] calculate pending changes from the files with modifications since our last sync.
     - [ ] In a way that's reusable below:
@@ -295,6 +305,11 @@ With only one of the two of `sync_end` or `new_sync` timestamps being set.
 - [ ] Update the host to be able to handle a `FileSyncRequest`
     - [ ] Generate all the `FileChangeProposals` between sync_start and sync_end
     - [ ] send them to the other host, reusing the code above
+- [ ] When the Host handshakes a remote and is out of date, the host must set `FileSyncRequest`s to other hosts
+    * see `host.models.Cloud.modified_between()`
+- [ ] Add support for mirroring with multiple hosts
+    * I might need to just run the feature test to see what breaks.
+    * If the first param to `recv_file_tree` is None, then `do_recv_file_transfer` is going to return an error. With multile hosts, I believe this is a path that's actually hittable. Unfortunately, during mirroring, there won't be a HostController that's been initialized yet.
 - [ ]
 
 ### File Opening

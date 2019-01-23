@@ -115,10 +115,21 @@ class Cloud(base):
         return curr_parent_node, new_nodes
 
     def get_child_node(self, relative_path):
-        # type: (RelativePath) -> Any(Cloud, FileNode)
+        """
+        Returns the node in this mirror corresponding to `relative_path`.
+        If the path does not exist under this mirror, returns None.
+        If the path corresponds to the root of the mirror, it returns this
+        object (a host.models.Cloud). Callers should not assume that the
+        returned object is a FileNode, and use result.is_root() to deterine if
+        the returned object is a FileNode or a Cloud.
+        """
+        # type: (RelativePath) -> Any(None, Cloud, FileNode)
+        if relative_path.is_root():
+            return self
+
         target_path_elems = relative_path.to_elements_no_root()
 
-        curr_child = self
+        curr_child = None
         while len(target_path_elems) > 0:
             curr_file = target_path_elems[0]
             curr_child = curr_child.children.filter_by(name=curr_file).first()
@@ -156,14 +167,15 @@ class Cloud(base):
         mirror_id = self.my_id_from_remote
         hostname = platform.uname()[1]
         msg = HostHandshakeMessage(
-            mirror_id,
-            ip,
-            port,
-            ws_port,
-            0,  # todo update number/timestamp? it's in my notes
-            hostname,  # hostname
-            used_space,
-            remaining_space
+            id=mirror_id,
+            ipv6=ip,
+            port=port,
+            wsport=ws_port,
+            last_sync=self.last_sync(),  # todo update number/timestamp? it's in my notes
+            last_modified=self.last_modified(),  # todo update number/timestamp? it's in my notes
+            hostname=hostname,  # hostname
+            used_space=used_space,
+            remaining_space=remaining_space
         )
         return msg
 
@@ -209,6 +221,7 @@ class Cloud(base):
         Returns all child nodes that have been modified since they were last sync'd.
         If everyone's most recent state has been sync'd, then this returns an empty list.
         If a node was added, then it should be in this list (it's last_sync will be None)
+        These are the pending changes
         :return:
         """
         nodes = []
@@ -217,6 +230,74 @@ class Cloud(base):
             nodes.extend(child_unsynced)
         return nodes
 
+
+    def modified_between(self, sync_start, sync_end):
+        # type (datetime, datetime) -> [FileNode]
+        """
+        Returns all child nodes that have been modified in the timeframe [sync_start, sync_end]
+        TODO: Should that be an inclusive or exclusive range?
+        :return:
+        """
+        nodes = []
+        for child in self.children.all():
+            # TODO:
+            # child_unsynced = child.modfied_children_inclusive(sync_start, sync_end)
+            nodes.extend(child_unsynced)
+        return nodes
+
+    def get_change_proposals(self, db):
+        # type: (SimpleDB) -> [FileSyncProposalMessage]
+        """
+        Generates a list of FileChangeProposals describing the set of changes we
+        have that haven't synced.
+        The caller should make sure to fill in the mirror_id param of these
+        messages with the id of the intended recipient.
+        :param db:
+        :return:
+        """
+        _log = get_mylog()
+        proposals = []
+        modified_nodes = self.modified_since_last_sync()
+        for node in modified_nodes:
+            change_type = node.get_update_type()
+            rel_src_path = node.relative_path()
+            rel_tgt_path = None
+            if change_type == FILE_MOVED:
+                tgt_node_id = node.moved_to_id
+                tgt_node = db.session.query(FileNode).get(tgt_node_id)
+                if tgt_node is None:
+                    _log.error('{} said it was moved, but the id it was moved to ({}) doesnt exist'.format(rel_src_path.to_string(), tgt_node_id))
+                    continue
+                rel_tgt_path = tgt_node.relative_path()
+
+            # TODO: I do NOT like this. I'd really rather that the db models
+            #   remain independent from the actual filesystem. There should
+            #   probably be an IFileSysteminfo interface that the HostController
+            #   can pass to these methods.
+            # Then, the unittests can override as necessary (to fake a filesystem)
+            is_dir = os.path.isdir(rel_src_path.to_absolute(self.root_directory))
+
+            # TODO: the mirror_id param - is that the source mirror or the target mirror?
+            # would the mirror proposing know the ID of the mirror it should be intended for?
+            # A FileSyncRequest sure could include the ID of the requestor and
+            #   the id of the mirror it's requesting from (our id)
+            #   So that path could fill in the mirror_id with the id of the
+            #   intended recipient.
+            # When we get a RemoteHandshake suggesting that we need to send
+            #       updates to other hosts, we could generate this list of
+            #       proposals, then fill in the mirror_id for the intended
+            #       recipient as we iterate over them.
+            proposal = FileSyncProposalMessage(
+                mirror_id=self.my_id_from_remote,
+                rel_path=rel_src_path,
+                tgt_path=rel_tgt_path,
+                change_type=change_type,
+                is_dir=is_dir,
+                sync_time=node.last_sync
+            )
+            proposals.append(proposal)
+        return proposals
+
     def create_file(self, full_path, db, timestamp=None):
         # type: (str) -> ResultAndData
 
@@ -224,6 +305,11 @@ class Cloud(base):
         rd = rel_path.from_absolute(self.root_directory, full_path)
         if not rd.success:
             return rd
+
+        child_node = self.get_child_node(rel_path)
+        if child_node is not None:
+            return Error('Cannot create a file that already exists')
+
         node = self.make_tree(relative_path=rel_path, db=db, created_on=timestamp)
         # Caller will commit the DB changes
         rd = ResultAndData(node is not None, node)
@@ -237,6 +323,8 @@ class Cloud(base):
             return rd
 
         child_node = self.get_child_node(rel_path)
+        if child_node is None:
+            return Error('Cannot modify a file that does not exist')
         if child_node.is_root():
             # TODO: you can't modify the root, right? that doesn't make sense
             return Error('Cant modify the root')
@@ -252,6 +340,8 @@ class Cloud(base):
             return rd
 
         child_node = self.get_child_node(rel_path)
+        if child_node is None:
+            return Error('Cannot delete a file that does not exist')
         if child_node.is_root():
             # TODO: you can't modify the root, right? that doesn't make sense
             return Error('Cant modify the root')
@@ -273,10 +363,16 @@ class Cloud(base):
             return rd
 
         child_src_node = self.get_child_node(rel_src_path)
+        if child_node is None:
+            return Error('Cannot move a file that does not exist')
         if child_src_node.is_root():
             # TODO: you can't modify the root, right? that doesn't make sense
             return Error('Cant modify the root')
 
+        # TODO: do we allow moving files to paths that already exist?
+        # child_tgt_node = self.get_child_node(rel_tgt_path)
+        # if child_tgt_node is not None:
+        #     return Error('Cannot move a file to a path that already exists')
         child_tgt_node = self.make_tree(rel_tgt_path, db)
         if child_tgt_node.is_root():
             # TODO: you can't modify the root, right? that doesn't make sense

@@ -1,4 +1,4 @@
-# last generated 2018-05-21 02:02:42.313000
+# last generated 2019-01-16 16:17:41.661000
 from messages.BaseMessage import BaseMessage
 from messages.UnknownMessageErrorMessage import UnknownMessageErrorMessage
 from messages.LinkDoesNotExistMessage import LinkDoesNotExistMessage
@@ -22,7 +22,7 @@ from messages.UnpreparedHostErrorMessage import UnpreparedHostErrorMessage
 from messages.AuthErrorMessage import AuthErrorMessage
 from messages.GenericErrorMessage import GenericErrorMessage
 from messages.NewHostMessage import NewHostMessage
-from messages.AssignHostIDMessage import AssignHostIdMessage
+from messages.AssignHostIdMessage import AssignHostIdMessage
 from messages.HostHandshakeMessage import HostHandshakeMessage
 from messages.RemoteHandshakeMessage import RemoteHandshakeMessage
 from messages.RemHandshakeGoFetchMessage import RemHandshakeGoFetchMessage
@@ -98,4 +98,7 @@ from messages.ClientRemoveUserFromLinkMessage import ClientRemoveUserFromLinkMes
 from messages.ClientSetLinkPermissionsSuccessMessage import ClientSetLinkPermissionsSuccessMessage
 from messages.ClientGetLinkPermissionsRequestMessage import ClientGetLinkPermissionsRequestMessage
 from messages.ClientGetLinkPermissionsResponseMessage import ClientGetLinkPermissionsResponseMessage
+from messages.FileSyncRequestMessage import FileSyncRequestMessage
+from messages.FileSyncProposalMessage import FileSyncProposalMessage
+from messages.FileSyncResponseMessage import FileSyncResponseMessage
 

@@ -1,4 +1,3 @@
-#this is a comment
 #The files generated from this file get dropped into the following places:
 # PYTHON
 #    `/messages/` contains all message.py classes, and
@@ -9,7 +8,8 @@
 # drop the generated /out/js/messages.js into static? I think?
 # I just comment out the TODO messages for now. JS won't need to be creating
 #   them for all i know.
-
+# On Windows, run copy_messages.cmd to place all the python files into the
+#   appropriate locations.
 
 ################################################################################
 # Messages
@@ -17,9 +17,9 @@
 
 0   , NEW_HOST              , string:ipv6, int:port     , int:wsport    , string:hostname
 1   , ASSIGN_HOST_ID        , int:id    , string:key    , string:cert
-2   , HOST_HANDSHAKE        , int:id    , string:ipv6   , int:port      , int:wsport    , update , string:hostname, int:used_space, int:remaining_space
+2   , HOST_HANDSHAKE        , int:id    , string:ipv6   , int:port      , int:wsport    , last_sync , last_modified , string:hostname, int:used_space, int:remaining_space
 
-3   , REMOTE_HANDSHAKE      , int:id    , string:key    , string:cert
+3   , REMOTE_HANDSHAKE      , int:id    , new_sync  , sync_end  , last_all_sync , blob:hosts
 4   , REM_HANDSHAKE_GO_FETCH # todo#65 not done
 
 5   , REQUEST_CLOUD         , int:id    , string:cloud_uname  , string:cname  , string:username  , string:passw
@@ -27,13 +27,9 @@
 # The owner_ids are used to set up the first mirror's PrivateData file.
 6   , GO_RETRIEVE_HERE      , int:id    , ip            , int:port      , blob:owner_ids    , int:max_size
 
-# Note: Prepare for fetch is now deprecated, see GH:14
-# fixme remove from rest of codebase
-# 7   , PREPARE_FOR_FETCH     , int:id    , string:cname  , ip
-
 # HHF is my_id asking other_id for the files at root and below on cloud (uname, cname)
 8   , HOST_HOST_FETCH       , int:my_id    , int:other_id    , string:cloud_uname, string:cname  , string:root
-9   , HOST_FILE_TRANSFER    , int:id    , string:cloud_uname, string:cname  , string:fpath, int:fsize, bool:isdir
+9   , HOST_FILE_TRANSFER    , int:id    , string:cloud_uname, string:cname  , string:fpath, int:fsize, bool:isdir, last_sync
 
 10  , MAKE_CLOUD_REQUEST #todo not done
 11  , MAKE_CLOUD_RESPONSE #todo not done
@@ -46,9 +42,6 @@
 15  , GET_HOSTS_REQUEST     , int:id    , string:cloud_uname, string:cname
 
 # 16 GHRp - Manual
-
-# fixme remove from rest of codebase
-#17  , COME_FETCH #still left here for some reason. Dunno really why. cause I was dumb?
 
 # Used for both H->H and C->H transfers. Should be sent in response to each file.
 #todo:23
@@ -68,10 +61,6 @@
 
 26  , CLIENT_SESSION_REQUEST    , string:uname  , string:passw
 28  , CLIENT_SESSION_RESPONSE   , sid
-
-# Note: Client alert is now deprecated, it was a R->H message
-# fixme remove from rest of codebase
-# 27  , CLIENT_SESSION_ALERT      , sid           , int:uid       ,  ip
 
 # C->R, refreshes the remote's timeout of the client session.
 #   Should be used in tandem whenever the client reads/writes from the host.
@@ -96,7 +85,6 @@
 #   also, the host_id is needed so the remote can prepare another host for the request,
 #   but a normal client won't know the host id, or, I mean I guess they could... Should investigate todo
 37  , CLIENT_MIRROR , sid   , int:host_id   , string:cloud_uname  , string:cname
-
 
 38  , CLIENT_GET_CLOUD_HOSTS_REQUEST      , sid, string:cloud_uname, string:cname
 # The remote fills hosts with [host.to_json for host in cloud.hosts]
@@ -172,6 +160,15 @@
 75  , CLIENT_SET_LINK_PERMISSIONS_SUCCESS
 76  , CLIENT_GET_LINK_PERMISSIONS_REQUEST, sid, string:link_string
 77  , CLIENT_GET_LINK_PERMISSIONS_RESPONSE, int:permissions, blob:users
+# FILE_SYNC_REQUEST is for one host to request the changes between two timestamps from another host
+# FILE_SYNC_PROPOSAL is for one host to tell another "I believe this file changed.
+#       If you're cool with it, I'm going to send it to you."
+# For both of these messages:
+# src_id is the id of the requesting mirror
+# tgt_id is the id of the mirror we're sending to
+78  , FILE_SYNC_REQUEST , int:src_id, int:tgt_id, string:uname  , string:cname, sync_start, sync_end
+79  , FILE_SYNC_PROPOSAL, int:src_id, int:tgt_id, string:rel_path, string:tgt_path, int:change_type, bool:is_dir, sync_time
+80  , FILE_SYNC_RESPONSE, int:resp_type
 ################################################################################
 #manually updated ones:
 ################################################################################

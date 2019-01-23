@@ -13,26 +13,32 @@ from messages import HostVerifyClientRequestMessage
 from msg_codes import HOST_VERIFY_CLIENT_SUCCESS
 from common_util import *
 
+FILE_CHANGE_PROPOSAL_ACKNOWLEDGE = 0
+FILE_CHANGE_PROPOSAL_REJECT = 1
+FILE_CHANGE_PROPOSAL_ACCEPT = 2
 
-def validate_host_id(db, host_id, conn):
-    rd = get_matching_clouds(db, host_id)
-    if not rd.success:
-        # send_generic_error_and_close(conn)
-        raise Exception(rd.data)
-    return rd
+FILE_CHANGE_TYPE_CREATE = 0
+FILE_CHANGE_TYPE_MODIFY = 1
+FILE_CHANGE_TYPE_DELETE = 2
+FILE_CHANGE_TYPE_MOVE = 3
 
 
-def get_matching_clouds(db, host_id):
+def get_matching_clouds(db, mirror_id):
+    # type: (SimpleDB, int) -> ResultAndData
+    # type: (SimpleDB, int) -> ResultAndData(True, Cloud)
+    # type: (SimpleDB, int) -> ResultAndData(False, str)
     rd = Error()
     matching_id_clouds = db.session.query(Cloud)\
-        .filter(Cloud.my_id_from_remote == host_id)
+        .filter(Cloud.my_id_from_remote == mirror_id)
 
     if matching_id_clouds.count() <= 0:
         rd = Error('Received a message intended for id={},'
                    ' but I don\'t have any clouds with that id'
-                   .format(host_id))
+                   .format(mirror_id))
+    elif matching_id_clouds.count() > 1:
+        rd = Error('Found more than one mirror for id_from_remote={}'.format(mirror_id))
     else:
-        rd = ResultAndData(True, matching_id_clouds)
+        rd = ResultAndData(True, matching_id_clouds.first())
     return rd
 
 
@@ -67,10 +73,12 @@ def check_response(expected, recieved):
 
 
 def get_clouds_by_name(db, uname, cname):
+    # type: (SimpleDB, str, str) -> [Cloud]
     # return [cloud for cloud in db.session.query(Cloud).filter_by(name=cname)]
     # return [cloud for cloud in db.session.query(Cloud).filter_by(username=uname, name=cname)]
     # return db.session.query(Cloud).filter_by(username=uname, name=cname).all()
     return db.session.query(Cloud).filter(Cloud.username.ilike(uname)).filter_by(name=cname).all()
+
 
 def get_client_session(db, uuid, cloud_uname, cloud_cname):
     if uuid is None:

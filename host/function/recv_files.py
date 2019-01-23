@@ -1,4 +1,5 @@
 from datetime import datetime
+import time
 import os
 
 import errno
@@ -10,7 +11,7 @@ from host.models import Cloud
 from host.util import mylog, get_client_session
 # from msg_codes import recv_msg
 from messages import *
-from msg_codes import CLIENT_FILE_TRANSFER
+from msg_codes import CLIENT_FILE_TRANSFER, HOST_FILE_TRANSFER
 
 __author__ = 'Mike'
 
@@ -21,14 +22,24 @@ def recv_file_tree(host_obj, msg, cloud, socket_conn, db):
         is_client = msg.type == CLIENT_FILE_TRANSFER
         rd = recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client)
         msg = socket_conn.recv_obj()
+    return rd
 
 
 def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
     # type: (HostController, BaseMessage, Cloud, AbstractConnection, SimpleDB, bool) -> ResultAndData
     _log = get_mylog()
+
+    if not (msg.type == CLIENT_FILE_TRANSFER or msg.type == HOST_FILE_TRANSFER):
+        msg = 'Unexpected message type in recv_file_transfer: {}'.format(msg.type)
+        err = InvalidStateMessage(msg)
+        _log.debug(err)
+        send_error_and_close(err, socket_conn)
+        return Error()
+
     msg_file_isdir = msg.isdir
     msg_file_size = msg.fsize
     msg_rel_path = msg.fpath
+    msg_last_sync = msg.last_sync if not is_client else None
     rel_path = RelativePath()
     rd = rel_path.from_relative(msg_rel_path)
     if not rd.success:
@@ -51,9 +62,32 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
             updated_node = cloud.make_tree(rel_path, db)
             if updated_node is not None:
                 old_modified_on = updated_node.last_modified
-                updated_node.last_modified = datetime.utcfromtimestamp(os.path.getmtime(full_path))
-                # mylog('update mtime {}=>{}'.format(old_modified_on, updated_node.last_modified))
+                old_last_sync = updated_node.last_sync
+
+                # change the last_modified time of this file to be the same time as what we sync'd to
+                # Leave the access time alone
+                new_atime = os.path.getatime(full_path)
+                # convert last_sync time to a posix timestamp for use with utime()
+                # TODO: validate this actually works
+                last_sync_posix = time.mktime(msg_last_sync.timetuple())
+
+                new_mtime = last_sync_posix
+                os.utime(full_path, (new_atime, new_mtime))
+
+                # update the newly created node's last_modified and last_sync.
+                # recall from the multiple-hosts-spec that it's the sender's
+                #   responsibility to get the correct sync_time for their file
+                #   that changed at some time t_0, and they'll have also made
+                #   sure to keep themselves in sync.
+                # updated_node.last_modified = datetime.utcfromtimestamp(os.path.getmtime(full_path))
+                updated_node.last_modified = msg_last_sync
+                updated_node.last_sync = msg_last_sync
+
+                _log.debug('<{}> update mtime {}=>{}'.format(rel_path.to_string(), old_modified_on, updated_node.last_modified))
+                _log.debug('<{}> update stime {}=>{}'.format(rel_path.to_string(), old_last_sync, updated_node.last_sync))
                 db.session.commit()
+
+    return rd
 
 
 def do_recv_file_transfer(host_obj, cloud, socket_conn, rel_path, is_dir, fsize):

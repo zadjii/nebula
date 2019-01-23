@@ -152,3 +152,14 @@ class FileNode(base):
             if child_recursive > newest:
                 newest = child_recursive
         return newest
+
+    def get_update_type(self):
+        # type: () -> int
+        if self.created_on == self.last_modified:
+            return FILE_CREATED
+        if self.moved_to_id is not None:
+            return FILE_MOVED
+        if self.deleted_on is not None:
+            return FILE_DELETED
+        return FILE_MODIFIED
+

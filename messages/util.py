@@ -1,7 +1,8 @@
 import os
 import struct
 
-from common_util import RelativePath
+from common.RelativePath import RelativePath
+
 # from host import Cloud
 # from host.PrivateData import PrivateData
 

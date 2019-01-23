@@ -5,7 +5,7 @@ __author__ = 'Mike'
 
 
 class HostFileTransferMessage(BaseMessage):
-    def __init__(self, id=None, cloud_uname=None, cname=None, fpath=None, fsize=None, isdir=None):
+    def __init__(self, id=None, cloud_uname=None, cname=None, fpath=None, fsize=None, isdir=None, last_sync=None):
         super(HostFileTransferMessage, self).__init__()
         self.type = HOST_FILE_TRANSFER
         self.id = id
@@ -14,6 +14,7 @@ class HostFileTransferMessage(BaseMessage):
         self.fpath = fpath
         self.fsize = fsize
         self.isdir = isdir
+        self.last_sync = last_sync
 
     @staticmethod
     def deserialize(json_dict):
@@ -24,5 +25,6 @@ class HostFileTransferMessage(BaseMessage):
         msg.fpath = json_dict['fpath']
         msg.fsize = json_dict['fsize']
         msg.isdir = json_dict['isdir']
+        msg.last_sync = json_dict['last_sync']
         return msg
 

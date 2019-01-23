@@ -1,9 +1,6 @@
-import logging
-import os
 from datetime import timedelta
 import unittest
 from .HostDbTestBase import HostDbTestBase
-from host.models.Remote import *
 from host.models.Cloud import *
 from host.models.FileNode import *
 
@@ -326,6 +323,9 @@ class HostMirrorTests(HostDbTestBase):
         self.assertEqual(1, len(modified))
         self.assertEqual(two.id, modified[0].id)
 
+
+# can we create a connection to the HostController for UT?
+# that just passes through?
 
 def main():
     unittest.main()

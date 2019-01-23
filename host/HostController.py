@@ -26,7 +26,7 @@ from host.function.network.client import list_files_handler, \
     handle_client_get_shared_paths, handle_client_create_link, handle_client_read_link, stat_files_handler, \
     handle_client_delete_file, handle_client_remove_dir, handle_client_set_link_permissions, \
     handle_client_add_user_to_link, handle_client_remove_user_from_link, handle_client_get_link_permissions
-from host.function.network_updates import handle_fetch, handle_file_change
+from host.function.network_updates import handle_fetch, handle_file_change_proposal
 from host.models.Cloud import Cloud
 from host.models.Remote import Remote
 from host.util import set_mylog_name, mylog, get_ipv6_list, setup_remote_socket, \
@@ -534,18 +534,21 @@ class HostController:
             # H->H Messages
             if msg_type == HOST_HOST_FETCH:
                 handle_fetch(self, connection, address, msg_obj)
-            elif msg_type == HOST_FILE_PUSH:
-                # This is for HOST_FILE_TRANSFER, REMOVE_FILE. They follow HFP
-                handle_file_change(self, connection, address, msg_obj)
+            # HostFilePush is being removed in favor of FileChangeProposal
+            # elif msg_type == HOST_FILE_PUSH:
+            #     # This is for HOST_FILE_TRANSFER, REMOVE_FILE. They follow HFP
+            #     handle_file_change(self, connection, address, msg_obj)
             elif msg_type == REFRESH_MESSAGE:
                 connection.send_obj(RefreshMessageMessage())
+            elif msg_type == FILE_SYNC_PROPOSAL:
+                handle_file_change_proposal(self, connection, address, msg_obj)
             # ------------------------ C->H Messages ------------------------ #
             elif msg_type == STAT_FILE_REQUEST:
                 stat_files_handler(self, connection, address, msg_obj)
             elif msg_type == LIST_FILES_REQUEST:
                 list_files_handler(self, connection, address, msg_obj)
-            elif msg_type == CLIENT_FILE_PUT:
-                mylog('Received a CLIENT_FILE_PUT. We\'re deprecating that message, use CLIENT_FILE_TRANSFER instead')
+            # elif msg_type == CLIENT_FILE_PUT:
+            #     mylog('Received a CLIENT_FILE_PUT. We\'re deprecating that message, use CLIENT_FILE_TRANSFER instead')
             elif msg_type == CLIENT_FILE_TRANSFER:
                 handle_recv_file_from_client(self, connection, address, msg_obj)
             elif msg_type == READ_FILE_REQUEST:
