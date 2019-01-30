@@ -291,17 +291,20 @@ With only one of the two of `sync_end` or `new_sync` timestamps being set.
         - [x] modifies
         - [ ] deletes
         - [ ] moves
-- [ ] Host deletes filenodes that have been deleted before `last_all_handshake`
-- [ ] rewrite host to use proposed change method
-    - [ ] calculate pending changes from the files with modifications since our last sync.
-    - [ ] In a way that's reusable below:
-        - [ ] Convert those objects into `FileChangeProposals`
-        - [ ] Send them to the other hosts, and handles their response
-- [ ] Add support to remote to handle `HostHandshake`s according to the above algorithm.
-    - [ ] Remote can tell the host to get updates from others
-    - [ ] Remote can tell the host it's up to data
-    - [ ] Remote can tell the host it's up to data and should send updates
-    - [ ] Remote can tell the host when others last_sync'd
+- [ ] Host handshakes the remote when it notices a file change, and handles the remote handshake
+    - [ ] When changes are noticed, send a handshake to the Remote
+    - [ ] Add support to remote to handle `HostHandshake`s according to the above algorithm.
+        - [ ] Remote can tell the host to get updates from others
+        - [ ] Remote can tell the host it's up to data
+        - [ ] Remote can tell the host it's up to data and should send updates
+        - [ ] Remote can tell the host when others last_sync'd
+    - [ ] Host supports recieving a RemoteHandshake after a HostHandshake.
+        - [ ] During a `RemoteHandshake`, Host deletes filenodes that have been deleted before `last_all_handshake`
+    - [ ] rewrite host to use proposed change method
+        - [ ] calculate pending changes from the files with modifications since our last sync.
+        - [ ] In a way that's reusable below:
+            - [ ] Convert those objects into `FileChangeProposals`
+            - [ ] Send them to the other hosts, and handles their response
 - [ ] Update the host to be able to handle a `FileSyncRequest`
     - [ ] Generate all the `FileChangeProposals` between sync_start and sync_end
     - [ ] send them to the other host, reusing the code above

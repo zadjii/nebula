@@ -396,29 +396,12 @@ def new_main_thread(host_obj):
             if changed:
                 last_handshake = datetime.utcnow()
 
-        # if the number of mirrors has changed...
-        if num_clouds_mirrored < mirrored_clouds.count():
-            # todo: if the number of mirrored clouds has changed, observe the new roots
-            # TODO: If a cloud is mirrored while we're waiting on the signal, then the
-            #       host process won't automatically wake up. We need an inter-process way
-            #       to signal that it's time for the thread to wake up again
-            _log.info('number of clouds changed.')
-
-            host_obj.watchdog_worker.watch_all_clouds(all_mirrored_clouds)
-            _log.info('checking for updates on {}'.format(
-                [cloud.my_id_from_remote for cloud in all_mirrored_clouds]
-            ))
-            num_clouds_mirrored = mirrored_clouds.count()
-            # if the number of clouds is different:
-            # - handshake all of them
-            # - Load the private data for any new ones into memory
-            for cloud in all_mirrored_clouds:
-                # load_private_data doesn't duplicate existing data
-                host_obj.load_private_data(cloud)
+        # Update our loaded mirrors, in case another mirror was added since the last loop
+        new_num_mirrors = update_num_mirrors(host_obj, num_clouds_mirrored)
+        if num_clouds_mirrored < new_num_mirrors:
             host_obj.handshake_remotes()
-
             last_handshake = datetime.utcnow()
-        # mylog('Done checking for changes to number of clouds')
+            num_clouds_mirrored = new_num_mirrors
 
         # scan the tree for updates
         # mylog('Checking for updates to files')
@@ -437,3 +420,45 @@ def new_main_thread(host_obj):
         db.session.close()
         host_obj.release_lock()
     _log.info('Leaving main loop')
+
+
+def update_num_mirrors(host, initial_mirror_count):
+    # type: (HostController, int) -> int
+    """
+    Check to see if the number of mirrors has changed. If it has, then:
+    * watch all of the roots of the new mirrors with Watchdog
+    * load the private data for any new mirrors
+    :param host:
+    :param initial_mirror_count:
+    :return: The current number active mirrors on this host.
+    """
+    db = host.get_db()
+    _log = get_mylog()
+    mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
+
+    if initial_mirror_count < mirrored_clouds.count():
+        _log.info('number of mirrors changed')
+
+        all_mirrored_clouds = mirrored_clouds.all()
+
+        # TODO: If a cloud is mirrored while we're waiting on the signal, then the
+        #       host process won't automatically wake up. We need an inter-process way
+        #       to signal that it's time for the thread to wake up again
+
+        # if the number of mirrored clouds has changed, observe the new roots
+        host.watchdog_worker.watch_all_clouds(all_mirrored_clouds)
+        _log.info('checking for updates on {}'.format(
+            [cloud.my_id_from_remote for cloud in all_mirrored_clouds]
+        ))
+
+        # if the number of clouds is different:
+        # - Load the private data for any new ones into memory
+        # - handshake all of them (This will be done by our caller)
+        for cloud in all_mirrored_clouds:
+            # load_private_data doesn't duplicate existing data
+            host.load_private_data(cloud)
+
+        new_num_clouds_mirrored = mirrored_clouds.count()
+        return new_num_clouds_mirrored
+    return initial_mirror_count
+
