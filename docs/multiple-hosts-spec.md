@@ -96,7 +96,7 @@ add it to our runtime list of changes to be sync'd.
 - [H] When we wake up,
   Determine if we have any changes:
   `changes = [f for f in mirror.files if f.last_modified>f.last_sync]`.
-  If we do, then our last_updates is the greatest of those last_modified timestamps.
+  If we do, then our last_updates is the greatest of those last_modified timestamps (`t_2`).
   If we don't have any changes, we're still going to handshake the remote. It's possible it's been 30s since our last handshake.
   In this case, new_updates will be None.
   If we haven't ever synced, then last_sync will be None.
@@ -232,6 +232,58 @@ In fact, we'll probably have already proposed the change to them.
 Any changes that get rejected will be received in the network portion
 If we were offline last time through the loop, then there aren't going to be new network updates
 if we were offline but now we're online, we'll have updated the local changes, then we'll tell the remote that we were last online and we're now online
+
+<!-- zadjii, 29 Jan, 2019 -->
+Do we want to have a handshake step separately at all?
+Let's examine the following:
+```
+local
+network
+```
+What happens here:
+A.1. The thread wakes up due to watchdog signalling it
+A.2. We query the DB, and find that a node has changed.
+A.3. We send a HostHandshake to the remote, and the remote replies with a list of hosts to update
+A.4. we send the file to other hosts to update
+A.5. we're now sync'd up with last sync
+A.6. we prune any nodes deleted after the last_all_sync
+A.7. we deque any network messages that have arrived
+
+Or:
+B.1 The thread wakes up because it's been 30s
+B.2 We query the db, find no changes
+B.3 We send a HostHandshake to the remote, the remote tells us that we're out of date
+B.4 we ask a host from the remote for the updates we missed
+<-- we're deadlocked here:
+    * The other host is currently locked trying to send updates in response to their remoteHandshake.
+    * Because they're locked, then they won't ever be able to deque the message from us asking for updates.
+B.5 they tell us, we update our db
+B.6 we handshake the remote, they tell us we're synced up
+B.7 we deque any network connections
+B.8 we find the file sync request correlated to the change we just got from another host before
+B.9 we ack it
+
+So looking at case B, we should remove the FileSyncRequest? Or the FileChangeProposal?
+- FileSyncRequest is needed for a newly online host to find out what it's missed
+  - If we removed it, then when hosts come online, they wouldn't be able to get any updates.
+  - Hosts that had changes they missed already sent the changes, and won't be sending them again.
+  - WE'd need to modiy the remote to tell hosts that ARE up to date to go back and re-update a new host.
+  - That's ridiculous.
+- FileChangeProposal is how one host updates the others. If we removed it:
+  - Without it, then hosts are not responsible for updating the others only telling the remote that they have something new.
+  - we lean on FileSyncRequest heavily, with each host waking up, finding out it's out of date, then asking the other host for whatever updates it needs to get, BEFORE they can send any other updates
+  - If two hosts have contemporaneous updates:
+    - Clouds original last sync is t_0
+    - A tells the remote it has an update u_0 at t_2. the remote assigns u_0 a timestamp of t_2. The remote marks B out of date. A is done, and unlocks.
+    - B tells the remote it has an update u_1 at t_1 < t_2. Remote tells B to sync with A.
+      * (If a client tries to query for a host here, it will only get A, which doesn't have B's change yet.)
+      - B queries A for changes from t_0 to t_2, A replies with u_0@t_2
+      - If the files are the same, then B will reject. something would happen for moves/deletes, else B will accept.
+      - B is done getting updates from others, updates it's last_sync to t_2
+    - B again tries to tell the remote it has an update u_1@t_1. (the host can know this will get a new timestamp)
+    The remote assigns u_1 the timestamp t_3, and marks A out of date.
+  - In the above scenario, and also in probably any scenario honestly, when a client has a connection to a host, if that host ever becomes out of date, the client won't know. This isn't made worse by the lack of a FileChangeProposal
+
 
 ### RemoteHandshake signature
 
