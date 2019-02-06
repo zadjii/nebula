@@ -51,3 +51,8 @@ After this point, the platform will be "Beta-Complete", and hopefully should onl
 
 - [ ] **v1.4 File Opening and Locking**
   Allow client's to "open" a file such that no other clients can make changes to the file during that duration, and other clients can be instantly notified of changes to that file. This will enable multiple users to collaboratively edit a file simultaneously.
+
+
+- [ ] **v1.5 File Caching**
+  Presumably, for lots of the files that will be shared heavily, they'll be read far more often than written.
+  So we could create a in-memory cache of (cloud,path)->file_data, and check that cache when a read request is made. That would reduce the disk load by quite a bit. Writes would obviously invalidate that cache, as well as writes to the filesystem.
