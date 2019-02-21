@@ -180,20 +180,8 @@ add it to our runtime list of changes to be sync'd.
       the value of last_all_sync is t_4. (This value is >=last_sync)
 
     - [H] The remote has assigned these updates a sync timestanp t_3 (>= t_2).
-      It also gives us a list of hosts that need to be updated with our change at t_3.
-
-    - [H] for each other host:
-        - [H] For each of our pending changes `[{update:t_i, sync:t_3,...}, ]`,
-            - [H] Generate and send a `FileChangeProposal`
-            - [H] Recieve a response (`FileSyncResponse`).
-            - [H] if (accept)
-                - [H] Send the file data.
-            - [H] if (reject)
-                - [H] *TODO* Nothing? do we instead recieve the other hosts view of the file?
-                  They have changes that are newer or unsynced since our change.
-                  They'll eventually handshake the remote, and be told to send the update to us.
-            - [H] if (acknowledge)
-                - [H] Nothing, they already have this change.
+    - [H] The remote _did not_ give us info on other hosts to update.
+          It's their responsibility to ask us for updates.
 
     - [H] We can prune any deleted or moved nodes that were deleted before `last_all_sync` now.
 
@@ -252,6 +240,9 @@ A.7. we deque any network messages that have arrived
 Or:
 B.1 The thread wakes up because it's been 30s
 B.2 We query the db, find no changes
+(B.2.5 Another host handshakes the remote with an update, is given a list of
+    hosts to sync with, and proposes it's change to them. In that list is the
+    host from steps 1&2, because it's not offline, it's just hanging out waiting for a change.)
 B.3 We send a HostHandshake to the remote, the remote tells us that we're out of date
 B.4 we ask a host from the remote for the updates we missed
 <-- we're deadlocked here:
@@ -283,6 +274,16 @@ So looking at case B, we should remove the FileSyncRequest? Or the FileChangePro
     - B again tries to tell the remote it has an update u_1@t_1. (the host can know this will get a new timestamp)
     The remote assigns u_1 the timestamp t_3, and marks A out of date.
   - In the above scenario, and also in probably any scenario honestly, when a client has a connection to a host, if that host ever becomes out of date, the client won't know. This isn't made worse by the lack of a FileChangeProposal
+
+So lets do B again w/o the FileChangeProposal
+C.1 The thread wakes up because it's been 30s
+C.2 We query the db, find no changes
+C.3 We send a HostHandshake to the remote, the remote tells us that we're out of date
+C.4 we ask a host from the remote for the updates we missed
+C.6 we handshake the remote, they tell us we're synced up
+C.7 we deque any network connections
+
+Seems good to me.
 
 
 ### RemoteHandshake signature
@@ -323,7 +324,8 @@ With only one of the two of `sync_end` or `new_sync` timestamps being set.
     - [x] Marks files as modified when they change
     - [x] Marks files as deleted when they are deleted
     - [x] Creates a new filenode, and marks the old one moved when a file is moved.
-- [ ] Update Host to be able to handle a `FileChangeProposal` Message
+- [ ] Remove the code to handle a `FileChangeProposal`. The Host should not send these - instead the host will ask other hosts if it's out of date ONLY.
+- ~~~[ ] Update Host to be able to handle a `FileChangeProposal` Message~~~
     - [ ] Verify the other host with the remote
         * see `host_verify_host` in `remote/.../mirror.py`
         * see `verify_host` in `network_updates.py`
@@ -347,16 +349,16 @@ With only one of the two of `sync_end` or `new_sync` timestamps being set.
     - [ ] When changes are noticed, send a handshake to the Remote
     - [ ] Add support to remote to handle `HostHandshake`s according to the above algorithm.
         - [ ] Remote can tell the host to get updates from others
-        - [ ] Remote can tell the host it's up to data
-        - [ ] Remote can tell the host it's up to data and should send updates
+        - [ ] Remote can tell the host it's up to date
+        <!-- - [ ] Remote can tell the host it's up to data and should send updates -->
         - [ ] Remote can tell the host when others last_sync'd
     - [ ] Host supports recieving a RemoteHandshake after a HostHandshake.
         - [ ] During a `RemoteHandshake`, Host deletes filenodes that have been deleted before `last_all_handshake`
     - [ ] rewrite host to use proposed change method
         - [ ] calculate pending changes from the files with modifications since our last sync.
-        - [ ] In a way that's reusable below:
-            - [ ] Convert those objects into `FileChangeProposals`
-            - [ ] Send them to the other hosts, and handles their response
+        <!-- - [ ] In a way that's reusable below: -->
+            <!-- - [ ] Convert those objects into `FileChangeProposals` -->
+            <!-- - [ ] Send them to the other hosts, and handles their response -->
 - [ ] Update the host to be able to handle a `FileSyncRequest`
     - [ ] Generate all the `FileChangeProposals` between sync_start and sync_end
     - [ ] send them to the other host, reusing the code above
