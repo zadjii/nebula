@@ -377,15 +377,52 @@ def new_main_thread(host_obj):
     _log.info('entering main loop')
 
     while not host_obj.is_shutdown_requested():
-        # mylog('Top of Loop')
+
         timed_out = host_obj.network_signal.wait(30)
         host_obj.network_signal.clear()
         host_obj.acquire_lock()
         host_obj.process_connections()
-        # mylog('Done processing connections')
 
         mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
         all_mirrored_clouds = mirrored_clouds.all()
+
+        # @Mike: There are two types of handshakes, and we need to differentate them better.
+        # There are SSL handshakes, which each host does with a remote once.
+        # Then there are mirror handshakes, which indicates when a mirror has
+        #   communicated with the remote.
+        # The names of these methods should chane to more accurately separate these ideas.
+        # [ ] update_network_status should only be responsible for cert maintainence.
+        #   It'll make update our network status, and if we've changed IP,port,
+        #   or our cert has expired, It'll host_move with that remote.
+        # handshake_remotes() should be removed.
+        # [ ] send_remote_handshake, which is mainly iplemented in _try_handshake, needs to be updated.
+        #   The ip,port,wsport seem redundant. They should be removed.
+        #   The HostMove handles those, and the remote can determine any
+        #   mirror's IP based on the IP of the Host it's on.
+        #   Maybe the same with hostname, but definitely not used/free space
+        # [ ] update_network_status shouldn't update our local tracker of last_handshake
+        # [ ] We shouldn't have a local tracker of last_handshake at all.
+        #   We should instead be keeping that info in each mirror, and at the
+        #   end of the loop, for any mirrors where it's been more than 30s, then
+        #   those should handshake.
+        # [ ] When we find new mirrors, we handshake all of them. This is probably fine.
+        #   Most of them will probably not have new changes, and we'll just
+        #   update the last_handshake for the mirror on the host and remote.
+        # [ ] For each mirror, determine if it has changes, and if it does, then handshake with the remote.
+        #   (in _handle_remote_handshake) The remote will either:
+        #       Give us a new timestamp for these changes. This means we're totally up to date
+        #       Tell us we're out of date, and give us a list of hosts to request changes from.
+        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        # TODO: What if a host creates a change, then goes offline? !!!!!!!!!!
+        # eg A changes f, goes offline, B comes online. no one has that change now.
+        # This is obviously bad! B isn't up to date, but there are no other hosts.
+        # So unfortunately, we can't really resolve this.
+        # We can however mark B as the new actiev host. ThIS COMES WITH CONSEQUENCES
+        # However, we do need to make sure that B can be marked as the new active host.
+        # So when B comes to handshake, and it's behind the last sync time, but there are no active hosts
+        # we could change the last_sync to B's.
+        # However, when A comes back online, it'll be very confused.
+
 
         # update network status will handshake the remotes if we've moved.
         rd = host_obj.update_network_status()
@@ -397,7 +434,7 @@ def new_main_thread(host_obj):
                 last_handshake = datetime.utcnow()
 
         # Update our loaded mirrors, in case another mirror was added since the last loop
-        new_num_mirrors = update_num_mirrors(host_obj, num_clouds_mirrored)
+        new_num_mirrors = _update_num_mirrors(host_obj, num_clouds_mirrored)
         if num_clouds_mirrored < new_num_mirrors:
             host_obj.handshake_remotes()
             last_handshake = datetime.utcnow()
@@ -422,7 +459,7 @@ def new_main_thread(host_obj):
     _log.info('Leaving main loop')
 
 
-def update_num_mirrors(host, initial_mirror_count):
+def _update_num_mirrors(host, initial_mirror_count):
     # type: (HostController, int) -> int
     """
     Check to see if the number of mirrors has changed. If it has, then:

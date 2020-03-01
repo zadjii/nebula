@@ -203,8 +203,13 @@ def do_remove_file(host_obj, mirror, relative_path, db):
     return rd
 
 
-def handle_file_change_proposal(host_obj, connection, address, msg_obj):
+def _handle_file_change_proposal(host_obj, connection, address, msg_obj):
     # type: (HostController, AbstractConnection, str, BaseMessage) -> ResultAndData
+
+    # NOTE: as of Feb 2019, FileChangePropoasl messages aren't sent by a host
+    #   in response to a RemoteHandshake anymore. They are sent in response to
+    #   a FileSyncRequest from another host
+
     db = host_obj.get_db()
     _log = get_mylog()
     requestor_id = msg_obj.src_id
@@ -322,3 +327,23 @@ def _do_file_change_proposal(db, mirror, src_path, tgt_path, change_type, is_dir
 
     _log.debug('Bottom of _do_file_change_proposal(type={}, src={}, proposed_last_sync={})'.format(change_type, src_path.to_string(), proposed_last_sync))
     return rd
+
+
+def handle_file_sync_request(host_obj, connection, address, msg_obj):
+    # type: (HostController, AbstractConnection, str, BaseMessage) -> ResultAndData
+    rd = Error()
+
+    db = host_obj.get_db()
+    _log = get_mylog()
+    requestor_id = msg_obj.src_id
+    # TODO: validate the requestor with the remote - They should have just
+    #       handshook the remote, and found they were out of date, which is when
+    #       the remote sent them here.
+    tgt_id = msg_obj.tgt_id
+    uname = msg_obj.uname
+    cname = msg_obj.cname
+    sync_start = msg_obj.sync_start
+    sync_end = msg_obj.sync_end
+
+    return rd
+

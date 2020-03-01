@@ -118,8 +118,8 @@ add it to our runtime list of changes to be sync'd.
                   I can determine that I need updates from t_0 and t_1 from
                   `[hosts]`.
                 - [H] Iterate over the hosts until we find a `FileSyncComplete` message.
-                    - [H] send the host H_i a `FileSyncRequest(t_0, t_1)`
-                        - [H_i] If we have files whose last_sync timestamp is in t:(t_0, t_1], send it to the requestor as a `FileChangeProposal`
+                    - [H] send the host `H_i` a `FileSyncRequest(t_0, t_1)`
+                        - [`H_i`] If we have files whose last_sync timestamp is in t:(t_0, t_1], send it to the requestor as a `FileChangeProposal`
                             - [HOST] We will accept, reject or acknowledge each,
                               based on the last_sync of the file
                                 - if we reject,
@@ -286,6 +286,54 @@ C.7 we deque any network connections
 Seems good to me.
 
 
+<!-- zadjii, 2019-02-22 -->
+What if a host creates a change, then goes offline? !!!!!!!!!!
+ex:
+  two hosts, A and B. B is offline.
+  A changes f (t_0), then goes offline.
+  B comes online (t_1).
+  When B asks the remote for active hosts, the only one that's up to date is A.
+    However, it's offline. So either the remote will tell B to go to A, and B will fail,
+    or the remote will tell B there are no online active hosts.
+  No one has that change now!
+
+This is obviously bad! B isn't up to date, but there are no other hosts.
+So unfortunately, we can't really resolve this.
+There are two possible solutions:
+ 1. We can mark B as the new active host. THIS COMES WITH CONSEQUENCES
+    However, we do need to make sure that B can be marked as the new active host.
+    So when B comes to handshake, and it's behind the last sync time, but there are no active hosts
+    we could change the last_sync to B's.
+    However, when A comes back online (t_2), it'll be very confused.
+    It'll say it's last_sync is t_0, the remote will tell it to get updates from B at t_1.
+    B may have no changes. It may have a change to f from t_-1, that the remote now assigned to t_1, meaning that the original change to f at t_0 is lost now.
+
+ 2. We can prevent anyone from becoming up to date until A comes back online.
+    When B needs to come up-to-date, and the remote doesn't find an active up-to-date host, then B can't be marked as up to date. B can accumulate changes, but it'll never be marked as up-to-date.
+    Clients will not be able to connect to B even though it's online.
+    A could theoretically also be accumlating changes while offline (maybe A and B are both laptops)
+    When A comes back online, it's changes will be prioritized over B's, right?
+    It'll come online, say that it's last_sync was the same as the cloud's last_sync, and the remote will assign all it's new changes that handshake timestamp.
+    Then, B will handshake, and find that there's an online host.
+    B will ask A, and A's timestamp for those changes will be newer than B's, even if B's change happened after A's, A actually got a handshake.
+    So, B's changes will be overwritten by A's
+    This means data loss, and is shitty
+
+Ideally, what do we wish would happen? If this problem was solved, what would that be like for the user?
+
+<!-- zadjii 27-Feb-2019 -->
+I've explored this case quite a bit prvately in my notes. In conclusion, one of these changes is going to get lost. Our policy in general is to keep the latest change. So, we're going to be pursuing 1, with a small modification to the algorithm. When A comes back online, A'll be told to request from B, who is the current active online host.
+When A does that, B will respond by proposing a change (file, last_modified, last_sync)=(f, t_-1, t_1), which A will compare with it's view of f, (f, t_0, t_0). A's f was changed after the proposed file, so it'll reject the change. A will then need to be able to tell the remote that A needs to be made the new active host.
+
+In this case, A handshakes:
+* `HostHandshake(last_sync=t_0, new_updates=t_0)`
+* `RemoteHandshake(sync_end=t_1, new_sync=t_2, mirrors=[B], last_all_sync=...)`
+* A->B `FileSyncRequest()`
+* B->A `FileChangeProposal()`
+  - A rejects
+  - A marks the t_-1 change as being syncd at t_2
+* `HostHandshake(last_sync=t_0, new_updates=t_2)`
+
 ### RemoteHandshake signature
 
 Thak means the signature is
@@ -294,6 +342,17 @@ With only one of the two of `sync_end` or `new_sync` timestamps being set.
 `hosts` is a list of hosts to sync with or from
 `last_all_sync` is the oldest of all the mirrors' last_sync's.
 
+<!-- zadjii 27-Feb-2019 -->
+The signature should be
+  `RemoteHandshake(sync_end=None, new_sync=None, mirrors=None, last_all_sync=None)`
+
+* we'll stash our current `last_sync` as `initial_last_sync`
+
+* if `sync_end` is set, then this mirror will need to go ask the `mirrors` for updates between (our `last_sync`, `sync_end`].
+  - If during the course of any of the proposals, we have a newer revision to a file than the cloud version,
+    we'll need to mark that file's last_sync as `new_sync`
+* if `sync_end is None`, then we're the newest mirror.
+  - update any files that were modified after our previous `initial_last_sync`
 
 --------------------------------------------------------------------------------------------
 
@@ -324,8 +383,22 @@ With only one of the two of `sync_end` or `new_sync` timestamps being set.
     - [x] Marks files as modified when they change
     - [x] Marks files as deleted when they are deleted
     - [x] Creates a new filenode, and marks the old one moved when a file is moved.
-- [ ] Remove the code to handle a `FileChangeProposal`. The Host should not send these - instead the host will ask other hosts if it's out of date ONLY.
-- ~~~[ ] Update Host to be able to handle a `FileChangeProposal` Message~~~
+- [x] Remove the code to handle a `FileChangeProposal` in filter_func. The Host should not send these - instead the host will ask other hosts if it's out of date ONLY.
+- [ ] Host handshakes the remote when it notices a file change, and handles the remote handshake
+    - [ ] When changes are noticed, send a handshake to the Remote
+    - [ ] Add support to remote to handle `HostHandshake`s according to the above algorithm.
+        - [ ] Remote can tell the host to get updates from others
+        - [ ] Remote can tell the host it's up to date
+        - [ ] Remote can tell the host it's up to date with a new timestamp t_3
+        - [ ] Remote can tell the host when others last_sync'd
+    - [ ] Host supports recieving a RemoteHandshake after a HostHandshake.
+        - [ ] During a `RemoteHandshake`, Host deletes filenodes that have been deleted before `last_all_handshake`
+    <!-- - [ ] rewrite host to use proposed change method -->
+        <!-- - [ ] calculate pending changes from the files with modifications since our last sync. -->
+        <!-- - [ ] In a way that's reusable below: -->
+            <!-- - [ ] Convert those objects into `FileChangeProposals` -->
+            <!-- - [ ] Send them to the other hosts, and handles their response -->
+- [ ] Update the host to be able to handle a `FileSyncRequest`
     - [ ] Verify the other host with the remote
         * see `host_verify_host` in `remote/.../mirror.py`
         * see `verify_host` in `network_updates.py`
@@ -334,6 +407,10 @@ With only one of the two of `sync_end` or `new_sync` timestamps being set.
           * ~~~We'll need another message type, HostVerifyHostSync~~~
           * If we do this, then the remote needs another set of mappings, for hosts that have been told to sync messages from another host. Is this necessary? Or coud we just overload the existing mapping?
           * We'll need to make sure to remove these mappings when we're done mirroring and done syncing
+    - [ ] Generate all the `FileChangeProposals` between sync_start and sync_end
+    - [ ] send them to the other host
+    - [ ] Requesting host handles FileChangeProposals
+- [ ] Update Host to be able to handle a `FileChangeProposal` Message
     - [x] ack their change
     - [x] reject their change
     - [x] accept their change (`FileChangeResponse`, followed by (HOST_FILE_TRANSFER, file_data))
@@ -345,23 +422,7 @@ With only one of the two of `sync_end` or `new_sync` timestamps being set.
         - [x] modifies
         - [ ] deletes
         - [ ] moves
-- [ ] Host handshakes the remote when it notices a file change, and handles the remote handshake
-    - [ ] When changes are noticed, send a handshake to the Remote
-    - [ ] Add support to remote to handle `HostHandshake`s according to the above algorithm.
-        - [ ] Remote can tell the host to get updates from others
-        - [ ] Remote can tell the host it's up to date
-        <!-- - [ ] Remote can tell the host it's up to data and should send updates -->
-        - [ ] Remote can tell the host when others last_sync'd
-    - [ ] Host supports recieving a RemoteHandshake after a HostHandshake.
-        - [ ] During a `RemoteHandshake`, Host deletes filenodes that have been deleted before `last_all_handshake`
-    - [ ] rewrite host to use proposed change method
-        - [ ] calculate pending changes from the files with modifications since our last sync.
-        <!-- - [ ] In a way that's reusable below: -->
-            <!-- - [ ] Convert those objects into `FileChangeProposals` -->
-            <!-- - [ ] Send them to the other hosts, and handles their response -->
-- [ ] Update the host to be able to handle a `FileSyncRequest`
-    - [ ] Generate all the `FileChangeProposals` between sync_start and sync_end
-    - [ ] send them to the other host, reusing the code above
+
 - [ ] When the Host handshakes a remote and is out of date, the host must set `FileSyncRequest`s to other hosts
     * see `host.models.Cloud.modified_between()`
 - [ ] Add support for mirroring with multiple hosts

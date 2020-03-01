@@ -171,8 +171,8 @@ class Cloud(base):
             ipv6=ip,
             port=port,
             wsport=ws_port,
-            last_sync=self.last_sync(),  # todo update number/timestamp? it's in my notes
-            last_modified=self.last_modified(),  # todo update number/timestamp? it's in my notes
+            last_sync=self.last_sync(),
+            last_modified=self.last_modified(),
             hostname=hostname,  # hostname
             used_space=used_space,
             remaining_space=remaining_space

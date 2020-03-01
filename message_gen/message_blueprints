@@ -161,10 +161,10 @@
 76  , CLIENT_GET_LINK_PERMISSIONS_REQUEST, sid, string:link_string
 77  , CLIENT_GET_LINK_PERMISSIONS_RESPONSE, int:permissions, blob:users
 # FILE_SYNC_REQUEST is for one host to request the changes between two timestamps from another host
-# FILE_SYNC_PROPOSAL is for one host to tell another "I believe this file changed.
+# FILE_SYNC_PROPOSAL is for one host to reply to a FSR, saying "I believe this file changed.
 #       If you're cool with it, I'm going to send it to you."
 # For both of these messages:
-# src_id is the id of the requesting mirror
+# src_id is the id of the mirror generating the message and sending it
 # tgt_id is the id of the mirror we're sending to
 78  , FILE_SYNC_REQUEST , int:src_id, int:tgt_id, string:uname  , string:cname, sync_start, sync_end
 79  , FILE_SYNC_PROPOSAL, int:src_id, int:tgt_id, string:rel_path, string:tgt_path, int:change_type, bool:is_dir, sync_time

@@ -26,7 +26,7 @@ from host.function.network.client import list_files_handler, \
     handle_client_get_shared_paths, handle_client_create_link, handle_client_read_link, stat_files_handler, \
     handle_client_delete_file, handle_client_remove_dir, handle_client_set_link_permissions, \
     handle_client_add_user_to_link, handle_client_remove_user_from_link, handle_client_get_link_permissions
-from host.function.network_updates import handle_fetch, handle_file_change_proposal
+from host.function.network_updates import handle_fetch, handle_file_sync_request
 from host.models.Cloud import Cloud
 from host.models.Remote import Remote
 from host.util import set_mylog_name, mylog, get_ipv6_list, setup_remote_socket, \
@@ -277,6 +277,8 @@ class HostController:
             # todo#64: Hey, now there's handshake_remotes and refresh_remotes.
             #   These do different things, but _really_ they do the same thing.
             #   Maybe we should do something about that.. like consolidate them.
+            # NOTE 2019-02-21: Maybe not. cert handshaking is a different thing
+            #   than mirror handshaking. Don't consolidate them.
 
         self.active_net_thread_obj.refresh_context()
 
@@ -540,8 +542,12 @@ class HostController:
             #     handle_file_change(self, connection, address, msg_obj)
             elif msg_type == REFRESH_MESSAGE:
                 connection.send_obj(RefreshMessageMessage())
-            elif msg_type == FILE_SYNC_PROPOSAL:
-                handle_file_change_proposal(self, connection, address, msg_obj)
+            # Note: FILE_SYNC_PROPOSAL's are only sent as a response to a
+            # FILE_SYNC_REQUEST. The FSR handler will handle the proposal directly.
+            # elif msg_type == FILE_SYNC_PROPOSAL:
+            #     handle_file_change_proposal(self, connection, address, msg_obj)
+            elif msg_type == FILE_SYNC_REQUEST:
+                handle_file_sync_request(self, connection, address, msg_obj)
             # ------------------------ C->H Messages ------------------------ #
             elif msg_type == STAT_FILE_REQUEST:
                 stat_files_handler(self, connection, address, msg_obj)
