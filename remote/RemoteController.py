@@ -35,6 +35,7 @@ HOST = ''                 # Symbolic name meaning all available interfaces
 
 
 def host_handshake(remote_obj, connection, address, msg_obj):
+    # type: (RemoteController, AbstractConnection, object, HostHandshakeMessage) -> None
     _log = get_mylog()
     db = remote_obj.get_db()
     ipv6 = msg_obj.ipv6
@@ -244,7 +245,7 @@ def host_move(remote_obj, connection, address, msg_obj):
         _log.debug(msg)
         send_error_and_close(err, connection)
 
-    certificate_request = crypto.load_certificate_request(crypto.FILETYPE_PEM, csr)
+    certificate_request = crypto.load_certificate_request(crypto.FILETYPE_PEM, csr) if (csr is not None and not remote_obj._unittesting) else None
     rd = do_host_move(remote_obj, host, ip, certificate_request)
     if rd.success:
         host = rd.data
@@ -401,6 +402,7 @@ class RemoteController(object):
     def __init__(self, nebr_instance):
         # type: (NebrInstance) -> None
         self.nebr_instance = nebr_instance
+        self._unittesting = nebr_instance._unittesting
 
     def get_db(self):
         # type: () -> SimpleDB
@@ -412,7 +414,7 @@ class RemoteController(object):
 
         :return:
         """
-        return self.nebr_instance.make_db_session()
+        return self.nebr_instance.get_db() if self._unittesting else self.nebr_instance.make_db_session()
 
     def get_instance(self):
         # type: () -> NebrInstance
@@ -512,9 +514,10 @@ class RemoteController(object):
         msg_obj = connection.recv_obj()
         msg_type = msg_obj.type
         # print 'The message is', msg_obj
-        if msg_type == NEW_HOST:
-            new_host_handler(self, connection, address, msg_obj)
-        elif msg_type == HOST_HANDSHAKE:
+        # I don't think this is used anymore??
+        # if msg_type == NEW_HOST:
+        #     new_host_handler(self, connection, address, msg_obj)
+        if msg_type == HOST_HANDSHAKE:
             host_handshake(self, connection, address, msg_obj)
         elif msg_type == REQUEST_CLOUD:
             host_request_cloud(self, connection, address, msg_obj)
