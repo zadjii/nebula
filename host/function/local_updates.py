@@ -368,6 +368,13 @@ def check_local_modifications(host_obj, cloud, db):
             pass
             # TODO _(7a, 32b, 33b, 34b)_
             # * Host supports recieving a RemoteMirrorHandshake after a MirrorHandshake.
+            #
+            # 7a: The remote told us we need to get updates from the hosts in [hosts]
+            #     - Introduce some helper to iterate over the hosts until we get the FileSyncComplete
+            #     - That helper will
+            #       * send a file sync request to the mirror
+            #       * call _handle_file_change_proposal for its response
+
 
         return rd
 

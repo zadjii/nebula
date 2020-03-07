@@ -8,8 +8,8 @@ from host import Cloud
 from host.function.recv_files import recv_file_tree
 from host.function.send_files import send_tree
 from host.util import check_response, mylog, find_deletable_children, \
-    get_matching_clouds, FILE_CHANGE_PROPOSAL_ACKNOWLEDGE, \
-    FILE_CHANGE_PROPOSAL_REJECT, FILE_CHANGE_PROPOSAL_ACCEPT, FILE_CHANGE_TYPE_CREATE, \
+    get_matching_clouds, FILE_SYNC_PROPOSAL_ACKNOWLEDGE, \
+    FILE_SYNC_PROPOSAL_REJECT, FILE_SYNC_PROPOSAL_ACCEPT, FILE_CHANGE_TYPE_CREATE, \
     FILE_CHANGE_TYPE_MODIFY, FILE_CHANGE_TYPE_DELETE, FILE_CHANGE_TYPE_MOVE
 from messages import HostVerifyHostFailureMessage, HostVerifyHostRequestMessage, InvalidStateMessage, \
     UnknownIoErrorMessage, FileSyncResponseMessage
@@ -210,10 +210,24 @@ def _handle_file_change_proposal(host_obj, connection, address, msg_obj):
     #   in response to a RemoteHandshake anymore. They are sent in response to
     #   a FileSyncRequest from another host
 
+    # 07-Mar-2020: This represents the 12a1, 14a2, 17a3 cases in the flow chart.
+    # We're handling the 11a message here, _from the host we asked_ in
+    # `handle_file_sync_request`
+    #
+    # TODO: This isn't called anywhere yet. This needs to be called in
+    # local_updates.py:check_local_modifications. That method is going to
+    # recieve a RemoteMirrorHandshake, then find another mirror, and send a
+    # FileSyncRequest to that mirror. That other mirror will handle the message
+    # in handle_file_sync_request, and send a FileChangePropoasl back to us to
+    # handle here.
+
     db = host_obj.get_db()
     _log = get_mylog()
     requestor_id = msg_obj.src_id
     # TODO: validate the requestor with the remote
+    #
+    # TODO 07-Mar-2020: I don't think the above comment is needed anymore. We
+    # should go through and update the names in here.
 
     mirror_id = msg_obj.tgt_id
     change_type = msg_obj.change_type
@@ -291,13 +305,13 @@ def _do_file_change_proposal(db, mirror, src_path, tgt_path, change_type, is_dir
     rd = Error('I wasnt prepared for this case of file change proposal')
 
     if src_node is None:
-        if change_type is FILE_CHANGE_TYPE_CREATE:
-            rd = Success(FILE_CHANGE_PROPOSAL_ACCEPT)
+        if change_type is FILE_SYNC_TYPE_CREATE:
+            rd = Success(FILE_SYNC_PROPOSAL_ACCEPT)
         else:
-            rd = Success(FILE_CHANGE_PROPOSAL_REJECT)
+            rd = Success(FILE_SYNC_PROPOSAL_REJECT)
     else:
-        if change_type is FILE_CHANGE_TYPE_CREATE:
-            rd = Success(FILE_CHANGE_PROPOSAL_REJECT)
+        if change_type is FILE_SYNC_TYPE_CREATE:
+            rd = Success(FILE_SYNC_PROPOSAL_REJECT)
         else:
             file_last_sync = src_node.last_sync
             file_last_modified = src_node.last_modified
@@ -307,20 +321,20 @@ def _do_file_change_proposal(db, mirror, src_path, tgt_path, change_type, is_dir
             #       newer than the proposed sync timestamp.
             # We'll send the update later.
             if (file_last_sync <= proposed_last_sync) and (proposed_last_sync < file_last_modified):
-                rd = Success(FILE_CHANGE_PROPOSAL_REJECT)
+                rd = Success(FILE_SYNC_PROPOSAL_REJECT)
             # It's a newer version of our file, or a file we didn't modify,
             #   - We'll recv the file's contents.
             elif (file_last_sync < proposed_last_sync):
-                rd = Success(FILE_CHANGE_PROPOSAL_ACCEPT)
+                rd = Success(FILE_SYNC_PROPOSAL_ACCEPT)
             # We have whatever change they're talking about
             elif (file_last_sync == proposed_last_sync):
                 # update our last sync timestamp
                 src_node.last_sync = proposed_last_sync
-                rd = Success(FILE_CHANGE_PROPOSAL_ACKNOWLEDGE)
+                rd = Success(FILE_SYNC_PROPOSAL_ACKNOWLEDGE)
             # Our version is newer than the other's.
             #       The other should know that... *TODO?*
             elif (file_last_sync > proposed_last_sync):
-                rd = Success(FILE_CHANGE_PROPOSAL_REJECT)
+                rd = Success(FILE_SYNC_PROPOSAL_REJECT)
 
     # Is it this function or _retrieve_file_from_connection's responsibility to update the file's last_sync
     # Answer: recv_file_transfer will update the last_modified timestamp
@@ -331,19 +345,48 @@ def _do_file_change_proposal(db, mirror, src_path, tgt_path, change_type, is_dir
 
 def handle_file_sync_request(host_obj, connection, address, msg_obj):
     # type: (HostController, AbstractConnection, str, BaseMessage) -> ResultAndData
+    """
+    9a-19a in the flowchart
+
+    """
+
     rd = Error()
 
     db = host_obj.get_db()
     _log = get_mylog()
     requestor_id = msg_obj.src_id
+
     # TODO: validate the requestor with the remote - They should have just
     #       handshook the remote, and found they were out of date, which is when
     #       the remote sent them here.
+    # 2020: This is _35a_ in the flow chart
+
     tgt_id = msg_obj.tgt_id
     uname = msg_obj.uname
     cname = msg_obj.cname
     sync_start = msg_obj.sync_start
     sync_end = msg_obj.sync_end
+
+    # TODO: If we have files whose last_sync timestamp is in t:(t_0, t_1], send it to
+    #       the requestor as a `FileChangeProposal`
+    # This is _10a_ in the flowchart
+
+    for f in files:
+        # TODO: Synthesize the FileChangeProposal 10a
+
+        # TODO: Send to requestor
+        # This is _11a_ in the flowchart
+
+        # Get the response from the requestor
+        # This is _13a1, 15a2, 18a3_ in the flowchart
+        response = connection.recv_obj()
+
+        # if they accepted the file, send the file here
+        # This is _16a2_
+
+    # TODO: Send a FileSyncComplete to mark that we're done sending the changes
+    #       we have on this interval.
+    # This is _19a_ in the flowchart
 
     return rd
 
