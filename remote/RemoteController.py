@@ -77,15 +77,28 @@ def mirror_handshake(remote_obj, connection, address, msg_obj):
 
         # They are out of date and need to sync updates. Reply to the host with
         # a list of hosts it can sync with
-        #
-        # TODO: Prepare us to reply to HOST_HOST_VERIFY messages from the hosts
+
+        # Prepare us to reply to HOST_HOST_VERIFY messages from the hosts
         # in this list, as they'll want to make sure the asking host is legit.
         # This is _36a_
+        #
+        # TODO: We should not be re-using the HostHostFetchMapping here - that's
+        # specific to mirroring.
+        # * We _should_ have our own map for normal sync's
+        # * We _should_ revoke these mappings once a host syncs up.
+        up_to_date_mirrors = cloud.up_to_date_mirrors()
+
+        for m in up_to_date_mirrors:
+            # this was stolen blatently from remote/f/mirror.py:respond_to_mirror_request
+            mapping = HostHostFetchMapping(rand_mirror, new_mirror, cloud)
+            db.session.add(mapping)
+        db.session.commit()
+
         response = RemoteMirrorHandshakeMessage(id=mirror.id,
                                                 new_sync=None,
                                                 sync_end=datetime_to_string(cloud_last_sync),
                                                 last_all_sync=None,
-                                                hosts=[m.to_dict() for m in cloud.up_to_date_mirrors()])
+                                                hosts=[m.to_dict() for m in up_to_date_mirrors])
 
     elif last_sync == cloud_last_sync:
         # This mirror is up to date. They might have _new_ updates though.
