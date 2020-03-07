@@ -23,7 +23,7 @@ class DebugMirrorsCommand(BaseCommand):
                     , mirror.username
                     , mirror.name
                     , mirror.created_on
-                    , mirror.last_update
+                    , mirror.last_sync
                     , mirror.completed_mirroring
                     , [child.name for child in mirror.children.all()]
                 )

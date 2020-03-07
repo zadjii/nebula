@@ -187,8 +187,8 @@ class HostController:
                 if rd.success:
                     # TODO: Right now I'm just kinda ignoring the RD's here...
 
-                    # handshake remotes will send all of them our new IP/port/wsport
-                    rd = self.handshake_remotes()
+                    # # handshake remotes will send all of them our new IP/port/wsport
+                    # rd = self.handshake_remotes()
 
                     # Part 2:
                     # Handshake each remote once for this host.
@@ -235,29 +235,30 @@ class HostController:
         self.spawn_net_thread()
         return Success()
 
-    def handshake_remotes(self):
-        """
-        Sends HostHandshakeMessages to the remote for each mirror on this host.
-        Called by:
-        `HostController::update_network_status`, if our IP changed we handshake all remotes.
-        `new_new_main_thread`, if the number of mirrors has changed
-        `new_new_main_thread`, if it's been 30s since the last handshake
-        :return:
-        """
-        db = self._nebs_instance.get_db()
-
-        # Part 1: Legacy
-        # Handshake the remote for each mirror on this host.
-        # This does not update our cert, or really our IP.
-        # todo#63: In the future, have one Remote object in the host DB for each remote
-        #   and handshake that remote once.
-        # todo: And then update that Remote's handshake (#63?)
-        mirrors = db.session.query(Cloud).filter_by(completed_mirroring=True)
-        all_mirrors = mirrors.all()
-        for mirror in all_mirrors:
-            self.send_remote_handshake(mirror)
-
-        return Success()
+    # We're removing this. HostMove is responsible for updating the Remote with
+    # this host's address. MirrorHandshake is now responsible for updating
+    # timestanps.
+    # def handshake_remotes(self):
+    #     """
+    #     Sends HostHandshakeMessages to the remote for each mirror on this host.
+    #     Called by:
+    #     `HostController::update_network_status`, if our IP changed we handshake all remotes.
+    #     `new_new_main_thread`, if the number of mirrors has changed
+    #     `new_new_main_thread`, if it's been 30s since the last handshake
+    #     :return:
+    #     """
+    #     db = self._nebs_instance.get_db()
+    #     # Part 1: Legacy
+    #     # Handshake the remote for each mirror on this host.
+    #     # This does not update our cert, or really our IP.
+    #     # todo#63: In the future, have one Remote object in the host DB for each remote
+    #     #   and handshake that remote once.
+    #     # todo: And then update that Remote's handshake (#63?)
+    #     mirrors = db.session.query(Cloud).filter_by(completed_mirroring=True)
+    #     all_mirrors = mirrors.all()
+    #     for mirror in all_mirrors:
+    #         self.send_remote_handshake(mirror)
+    #     return Success()
 
     def refresh_remotes(self):
         """
@@ -284,67 +285,66 @@ class HostController:
 
         return Success()
 
-    def _try_handshake(self, cloud):
+    def try_mirror_handshake(self, cloud):
         # type: (Cloud) -> ResultAndData
+        # type: (Cloud) -> ResultAndData(true, RawConnection)
         remote_conn = None
+        _log = get_mylog()
+
         try:
             rd = setup_remote_socket(cloud)
             if not rd.success:
                 return rd
             remote_sock = rd.data
             remote_conn = RawConnection(remote_sock)
-            msg = cloud.generate_handshake(
-                self.active_net_thread_obj.get_external_ip()
-                , self.active_net_thread_obj.get_external_port()
-                , self.active_net_thread_obj.get_external_ws_port()
-            )
+            msg = cloud.generate_mirror_handshake()
 
             remote_conn.send_obj(msg)
-            # todo#65: implement REM_HANDSHAKE_GO_FETCH
-            # response = remote_conn.recv_obj()
+
         except gaierror as e:
-            mylog('Failed to connect to remote')
-            mylog('likely a network failure.')
-            mylog('Even more likely, network disconnected.')
-            mylog(e.message)
+            _log.error('Failed to connect to remote for a MirrorHandshake')
+            _log.debug('likely a network failure.')
+            _log.debug('Even more likely, network disconnected.')
+            _log.error(e.message)
             return Error(e.message)
         except Exception, e:
-            mylog('some other error handshaking remote')
-            mylog(e.message)
+            _log.error('Some other error handshaking remote')
+            _log.error(e.message)
             return Error(e.message)
-        finally:
-            if remote_conn is not None:
-                remote_conn.close()
-        return Success()
+        # finally:
+        #     if remote_conn is not None:
+        #         remote_conn.close()
+        return Success(remote_conn)
 
-    def send_remote_handshake(self, cloud):
-        """
-        Sends a single HostHandshake message to a remote for the given Mirror on this host.
-        Called by `handshake_remotes`
-        :param cloud:
-        :return:
-        """
-        _log = get_mylog()
-        # mylog('Telling {}\'s remote that [{}]\'s at {}'.format(
-        #     cloud.name, cloud.my_id_from_remote, self.active_ipv6())
-        # )
-        attempts = 0
-        succeeded = False
-        rd = Error()
-        while attempts < 5:
-            rd = self._try_handshake(cloud)
-            succeeded = rd.success
-            if succeeded:
-                break
-            attempts += 1
-            _log.debug('Attempted to handshake cloud, error was "{}"'.format(rd.data))
+    # def send_remote_handshake(self, cloud):
+    #     # type: (Cloud) -> ResultAndData
+    #     """
+    #     Sends a single HostHandshake message to a remote for the given Mirror on this host.
+    #     Called by `handshake_remotes`
+    #     :param cloud:
+    #     :return:
+    #     """
+    #     _log = get_mylog()
+    #     # mylog('Telling {}\'s remote that [{}]\'s at {}'.format(
+    #     #     cloud.name, cloud.my_id_from_remote, self.active_ipv6())
+    #     # )
+    #     attempts = 0
+    #     succeeded = False
+    #     rd = Error()
+    #     while attempts < 5:
+    #         rd = self._try_mirror_handshake(cloud)
+    #         succeeded = rd.success
+    #         if succeeded:
+    #             break
+    #         attempts += 1
+    #         _log.debug('Attempted to handshake cloud, error was "{}"'.format(rd.data))
 
-        if not succeeded:
-            _log.debug('Failed to handshake the remote. Moving to offline mode.')
-            self.set_offline()
-        else:
-            self.set_online()
-        return rd
+    #     if not succeeded:
+    #         _log.debug('Failed to handshake the remote. Moving to offline mode.')
+    #         self.set_offline()
+    #     else:
+    #         self.set_online()
+    #     return rd
 
     def _try_move(self, remote, message, ip, new_key):
         # type: (Remote, HostMoveRequestMessage, str, crypto.PKey) -> ResultAndData

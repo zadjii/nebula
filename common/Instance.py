@@ -6,6 +6,7 @@ import signal
 from argparse import Namespace
 
 import psutil
+import sys
 from migrate.versioning import api
 
 from common.SimpleDB import SimpleDB
@@ -184,6 +185,7 @@ class Instance(object):
         my_pid = os.getpid()
         rd = Error()
         other_pids = Instance.get_other_processes()
+        _log.debug('found other processes: {}'.format(other_pids))
         if force:
             rd = Instance.kill_pids(other_pids)
         else:

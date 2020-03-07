@@ -156,23 +156,51 @@ class Cloud(base):
                 total_size += os.path.getsize(fp)
         return total_size
 
-    def generate_handshake(self, ip, port, ws_port):
+    # def generate_handshake(self, ip, port, ws_port):
+    #     used_space = self.get_used_size()
+    #     if self.max_size == INFINITE_SIZE:
+    #         remaining_space = get_free_space_bytes('/')
+    #     else:
+    #         remaining_space = self.max_size - used_space
+    #     host_id = self.remote.my_id_from_remote
+    #     mirror_id = self.my_id_from_remote
+    #     hostname = platform.uname()[1]
+    #     # TODO: HostHandshakeMessage should only be used for the Host->Remote
+    #     # SSL handshake, and updating address and such. We should be using
+    #     # MirrorHandshakeMessage for updating the timestamp of a particular
+    #     # mirror.
+    #     msg = HostHandshakeMessage(
+    #         id=mirror_id,
+    #         ipv6=ip,
+    #         port=port,
+    #         wsport=ws_port,
+    #         last_sync=self.last_sync().isoformat() + 'Z',
+    #         last_modified=self.last_modified().isoformat() + 'Z',
+    #         hostname=hostname,  # hostname
+    #         used_space=used_space,
+    #         remaining_space=remaining_space
+    #     )
+    #     return msg
+
+
+    def generate_mirror_handshake(self):
+        # type: () -> HostHandshakeMessage
         used_space = self.get_used_size()
         if self.max_size == INFINITE_SIZE:
             remaining_space = get_free_space_bytes('/')
         else:
             remaining_space = self.max_size - used_space
 
-        host_id = self.remote.my_id_from_remote
         mirror_id = self.my_id_from_remote
         hostname = platform.uname()[1]
-        msg = HostHandshakeMessage(
-            id=mirror_id,
-            ipv6=ip,
-            port=port,
-            wsport=ws_port,
-            last_sync=self.last_sync(),
-            last_modified=self.last_modified(),
+
+        # last_modified() will automatically determine our latest modification,
+        # based on the timestamps of our children.
+
+        msg = MirrorHandshakeMessage(
+            mirror_id=mirror_id,
+            last_sync=self.last_sync().isoformat() + 'Z',
+            last_modified=self.last_modified().isoformat() + 'Z',
             hostname=hostname,  # hostname
             used_space=used_space,
             remaining_space=remaining_space

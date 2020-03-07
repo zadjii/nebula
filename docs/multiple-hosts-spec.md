@@ -410,6 +410,7 @@ The signature should be
   should not send these - instead the host will ask other hosts if it's out of
   date ONLY.
 - [ ] Host handshakes the remote when it notices a file change, and handles the remote handshake _(2, 3)_
+    - [x] When changes are noticed, send a handshake to the Remote _(2, 3)_
     - [ ] Add support to remote to handle `HostHandshake`s according to the above algorithm. _(4)_
         - [ ] Remote can tell the host to get updates from others _(4a, 5a)_
         - [ ] Remote can tell the host it's up to date _(22b, 23b1, 25b1)_

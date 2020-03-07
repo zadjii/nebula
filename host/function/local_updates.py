@@ -18,34 +18,34 @@ from messages import *
 __author__ = 'Mike'
 
 
-def send_updates(host_obj, db, cloud, updates):
-    _log = get_mylog()
-    _log.info('[{}] has updates {}'.format(cloud.my_id_from_remote, updates))
-    # connect to remote
+# def send_updates(host_obj, db, cloud, updates):
+#     _log = get_mylog()
+#     _log.info('[{}] has updates {}'.format(cloud.my_id_from_remote, updates))
+#     # connect to remote
 
-    rd = setup_remote_socket(cloud)
-    if not rd.success:
-        msg = 'Failed to connect to remote: {}'.format(rd.data)
-        _log.error(msg)
-        # TODO: At this point, the local updates will not be reflected in the
-        #   nebula. This is a spot to come back to when we add support for
-        #   multiple hosts.
-        return
-    remote_sock = rd.data
-    raw_connection = RawConnection(remote_sock)
-    # get hosts list
-    msg = GetActiveHostsRequestMessage(cloud.my_id_from_remote, cloud.uname(), cloud.cname())
-    raw_connection.send_obj(msg)
-    response = raw_connection.recv_obj()
-    check_response(GET_ACTIVE_HOSTS_RESPONSE, response.type)
-    hosts = response.hosts
-    updated_peers = 0
-    for host in hosts:
-        if host['id'] == cloud.my_id_from_remote:
-            continue
-        update_peer(host_obj, db, cloud, host, updates)
-        updated_peers += 1
-    _log.info('[{}] updated {} peers'.format(cloud.my_id_from_remote, updated_peers))
+#     rd = setup_remote_socket(cloud)
+#     if not rd.success:
+#         msg = 'Failed to connect to remote: {}'.format(rd.data)
+#         _log.error(msg)
+#         # TODO: At this point, the local updates will not be reflected in the
+#         #   nebula. This is a spot to come back to when we add support for
+#         #   multiple hosts.
+#         return
+#     remote_sock = rd.data
+#     raw_connection = RawConnection(remote_sock)
+#     # get hosts list
+#     msg = GetActiveHostsRequestMessage(cloud.my_id_from_remote, cloud.uname(), cloud.cname())
+#     raw_connection.send_obj(msg)
+#     response = raw_connection.recv_obj()
+#     check_response(GET_ACTIVE_HOSTS_RESPONSE, response.type)
+#     hosts = response.hosts
+#     updated_peers = 0
+#     for host in hosts:
+#         if host['id'] == cloud.my_id_from_remote:
+#             continue
+#         update_peer(host_obj, db, cloud, host, updates)
+#         updated_peers += 1
+#     _log.info('[{}] updated {} peers'.format(cloud.my_id_from_remote, updated_peers))
 
 
 def update_peer(host_obj, db, cloud, host, updates):
@@ -127,11 +127,8 @@ def local_file_create(host_obj, directory_path, dir_node, filename, db):
     file_created = file_stat.st_ctime
     mode = file_stat.st_mode
 
-    filenode = FileNode()
+    filenode = FileNode(filename, datetime.utcfromtimestamp( file_created ))
     db.session.add(filenode)
-    filenode.name = filename
-    filenode.created_on = datetime.utcfromtimestamp( file_created )
-    filenode.last_modified = datetime.utcfromtimestamp( file_modified )
 
     # DO NOT try and set the new node's `cloud` setting. If that's set, then
     #       we'll treat that node as a child of the cloud itself - as a child of
@@ -346,10 +343,33 @@ def recursive_local_modifications_check(host_obj, directory_path, dir_node, db):
 
 def check_local_modifications(host_obj, cloud, db):
     # type: (HostController, Cloud, SimpleDB) -> None
-    root = cloud.root_directory
-    updates = recursive_local_modifications_check(host_obj, root, cloud, db)
-    if len(updates) > 0:
-        send_updates(host_obj, db, cloud, updates)
+    # root = cloud.root_directory
+    # updates = recursive_local_modifications_check(host_obj, root, cloud, db)
+    # if len(updates) > 0:
+    #     send_updates(host_obj, db, cloud, updates)
+    _log = get_mylog()
+    updated_files = cloud.modified_since_last_sync()
+    if len(updated_files) > 0:
+        # send a Handshake to the remote
+        rd = host_obj.try_mirror_handshake(cloud)
+        if rd.success:
+            conn = rd.data
+            try:
+                response = conn.recv_obj()
+                resp_type = response.type
+                rd = ResultAndData(resp_type == REMOTE_MIRROR_HANDSHAKE, response)
+
+            except Exception, e:
+                _log.error('Some error recieving handshake from remote')
+                _log.error(e.message)
+                rd = Error(e.message)
+
+        if rd.success:
+            pass
+            # TODO _(7a, 32b, 33b, 34b)_
+            # * Host supports recieving a RemoteMirrorHandshake after a MirrorHandshake.
+
+        return rd
 
 
 def new_main_thread(host_obj):
@@ -363,7 +383,7 @@ def new_main_thread(host_obj):
     mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
     num_clouds_mirrored = 0  # mirrored_clouds.count()
 
-    host_obj.handshake_remotes()
+    host_obj.refresh_remotes()
 
     host_obj.acquire_lock()
     host_obj.watchdog_worker.watch_all_clouds(mirrored_clouds.all())
@@ -386,29 +406,30 @@ def new_main_thread(host_obj):
         mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
         all_mirrored_clouds = mirrored_clouds.all()
 
-        # @Mike: There are two types of handshakes, and we need to differentate them better.
-        # There are SSL handshakes, which each host does with a remote once.
-        # Then there are mirror handshakes, which indicates when a mirror has
-        #   communicated with the remote.
-        # The names of these methods should chane to more accurately separate these ideas.
-        # [ ] update_network_status should only be responsible for cert maintainence.
+        # @Mike: There are two types of handshakes, and we need to differentiate them better.
+        # 1. There are SSL handshakes, which each host does with a remote once.
+        # 2. Then there are mirror handshakes, which indicates when a mirror has
+        #    communicated with the remote.
+        # The names of these methods should change to more accurately separate these ideas.
+        # * [ ] update_network_status should only be responsible for cert maintenance.
         #   It'll make update our network status, and if we've changed IP,port,
         #   or our cert has expired, It'll host_move with that remote.
         # handshake_remotes() should be removed.
-        # [ ] send_remote_handshake, which is mainly iplemented in _try_handshake, needs to be updated.
-        #   The ip,port,wsport seem redundant. They should be removed.
-        #   The HostMove handles those, and the remote can determine any
-        #   mirror's IP based on the IP of the Host it's on.
-        #   Maybe the same with hostname, but definitely not used/free space
-        # [ ] update_network_status shouldn't update our local tracker of last_handshake
-        # [ ] We shouldn't have a local tracker of last_handshake at all.
+        # * [ ] HostController::send_remote_handshake, which is mainly
+        #   implemented in HostController::_try_handshake, needs to be updated.
+        #     * The ip,port,wsport seem redundant. They should be removed.
+        #     * The HostMove handles those, and the remote can determine any
+        #     * mirror's IP based on the IP of the Host it's on.
+        #     * Maybe the same with hostname, but definitely not used/free space
+        # * [x] update_network_status shouldn't update our local tracker of last_handshake
+        # * [ ] We shouldn't have a local tracker of last_handshake at all.
         #   We should instead be keeping that info in each mirror, and at the
         #   end of the loop, for any mirrors where it's been more than 30s, then
         #   those should handshake.
-        # [ ] When we find new mirrors, we handshake all of them. This is probably fine.
+        # * [ ] When we find new mirrors, we handshake all of them. This is probably fine.
         #   Most of them will probably not have new changes, and we'll just
         #   update the last_handshake for the mirror on the host and remote.
-        # [ ] For each mirror, determine if it has changes, and if it does, then handshake with the remote.
+        # * [ ] For each mirror, determine if it has changes, and if it does, then handshake with the remote.
         #   (in _handle_remote_handshake) The remote will either:
         #       Give us a new timestamp for these changes. This means we're totally up to date
         #       Tell us we're out of date, and give us a list of hosts to request changes from.
@@ -424,6 +445,7 @@ def new_main_thread(host_obj):
         # However, when A comes back online, it'll be very confused.
 
 
+
         # update network status will handshake the remotes if we've moved.
         rd = host_obj.update_network_status()
         if rd.success:
@@ -436,7 +458,7 @@ def new_main_thread(host_obj):
         # Update our loaded mirrors, in case another mirror was added since the last loop
         new_num_mirrors = _update_num_mirrors(host_obj, num_clouds_mirrored)
         if num_clouds_mirrored < new_num_mirrors:
-            host_obj.handshake_remotes()
+            host_obj.refresh_remotes()
             last_handshake = datetime.utcnow()
             num_clouds_mirrored = new_num_mirrors
 
@@ -452,7 +474,7 @@ def new_main_thread(host_obj):
         # if more that 30s have passed since the last handshake, handshake
         delta = datetime.utcnow() - last_handshake
         if delta.seconds > 30:
-            host_obj.handshake_remotes()
+            host_obj.refresh_remotes()
             last_handshake = datetime.utcnow()
         db.session.close()
         host_obj.release_lock()

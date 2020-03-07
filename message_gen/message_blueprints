@@ -169,6 +169,10 @@
 78  , FILE_SYNC_REQUEST , int:src_id, int:tgt_id, string:uname  , string:cname, sync_start, sync_end
 79  , FILE_SYNC_PROPOSAL, int:src_id, int:tgt_id, string:rel_path, string:tgt_path, int:change_type, bool:is_dir, sync_time
 80  , FILE_SYNC_RESPONSE, int:resp_type
+81  , FILE_SYNC_COMPLETE
+82  , MIRROR_HANDSHAKE, int:mirror_id, last_sync , last_modified, string:hostname, int:used_space, int:remaining_space
+83   , REMOTE_MIRROR_HANDSHAKE      , int:id    , new_sync  , sync_end  , last_all_sync , blob:hosts
+
 ################################################################################
 #manually updated ones:
 ################################################################################

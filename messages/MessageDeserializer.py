@@ -1,4 +1,4 @@
-# last generated 2019-01-16 16:17:43.404000
+# last generated 2020-03-07 05:19:37.539000
 import json
 from msg_codes import *
 from messages import *
@@ -105,6 +105,9 @@ _decoder_table = {
     , FILE_SYNC_REQUEST: FileSyncRequestMessage.deserialize # 78
     , FILE_SYNC_PROPOSAL: FileSyncProposalMessage.deserialize # 79
     , FILE_SYNC_RESPONSE: FileSyncResponseMessage.deserialize # 80
+    , FILE_SYNC_COMPLETE: FileSyncCompleteMessage.deserialize # 81
+    , MIRROR_HANDSHAKE: MirrorHandshakeMessage.deserialize # 82
+    , REMOTE_MIRROR_HANDSHAKE: RemoteMirrorHandshakeMessage.deserialize # 83
 }
 
 

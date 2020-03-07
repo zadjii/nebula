@@ -184,8 +184,8 @@ class Cloud(base):
                 , 'port': mirror.host.port
                 , 'wsport': mirror.host.ws_port
                 , 'id': mirror.id
-                , 'update': mirror.last_update
-                , 'hndshk': mirror.last_handshake.isoformat()
+                , 'update': mirror.last_sync.isoformat() + 'Z'
+                , 'hndshk': mirror.last_handshake.isoformat() + 'Z'
                 , 'hostname': mirror.host.hostname
             }
             mirror_dicts.append(mirror_obj)

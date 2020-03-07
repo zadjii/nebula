@@ -438,15 +438,22 @@ class RemoteController(object):
         multiple_hosts_enabled = self.nebr_instance.is_multiple_hosts_enabled()
         _log.debug('Multiple hosts is {}'.format('enabled' if multiple_hosts_enabled else 'disabled'))
 
+        _log.debug('literally print anything')
+
         # register the shutdown callback
         atexit.register(self.shutdown)
 
         # force_kill = '--force' in argv
         if force_kill:
-            mylog('Forcing shutdown of previous instance')
+            _log.debug('Forcing shutdown of previous instance')
+
+        _log.debug('literally print another thing')
         rd = self.nebr_instance.start(force_kill)
         if rd.success:
+            _log.debug('Started nebr instance. Begining network_updates()...')
             self.network_updates()
+        else:
+            _log.error('Failed to start nebr instance')
 
     def network_updates(self):
         _log = get_mylog()
@@ -456,8 +463,8 @@ class RemoteController(object):
         # (We won't be doing any signing or anything though)
         # if self.nebr_instance.is_ssl_enabled():
         context = SSL.Context(SSL.TLSv1_2_METHOD)
-        mylog(self.nebr_instance.get_key_file())
-        mylog(self.nebr_instance.get_cert_file())
+        _log.debug(self.nebr_instance.get_key_file())
+        _log.debug(self.nebr_instance.get_cert_file())
         context.use_privatekey_file(self.nebr_instance.get_key_file())
         context.use_certificate_file(self.nebr_instance.get_cert_file())
         s = SSL.Connection(context, s)

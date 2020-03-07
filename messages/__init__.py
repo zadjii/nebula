@@ -1,4 +1,4 @@
-# last generated 2019-01-16 16:17:41.661000
+# last generated 2020-03-07 05:19:37.409000
 from messages.BaseMessage import BaseMessage
 from messages.UnknownMessageErrorMessage import UnknownMessageErrorMessage
 from messages.LinkDoesNotExistMessage import LinkDoesNotExistMessage
@@ -101,4 +101,7 @@ from messages.ClientGetLinkPermissionsResponseMessage import ClientGetLinkPermis
 from messages.FileSyncRequestMessage import FileSyncRequestMessage
 from messages.FileSyncProposalMessage import FileSyncProposalMessage
 from messages.FileSyncResponseMessage import FileSyncResponseMessage
+from messages.FileSyncCompleteMessage import FileSyncCompleteMessage
+from messages.MirrorHandshakeMessage import MirrorHandshakeMessage
+from messages.RemoteMirrorHandshakeMessage import RemoteMirrorHandshakeMessage
 
