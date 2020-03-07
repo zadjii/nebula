@@ -2,7 +2,7 @@ import json
 import socket
 # from msg_codes import send_msg
 from datetime import datetime
-
+from common_util import datetime_to_string
 from connections.RawConnection import RawConnection
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table,\
     Boolean
@@ -58,8 +58,8 @@ class Mirror(base):
             , 'ws_port': self.host.ws_port
             , 'hostname': self.host.hostname
             , 'remaining_size': self.remaining_size
-            , 'last_sync': (self.last_sync.isoformat() + 'Z') if self.last_sync else None
-            , 'last_handshake': (self.last_handshake.isoformat() + 'Z') if self.last_handshake else None
+            , 'last_sync': datetime_to_string(self.last_sync) if self.last_sync else None
+            , 'last_handshake': datetime_to_string(self.last_handshake) if self.last_handshake else None
         }
         return self_dict
 

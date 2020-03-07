@@ -7,7 +7,7 @@ from host.HostController import HostController
 from host.NebsInstance import NebsInstance
 from ExpectedObjConnection import ExpectedObjConnection
 
-
+# You there copy-pasting this - make sure to add it to all_unit_tests.py as well!
 class HostControllerTests(unittest.TestCase):
     ZADJII_HOME = '/user/home/zadjii/nebula/zadjii/home'
     ZADJII_WORK = '/user/home/zadjii/nebula/zadjii/work'
@@ -163,7 +163,7 @@ class HostControllerTests(unittest.TestCase):
         self.assertEqual(bar_modified_0, node_bar.last_modified)
         self.assertEqual(bar_modified_0, self.zadjii_home.last_modified())
         self.assertEqual(sync_0, self.zadjii_home.last_sync())
-        
+
 
 def main():
     unittest.main()

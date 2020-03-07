@@ -32,7 +32,7 @@ cloud_contributors = Table(
 # # todo: when making links, host needs to know privacy state. If a host wants to
 # # cont make a public link, then the cloud needs to be public, etc.
 
-PRIVATE_CLOUD = 1  # No file on the coud was ever shared with the public.
+PRIVATE_CLOUD = 1  # No file on the cloud was ever shared with the public.
 PUBLIC_CLOUD = 2  # At least one file was shared with the public.
 # Honestly, we could still probably just do away with this...
 # We'd make all clouds public, and then it'd be the host's responsibility to reject the requests.
@@ -57,7 +57,10 @@ class Cloud(base):
         , lazy='dynamic'
         )
     mirrors = relationship('Mirror', backref='cloud', lazy='dynamic')
+
+    # TODO: How is last_update different than last_sync_time()?
     last_update = Column(DateTime)
+
     max_size = Column(Integer, default=INFINITE_SIZE)  # Cloud size in bytes
     # If this is set to public, then at least one file was shared publicly.
     privacy = Column(Integer, default=PRIVATE_CLOUD)
@@ -213,7 +216,7 @@ class Cloud(base):
         up_to_date_mirrors = []
         # todo: use a sql query to sort the mirrors by last_sync, then get the newest one
         for mirror in self.mirrors.all():
-            mirror_last_sync = mirror.last_sync()
+            mirror_last_sync = mirror.last_sync
             if newest_sync_time is None or mirror_last_sync > newest_sync_time:
                 newest_sync_time = mirror_last_sync
                 up_to_date_mirrors = []

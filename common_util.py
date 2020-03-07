@@ -5,7 +5,7 @@ import platform
 from logging import *
 import logging.handlers
 from os import path
-
+from datetime import datetime
 ###############################################################################
 
 NEBULA_ROOT = path.abspath(path.dirname(__file__))
@@ -279,3 +279,12 @@ def setup_common_argparsing():
     common_parser.add_argument('-l', '--log', default=None)
     common_parser.add_argument('-v', '--verbose', default=None)
     return common_parser
+
+
+def datetime_to_string(dt):
+    # type: (datetime.datetime) -> str
+    return dt.isoformat() + 'Z'
+
+def datetime_from_string(s):
+    # type: (str) -> datetime.datetime
+    return datetime.strptime(s, "%Y-%m-%dT%H:%M:%S.%fZ")

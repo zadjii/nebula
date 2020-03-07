@@ -54,6 +54,83 @@ def host_handshake(remote_obj, connection, address, msg_obj):
         db.session.commit()
 
 
+def mirror_handshake(remote_obj, connection, address, msg_obj):
+    # type: (RemoteController, AbstractConnection, object, MirrorHandshakeMessage) -> None
+    _log = get_mylog()
+    db = remote_obj.get_db()
+
+    mirror = db.session.query(Mirror).get(msg_obj.mirror_id)
+    cloud = mirror.cloud
+
+    last_sync = datetime_from_string(msg_obj.last_sync)
+    last_modified = datetime_from_string(msg_obj.last_modified)
+
+    response = InvalidStateMessage('Unhandled case in `mirror_handshake`')
+
+    if last_sync is None or last_sync < cloud.last_update:
+        # They are out of date and need to sync updates. Reply to the host with
+        # a list of hosts it can sync with
+        cloud_last_sync, mirrors = cloud.last_sync_and_mirrors()
+        response = RemoteMirrorHandshakeMessage(id=mirror.id,
+                                                new_sync=None,
+                                                sync_end=datetime_to_string(cloud.last_update),
+                                                last_all_sync=None,
+                                                hosts=[m.to_dict() for m in mirrors])
+
+    elif last_sync == cloud.last_update:
+        pass
+
+    elif last_sync > cloud.last_update:
+        error = 'Mirror\'s last_sync was newer than the cloud\'s last_update'
+        _log.debug(error)
+        response = InvalidStateMessage(error)
+
+    """
+    - Recieve a `HostHandshake`.
+      * Their `last_sync` was t_0. (possibly None)
+      * Their `last_update` was t_2. (possibly None)
+      * The cloud's `last_update` is t_1.
+      * The current time is t_3.
+      * The mirror for this cloud with the oldest `last_sync` is t_4.
+
+    - `if (t_0 is None or t_0 < t_1):` Their `last_sync` was before the
+      `last_update` for the cloud. They are out of date and need to sync
+      updates.
+        - [R] Reply to the host with a list of hosts it can sync with
+          `RemoteHandshake(sync_end=t_1, hosts=[hosts])`
+
+    - `elif (t_0 == t_1):` Their last_sync is the cloud's last_sync.
+      (The host's response to these messages is detailed below.)
+        - `if (t_2 is None or t_2 == t_1):`
+            - [R] This is fine. Their last update was at the last sync time,
+              or they have no updates.
+              * reply `RemoteHandshake(new_sync=t_2, last_all_sync=t_4)`
+        - `elif (t_2 > t_1):`
+            - [R] This host has a new update.
+              * Mark the others as out-of-date / Set the cloud's `last_update` to `t_2`.
+              * Reply `RemoteHandshake(new_sync=t_2, last_all_sync=t_4, hosts=[hosts])`
+        - `elif (t_2 < t_1):`
+            - [R] This host has updates from before our current latest sync. We'll
+              track them with a new sync timestamp, `t_3`.
+              * Mark the other mirrors as out-of-date / Set the cloud's `last_update` to t_3.
+              * Set this mirror's `last_sync` to `t_3`.
+              * Reply `RemoteHandshake(new_sync=t_3, last_all_sync=t_4, hosts=[hosts])`
+
+    - `elif (t_0 > t_1):` Their last_sync is after the cloud's last_sync
+        - This is definitely an error. The host can't have possibly synced at a later time than what we have. Log an error, and reply with an error message.
+        - *TODO*: How should the host respond to this? Take itself offline? Or is there a way to try and right itself?
+
+    """
+
+    # response = RemoteMirrorHandshakeMessage(id=mirror.id,
+    #                                         new_sync=None,
+    #                                         sync_end=None,
+    #                                         last_all_sync=None,
+    #                                         hosts=None)
+    connection.send_obj(response)
+    _log.debug('Replied to Mirror Handshake from {}'.format(mirror.id))
+
+
 def client_session_refresh(remote_obj, connection, address, msg_obj):
     _log = get_mylog()
     db = remote_obj.get_db()
@@ -519,6 +596,8 @@ class RemoteController(object):
         #     new_host_handler(self, connection, address, msg_obj)
         if msg_type == HOST_HANDSHAKE:
             host_handshake(self, connection, address, msg_obj)
+        elif msg_type == MIRROR_HANDSHAKE:
+            mirror_handshake(self, connection, address, msg_obj)
         elif msg_type == REQUEST_CLOUD:
             host_request_cloud(self, connection, address, msg_obj)
         elif msg_type == MIRRORING_COMPLETE:
@@ -589,3 +668,4 @@ class RemoteController(object):
         cert.add_extensions([basic, alt])
         cert.sign(my_key, 'sha256')
         return cert
+

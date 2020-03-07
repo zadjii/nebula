@@ -6,6 +6,7 @@ from CommandLineTests import CommandLineTests
 from MessageDeserializerTests import MessageDeserializerTests
 from HostMirrorTests import HostMirrorTests
 from HostControllerTests import HostControllerTests
+from RemoteControllerTests import RemoteControllerTests
 
 def main():
     unittest.main()
