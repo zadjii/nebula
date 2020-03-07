@@ -49,7 +49,7 @@ def repop(instance):
     remote_db.session.add(qwer)
     qwer.name = 'qwer'
     qwer.created_on = datetime.utcnow()
-    qwer.last_update = datetime.utcnow()
+    # qwer.last_update = datetime.utcnow()
     # qwer.owners.append(asdf)
     qwer.owners.append(admin)
     qwer.contributors.append(mike)
@@ -59,7 +59,7 @@ def repop(instance):
     remote_db.session.add(zxcv)
     zxcv.name = 'zxcv'
     zxcv.created_on = datetime.utcnow()
-    zxcv.last_update = datetime.utcnow()
+    # zxcv.last_update = datetime.utcnow()
     zxcv.contributors.append(asdf)
     # zxcv.owners.append(admin)
     zxcv.owners.append(mike)

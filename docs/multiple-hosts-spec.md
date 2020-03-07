@@ -413,8 +413,8 @@ The signature should be
     - [x] When changes are noticed, send a handshake to the Remote _(2, 3)_
     - [ ] Add support to remote to handle `HostHandshake`s according to the above algorithm. _(4)_
         - [x] Remote can tell the host to get updates from others _(4a, 5a)_
-        - [ ] Remote can tell the host it's up to date _(22b, 23b1, 25b1)_
-        - [ ] Remote can tell the host it's up to date with a new timestamp t_3 _(28b3, 29b3, 30b3)_
+        - [x] Remote can tell the host it's up to date _(22b, 23b1, 25b1)_
+        - [x] Remote can tell the host it's up to date with a new timestamp t_3 _(28b3, 29b3, 30b3)_
         - [ ] Remote can tell the host when others last_sync'd (`last_all_sync`)
     - [ ] Host supports recieving a RemoteHandshake after a HostHandshake.
         - [ ] During a `RemoteHandshake`, Host deletes filenodes that have been deleted before `last_all_handshake`

@@ -58,8 +58,9 @@ class Cloud(base):
         )
     mirrors = relationship('Mirror', backref='cloud', lazy='dynamic')
 
-    # TODO: How is last_update different than last_sync_time()?
-    last_update = Column(DateTime)
+    # TODO: 06-03-20202 How is last_update different than last_sync_time()?
+    # * 07-03-2020: I don't believe this is _actually_ used at all, and last_sync_time() is what we should be using.
+    # last_update = Column(DateTime)
 
     max_size = Column(Integer, default=INFINITE_SIZE)  # Cloud size in bytes
     # If this is set to public, then at least one file was shared publicly.
@@ -73,7 +74,7 @@ class Cloud(base):
         self.creator_id = creator.id
         self.owners.append(creator)
         self.created_on = datetime.utcnow()
-        self.last_update = datetime.utcnow()
+        # self.last_update = datetime.utcnow()
         self.privacy = PRIVATE_CLOUD
         self.max_size = -1
 
@@ -155,7 +156,7 @@ class Cloud(base):
             'uname': self.uname()
             , 'cname': self.cname()
             , 'created_on': self.created_on.isoformat() + 'Z'
-            , 'last_update': self.last_update.isoformat() + 'Z'
+            # , 'last_update': self.last_update.isoformat() + 'Z'
             , 'max_size': self.max_size
             , 'available_space': self.available_space()
             , 'privacy': self.privacy
@@ -224,3 +225,13 @@ class Cloud(base):
                 up_to_date_mirrors.append(mirror)
         return newest_sync_time, up_to_date_mirrors
 
+    def last_all_sync(self):
+        # type: () -> datetime
+        """
+        Get the oldest time that all the mirrors for this cloud have sync'd.
+        Mirrors can safely assume that any files that have been deleted _before_
+        this time can be pruned from their list of FileNodes.
+        """
+
+        # TODO: Implement this
+        return self.created_on

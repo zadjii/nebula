@@ -54,7 +54,7 @@ def repop(instance):
     db.session.add(wedding)
     wedding.name = 'AfterglowWedding2017'
     wedding.created_on = datetime.utcnow()
-    wedding.last_update = datetime.utcnow()
+    # wedding.last_update = datetime.utcnow()
     wedding.max_size = FOUR_GB
     wedding.owners.append(mikegr)
     wedding.owners.append(clairabel)
@@ -69,7 +69,7 @@ def repop(instance):
     db.session.add(bridesmaids)
     bridesmaids.name = 'Claires-Bridesmaids'
     bridesmaids.created_on = datetime.utcnow()
-    bridesmaids.last_update = datetime.utcnow()
+    # bridesmaids.last_update = datetime.utcnow()
     bridesmaids.max_size = FOUR_GB
     # bridesmaids.owners.append(clairabel)
     # wedding.contributors.append(hoon)
@@ -79,7 +79,7 @@ def repop(instance):
     db.session.add(bachelorette)
     bachelorette.name = 'Claires_Bachelorette_Party'
     bachelorette.created_on = datetime.utcnow()
-    bachelorette.last_update = datetime.utcnow()
+    # bachelorette.last_update = datetime.utcnow()
     bachelorette.max_size = FOUR_GB
     # bachelorette.owners.append(hoon)
     bachelorette.owners.append(alli)
