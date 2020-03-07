@@ -22,7 +22,7 @@ from messages.UnpreparedHostErrorMessage import UnpreparedHostErrorMessage
 from messages.AuthErrorMessage import AuthErrorMessage
 from messages.GenericErrorMessage import GenericErrorMessage
 from messages.NewHostMessage import NewHostMessage
-from messages.AssignHostIdMessage import AssignHostIdMessage
+from messages.AssignHostIDMessage import AssignHostIdMessage
 from messages.HostHandshakeMessage import HostHandshakeMessage
 from messages.RemoteHandshakeMessage import RemoteHandshakeMessage
 from messages.RemHandshakeGoFetchMessage import RemHandshakeGoFetchMessage

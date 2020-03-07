@@ -414,6 +414,10 @@ class RemoteController(object):
         """
         return self.nebr_instance.make_db_session()
 
+    def get_instance(self):
+        # type: () -> NebrInstance
+        return self.nebr_instance
+
     def start(self, force_kill=False):
         set_mylog_name('nebr')
         _log = get_mylog()
@@ -557,7 +561,7 @@ class RemoteController(object):
     def sign_host_csr(self, certificate_request, ip):
         # type: (crypto.X509Req, str) -> crypto.X509
 
-        #TODO#55: This is SO SO SO bad.
+        # TODO#55: This is SO SO SO bad.
         # Every time the remote needs to sign a cert, it reads them off disk?
         # jesus christ that's poorly written prototype shit.
         my_key = crypto.load_privatekey(crypto.FILETYPE_PEM, open(self.nebr_instance.get_key_file(), 'rt').read())
