@@ -233,5 +233,13 @@ class Cloud(base):
         this time can be pruned from their list of FileNodes.
         """
 
-        # TODO: Implement this
-        return self.created_on
+        # TODO: How should we handle mirrors that are inactive? Should we
+        # include them in this? Right now we do, but one could imagine if a
+        # mirror is offline permanently, we don't want it poisoning this value.
+        oldest_sync_time = None
+        for mirror in self.mirrors.all():
+            mirror_last_sync = mirror.last_sync
+            if oldest_sync_time is None or mirror_last_sync < oldest_sync_time:
+                oldest_sync_time = mirror_last_sync
+
+        return oldest_sync_time

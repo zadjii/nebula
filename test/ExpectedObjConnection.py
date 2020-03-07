@@ -1,5 +1,5 @@
 import unittest
-
+import time
 from connections.AbstractConnection import AbstractConnection
 
 
@@ -13,12 +13,17 @@ class ExpectedObjConnection(AbstractConnection):
         self.recv_callback = None
 
     def send_obj(self, message_obj):
+
         """
         When the host tries to send a message, we'll check that the message is
         the same as whatever one we're expecting.
         :param message_obj:
         :return:
         """
+
+        # simulate network delay
+        time.sleep(0.001)
+
         if self.send_callback is not None:
             self.send_callback(message_obj)
         else:
@@ -26,6 +31,10 @@ class ExpectedObjConnection(AbstractConnection):
             self._testcase.assertEqual(self.expected_obj.__dict__, message_obj.__dict__)
 
     def recv_obj(self):
+
+        # simulate network delay
+        time.sleep(0.001)
+
         if self.recv_callback is not None:
             return self.recv_callback()
         else:

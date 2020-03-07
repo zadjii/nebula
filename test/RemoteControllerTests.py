@@ -1,4 +1,5 @@
 import unittest
+import time
 from datetime import timedelta
 from common_util import *
 from connections.AbstractConnection import AbstractConnection
@@ -65,12 +66,21 @@ class RemoteControllerTests(unittest.TestCase):
         self.zadjii.name = 'zadjii'
         self.db.session.add(self.zadjii)
 
+        # We're using a created time here that's definitely in the past, because
+        # sometimes all this executes in under a millisecond, and then some
+        # tests get confused, since the time resolution is only milliseconds
+        created = datetime.utcnow() - timedelta(0, 1, 0)
+
         self.zadjii_home = Cloud(self.zadjii)
         self.zadjii_home.name = 'home'
         self.db.session.add(self.zadjii_home)
         self.zadjii_work = Cloud(self.zadjii)
         self.zadjii_work.name = 'work'
         self.db.session.add(self.zadjii_work)
+
+        # set the cloud's created_on to the time in the past.
+        self.zadjii_home.created_on = created
+        self.zadjii_work.created_on = created
 
         self.host_0 = Host()
         self.host_1 = Host()
@@ -80,6 +90,8 @@ class RemoteControllerTests(unittest.TestCase):
 
         self.mirror_0 = Mirror(self.zadjii_home, self.host_0)
         self.db.session.add(self.mirror_0)
+        self.mirror_1 = Mirror(self.zadjii_home, self.host_0)
+        self.db.session.add(self.mirror_1)
 
         # Initialize the host, cloud with some sane defaults.
         # * mirror_0 is the most recently sync'd mirror, and it's active
@@ -89,6 +101,11 @@ class RemoteControllerTests(unittest.TestCase):
         self.mirror_0.last_handshake = now
         self.mirror_0.completed_mirroring = True
         self.host_0.last_update = now
+
+        # Additionally, make the mirror_1 active, but leave it's last_sync
+        # unchanged. mirror_1.last_sync will be self.zadjii_home.created_on
+        self.mirror_1.last_handshake = now
+        self.mirror_1.completed_mirroring = True
 
         self.db.session.commit()
 
@@ -112,9 +129,6 @@ class RemoteControllerTests(unittest.TestCase):
         greater than the cloud's last_sync, we reply with an error
         """
         self.setup_default_clouds()
-
-        # clouds_last_sync = self.mirror_0.last_sync
-        # later = clouds_last_sync + timedelta(1, 0, 0)
 
         clouds_last_sync = self.zadjii_home.last_sync_time()
         later = clouds_last_sync + timedelta(1, 0, 0)
@@ -144,7 +158,7 @@ class RemoteControllerTests(unittest.TestCase):
         earlier = clouds_last_sync - timedelta(1, 0, 0)
 
         req = MirrorHandshakeMessage(
-            mirror_id=1,
+            mirror_id=2,
             last_sync=datetime_to_string(earlier),
             last_modified=datetime_to_string(earlier),
             hostname='hostname',
@@ -152,7 +166,7 @@ class RemoteControllerTests(unittest.TestCase):
             remaining_space=INFINITE_SIZE
         )
 
-        resp = RemoteMirrorHandshakeMessage(id=1,
+        resp = RemoteMirrorHandshakeMessage(id=2,
                                             new_sync=None,
                                             sync_end=datetime_to_string(clouds_last_sync),
                                             last_all_sync=None,
@@ -170,7 +184,7 @@ class RemoteControllerTests(unittest.TestCase):
         clouds_last_sync = self.zadjii_home.last_sync_time()
 
         req = MirrorHandshakeMessage(
-            mirror_id=1,
+            mirror_id=2,
             last_sync=None,
             last_modified=None,
             hostname='hostname',
@@ -178,7 +192,7 @@ class RemoteControllerTests(unittest.TestCase):
             remaining_space=INFINITE_SIZE
         )
 
-        resp = RemoteMirrorHandshakeMessage(id=1,
+        resp = RemoteMirrorHandshakeMessage(id=2,
                                             new_sync=None,
                                             sync_end=datetime_to_string(clouds_last_sync),
                                             last_all_sync=None,
@@ -193,7 +207,7 @@ class RemoteControllerTests(unittest.TestCase):
         clouds_last_sync = self.zadjii_home.last_sync_time()
 
         req = MirrorHandshakeMessage(
-            mirror_id=1,
+            mirror_id=2,
             last_sync=datetime_to_string(clouds_last_sync),
             last_modified=datetime_to_string(clouds_last_sync),
             hostname='hostname',
@@ -201,10 +215,13 @@ class RemoteControllerTests(unittest.TestCase):
             remaining_space=INFINITE_SIZE
         )
 
-        resp = RemoteMirrorHandshakeMessage(id=1,
+        # everyone is up to date
+        last_all_sync=datetime_to_string(clouds_last_sync)
+
+        resp = RemoteMirrorHandshakeMessage(id=2,
                                             new_sync=datetime_to_string(clouds_last_sync),
                                             sync_end=None,
-                                            last_all_sync=datetime_to_string(self.zadjii_home.last_all_sync()),
+                                            last_all_sync=last_all_sync,
                                             hosts=None)
         conn = self.expectResponse(req, resp)
         self.controller.filter_func(conn, '')
@@ -215,7 +232,7 @@ class RemoteControllerTests(unittest.TestCase):
         clouds_last_sync = self.zadjii_home.last_sync_time()
 
         req = MirrorHandshakeMessage(
-            mirror_id=1,
+            mirror_id=2,
             last_sync=datetime_to_string(clouds_last_sync),
             last_modified=None,
             hostname='hostname',
@@ -223,10 +240,13 @@ class RemoteControllerTests(unittest.TestCase):
             remaining_space=INFINITE_SIZE
         )
 
-        resp = RemoteMirrorHandshakeMessage(id=1,
+        # everyone is up to date
+        last_all_sync=datetime_to_string(clouds_last_sync)
+
+        resp = RemoteMirrorHandshakeMessage(id=2,
                                             new_sync=datetime_to_string(clouds_last_sync),
                                             sync_end=None,
-                                            last_all_sync=datetime_to_string(self.zadjii_home.last_all_sync()),
+                                            last_all_sync=last_all_sync,
                                             hosts=None)
         conn = self.expectResponse(req, resp)
         self.controller.filter_func(conn, '')
@@ -238,7 +258,7 @@ class RemoteControllerTests(unittest.TestCase):
         later = clouds_last_sync + timedelta(1, 0, 0)
 
         req = MirrorHandshakeMessage(
-            mirror_id=1,
+            mirror_id=2,
             last_sync=datetime_to_string(clouds_last_sync),
             last_modified=datetime_to_string(later),
             hostname='hostname',
@@ -246,10 +266,13 @@ class RemoteControllerTests(unittest.TestCase):
             remaining_space=INFINITE_SIZE
         )
 
-        resp = RemoteMirrorHandshakeMessage(id=1,
+        # mirror_1 has the new update, so mirror_0 is the oldest sync time
+        last_all_sync=datetime_to_string(self.mirror_0.last_sync)
+
+        resp = RemoteMirrorHandshakeMessage(id=2,
                                             new_sync=datetime_to_string(later),
                                             sync_end=None,
-                                            last_all_sync=datetime_to_string(self.zadjii_home.last_all_sync()),
+                                            last_all_sync=last_all_sync,
                                             hosts=None)
         conn = self.expectResponse(req, resp)
         self.controller.filter_func(conn, '')
@@ -266,7 +289,7 @@ class RemoteControllerTests(unittest.TestCase):
         earlier = clouds_last_sync - timedelta(1, 0, 0)
 
         req = MirrorHandshakeMessage(
-            mirror_id=1,
+            mirror_id=2,
             last_sync=datetime_to_string(clouds_last_sync),
             last_modified=datetime_to_string(earlier),
             hostname='hostname',
@@ -279,27 +302,32 @@ class RemoteControllerTests(unittest.TestCase):
         # resp = RemoteMirrorHandshakeMessage(id=1,
         #                                     new_sync=some_time,
         #                                     sync_end=None,
-        #                                     last_all_sync=datetime_to_string(self.zadjii_home.last_all_sync()),
+        #                                     last_all_sync=datetime_to_string(self.mirror_0.last_sync),
         #                                     hosts=None)
         conn = self.expectResponse(req, None)
         def on_send(msg):
+
             after_request = datetime.utcnow()
             self.assertEqual(REMOTE_MIRROR_HANDSHAKE, msg.type)
+            self.assertEqual(2, msg.id)
             self.assertEqual(None, msg.hosts)
             self.assertEqual(None, msg.sync_end)
             self.assertNotEqual(None, msg.new_sync)
             self.assertNotEqual(None, msg.last_all_sync)
             new_sync = datetime_from_string(msg.new_sync)
             last_all_sync = datetime_from_string(msg.last_all_sync)
+
+            # mirror_1 has the new update, so mirror_0 is the oldest sync time
             self.assertEqual(self.zadjii_home.last_all_sync(), last_all_sync)
+            self.assertEqual(self.mirror_0.last_sync, last_all_sync)
 
             # We can't check the exact timestamp we assigned the cloud, but we
             # can ensure that it was between when we sent the request and when
             # we recieved it.
-            self.assertTrue(new_sync > earlier)
-            self.assertTrue(new_sync > clouds_last_sync)
-            self.assertTrue(new_sync > before_request)
-            self.assertTrue(new_sync < after_request)
+            self.assertTrue(earlier < new_sync, '{} < {}'.format(earlier, new_sync))
+            self.assertTrue(clouds_last_sync < new_sync, '{} < {}'.format(clouds_last_sync, new_sync))
+            self.assertTrue(before_request < new_sync, '{} < {}'.format(before_request, new_sync))
+            self.assertTrue(new_sync < after_request, '{} < {}'.format(new_sync, after_request))
 
         conn.send_callback = on_send
         self.controller.filter_func(conn, '')

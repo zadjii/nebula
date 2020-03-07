@@ -411,18 +411,15 @@ The signature should be
   date ONLY.
 - [ ] Host handshakes the remote when it notices a file change, and handles the remote handshake _(2, 3)_
     - [x] When changes are noticed, send a handshake to the Remote _(2, 3)_
-    - [ ] Add support to remote to handle `HostHandshake`s according to the above algorithm. _(4)_
+    - [x] Add support to remote to handle `HostHandshake`s according to the above algorithm. _(4)_
         - [x] Remote can tell the host to get updates from others _(4a, 5a)_
         - [x] Remote can tell the host it's up to date _(22b, 23b1, 25b1)_
         - [x] Remote can tell the host it's up to date with a new timestamp t_3 _(28b3, 29b3, 30b3)_
-        - [ ] Remote can tell the host when others last_sync'd (`last_all_sync`)
+        - [x] Remote can tell the host when others last_sync'd (`last_all_sync`)
     - [ ] Host supports recieving a RemoteHandshake after a HostHandshake.
+        - [ ] When the Host handshakes a remote and is out of date, the host must send `FileSyncRequest`s to other hosts
+            * see `host.models.Cloud.modified_between()`
         - [ ] During a `RemoteHandshake`, Host deletes filenodes that have been deleted before `last_all_handshake`
-    <!-- - [ ] rewrite host to use proposed change method -->
-        <!-- - [ ] calculate pending changes from the files with modifications since our last sync. -->
-        <!-- - [ ] In a way that's reusable below: -->
-            <!-- - [ ] Convert those objects into `FileChangeProposals` -->
-            <!-- - [ ] Send them to the other hosts, and handles their response -->
 - [ ] Update the host to be able to handle a `FileSyncRequest` _(9a, 10a, 11a)_
     - [ ] Verify the other host with the remote _(35a)_
         * see `host_verify_host` in `remote/.../mirror.py`
@@ -455,9 +452,6 @@ The signature should be
         - [x] modifies
         - [ ] deletes
         - [ ] moves
-
-- [ ] When the Host handshakes a remote and is out of date, the host must set `FileSyncRequest`s to other hosts
-    * see `host.models.Cloud.modified_between()`
 - [ ] Add support for mirroring with multiple hosts
     * I might need to just run the feature test to see what breaks.
     * If the first param to `recv_file_tree` is None, then
@@ -471,7 +465,8 @@ The signature should be
 - [ ] `Host.models.Cloud::generate_handshake` - I don't think that
   `HostHandshakeMessage` should be used anymore, or it should only be used for
   the IP/SSL updates.
-- [ ] How is `remote.models.Cloud.last_update` different than `r.m.c.last_sync_time()`?
+- [x] How is `remote.models.Cloud.last_update` different than `r.m.c.last_sync_time()`?
+    * 07-Mar-2020: We're going to remove `last_update`, because that's not needed.
 
 ### File Opening
 This kinda makes it clearer why there was a "ClientFilePut" originally. The Put

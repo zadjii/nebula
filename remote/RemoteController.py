@@ -65,24 +65,28 @@ def mirror_handshake(remote_obj, connection, address, msg_obj):
     last_sync = datetime_from_string(msg_obj.last_sync) if msg_obj.last_sync is not None else None  # t_0
     last_modified = datetime_from_string(msg_obj.last_modified) if msg_obj.last_modified is not None else None  # t_2
 
-    cloud_last_sync, mirrors = cloud.last_sync_and_mirrors()
-    # cloud_last_sync = t_1
+    cloud_last_sync = cloud.last_sync_time()  # t_1
     now = datetime.utcnow()  # t_3
 
     response = InvalidStateMessage('Unhandled case in `mirror_handshake`')
 
     if last_sync is None or last_sync < cloud_last_sync:
+        # update our tracker to match when the cloud said their last sync was.
+        if last_sync is not None:
+            mirror.last_sync = last_sync
+
         # They are out of date and need to sync updates. Reply to the host with
         # a list of hosts it can sync with
         response = RemoteMirrorHandshakeMessage(id=mirror.id,
                                                 new_sync=None,
                                                 sync_end=datetime_to_string(cloud_last_sync),
                                                 last_all_sync=None,
-                                                hosts=[m.to_dict() for m in mirrors])
+                                                hosts=[m.to_dict() for m in cloud.up_to_date_mirrors()])
 
     elif last_sync == cloud_last_sync:
         # This mirror is up to date. They might have _new_ updates though.
         if (last_modified is None or last_modified == cloud_last_sync):
+            mirror.last_sync = cloud_last_sync
             # Their last update was at the last sync time, or they have no updates.
             response = RemoteMirrorHandshakeMessage(id=mirror.id,
                                                     new_sync=datetime_to_string(cloud_last_sync),
@@ -102,7 +106,6 @@ def mirror_handshake(remote_obj, connection, address, msg_obj):
                                                     sync_end=None,
                                                     last_all_sync=datetime_to_string(cloud.last_all_sync()),
                                                     hosts=None)
-            db.session.commit()
 
         elif (last_modified < cloud_last_sync):
             # This host has updates from before our current latest sync. We'll
@@ -118,7 +121,6 @@ def mirror_handshake(remote_obj, connection, address, msg_obj):
                                                     sync_end=None,
                                                     last_all_sync=datetime_to_string(cloud.last_all_sync()),
                                                     hosts=None)
-            db.session.commit()
 
     elif last_sync > cloud_last_sync:
         error = 'Mirror\'s last_sync was newer than the cloud\'s last_update'
@@ -162,11 +164,7 @@ def mirror_handshake(remote_obj, connection, address, msg_obj):
 
     """
 
-    # response = RemoteMirrorHandshakeMessage(id=mirror.id,
-    #                                         new_sync=None,
-    #                                         sync_end=None,
-    #                                         last_all_sync=None,
-    #                                         hosts=None)
+    db.session.commit()
     connection.send_obj(response)
     _log.debug('Replied to Mirror Handshake from {}'.format(mirror.id))
 
