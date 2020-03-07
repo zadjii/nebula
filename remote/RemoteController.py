@@ -77,6 +77,10 @@ def mirror_handshake(remote_obj, connection, address, msg_obj):
 
         # They are out of date and need to sync updates. Reply to the host with
         # a list of hosts it can sync with
+        #
+        # TODO: Prepare us to reply to HOST_HOST_VERIFY messages from the hosts
+        # in this list, as they'll want to make sure the asking host is legit.
+        # This is _36a_
         response = RemoteMirrorHandshakeMessage(id=mirror.id,
                                                 new_sync=None,
                                                 sync_end=datetime_to_string(cloud_last_sync),
@@ -107,6 +111,9 @@ def mirror_handshake(remote_obj, connection, address, msg_obj):
                                                     last_all_sync=datetime_to_string(cloud.last_all_sync()),
                                                     hosts=None)
 
+        # TODO 07-Mar-2020: Make sure that the host uses None for future updates
+        # after this case is hit. The file changed here at a timestamp that's <
+        # the last_sync we're going to assign it.
         elif (last_modified < cloud_last_sync):
             # This host has updates from before our current latest sync. We'll
             # track them with a new sync timestamp

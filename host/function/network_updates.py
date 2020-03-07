@@ -356,37 +356,88 @@ def handle_file_sync_request(host_obj, connection, address, msg_obj):
     _log = get_mylog()
     requestor_id = msg_obj.src_id
 
-    # TODO: validate the requestor with the remote - They should have just
-    #       handshook the remote, and found they were out of date, which is when
-    #       the remote sent them here.
-    # 2020: This is _35a_ in the flow chart
-
     tgt_id = msg_obj.tgt_id
     uname = msg_obj.uname
     cname = msg_obj.cname
-    sync_start = msg_obj.sync_start
-    sync_end = msg_obj.sync_end
+    sync_start = datetime_from_string(msg_obj.sync_start)
+    sync_end = datetime_from_string(msg_obj.sync_end)
 
-    # TODO: If we have files whose last_sync timestamp is in t:(t_0, t_1], send it to
-    #       the requestor as a `FileChangeProposal`
-    # This is _10a_ in the flowchart
+    # TODO: Make sure that remotes prepare for HOST_HOST_VERIFYs when replying
+    # to a MirrorHandshake
+    #
+    # Validate the requestor with the remote - They should have just
+    #       handshook the remote, and found they were out of date, which is when
+    #       the remote sent them here.
+    # 2020: This is _35a_ in the flow chart
+    rd = verify_host(db, uname, cname, tgt_id, requestor_id)
+    if not rd.success:
+        _log.error(rd.data)
+        return rd
 
-    for f in files:
-        # TODO: Synthesize the FileChangeProposal 10a
+    # If we have files whose last_sync timestamp is in t:(t_0, t_1], send it to
+    # the requestor as a `FileChangeProposal`
 
-        # TODO: Send to requestor
+    # This is 10a:
+    proposals = cloud.get_change_proposals(db, sync_start=sync_start, sync_end=sync_end, requestor_id)
+    for p in proposals:
+        # Send to requestor
         # This is _11a_ in the flowchart
+        connection.send_obj(p)
 
         # Get the response from the requestor
         # This is _13a1, 15a2, 18a3_ in the flowchart
         response = connection.recv_obj()
 
-        # if they accepted the file, send the file here
-        # This is _16a2_
+        if response.type != FILE_SYNC_RESPONSE:
+            err = 'Other host did not reply with a FILE_SYNC_RESPONSE'
+            _log.error(err)
+            connection.send_obj(InvalidStateMessage(err))
+            return Error(err)
+
+        sync_response_type = response.resp_type
+        if sync_response_type == FILE_SYNC_PROPOSAL_ACCEPT:
+            # TODO: if they accepted the file, send the file here
+            # This is _16a2_
+
+            matching_local_mirror = db.session.query(Cloud).filter_by(my_id_from_remote=requestor_id).first()
+            is_local_peer = matching_local_mirror is not None
+
+            if p.change_type == FILE_SYNC_TYPE_CREATE or p.change_type] == FILE_CHANGE_TYPE_MODIFY:
+                if local_peer:
+                    send_file_to_local(db, cloud, matching_local_mirror, rel_path)
+                else:
+                    send_file_to_other(requestor_id, cloud, rel_path, connection, recurse=False)
+
+            # If we deleted the file, delete it here.
+            elif p.change_type == FILE_CHANGE_TYPE_DELETE:
+                msg = RemoveFileMessage(requestor_id, cloud.uname(), cloud.cname(), rel_path.to_string())
+                if local_peer:
+                    handle_remove_file(host_obj, msg, matching_local_mirror, connection, db)
+                else:
+                    connection.send_obj(msg)
+
+            # TODO: If we _moved_ the file, move it here?
+            elif p.change_type == FILE_CHANGE_TYPE_MOVE:
+                # TODO: I don't think we support this at all yet
+                err = 'We don\'t yet support FILE_CHANGE_TYPE_MOVE, but it happened...'
+                _log.error(err)
+                connection.send_obj(InvalidStateMessage(err))
+                return Error(err)
+
+            complete_sending_files(requestor_id, cloud, rel_path, connection)
+
+
+        elif (sync_response_type == FILE_SYNC_PROPOSAL_ACKNOWLEDGE) or (sync_response_type == FILE_SYNC_PROPOSAL_REJECT):
+            # they either already have this change, or they rejected this
+            # change, because their version of the file is newer. We don't need
+            # to do anything here.
+            pass
 
     # TODO: Send a FileSyncComplete to mark that we're done sending the changes
     #       we have on this interval.
     # This is _19a_ in the flowchart
+    connection.send_obj(FileSyncCompleteMessage())
+
 
     return rd
 

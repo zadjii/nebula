@@ -421,7 +421,7 @@ The signature should be
             * see `host.models.Cloud.modified_between()`
         - [ ] During a `RemoteHandshake`, Host deletes filenodes that have been deleted before `last_all_handshake`
 - [ ] Update the host to be able to handle a `FileSyncRequest` _(9a, 10a, 11a)_
-    - [ ] Verify the other host with the remote _(35a)_
+    - [x] Verify the other host with the remote _(35a)_
         * see `host_verify_host` in `remote/.../mirror.py`
         * see `verify_host` in `network_updates.py`
           * We need something with the same form, but more general purpose.
@@ -432,6 +432,7 @@ The signature should be
           * ~~~We'll need another message type, HostVerifyHostSync~~~
           * If we do this, then the remote needs another set of mappings, for hosts that have been told to sync messages from another host. Is this necessary? Or coud we just overload the existing mapping?
           * We'll need to make sure to remove these mappings when we're done mirroring and done syncing
+          * [ ] We could do the above things, but as of 07-Mar-2020 I'm just moving on without the above.
     - [ ] Generate all the `FileChangeProposals` between sync_start and sync_end
     - [ ] send them to the other host
     - [ ] Requesting host handles `FileChangeProposals`
@@ -458,8 +459,8 @@ The signature should be
       `do_recv_file_transfer` is going to return an error. With multiple hosts, I
       believe this is a path that's actually hittable. Unfortunately, during
       mirroring, there won't be a HostController that's been initialized yet.
-- [ ] Fix whatever is going on with the `FileSyncProposalMessage` in `Host.models.Cloud::get_change_proposals`
-- [ ] Fix whatever is going on with the `child_unsynced` in `Host.models.Cloud::modified_between`
+- [x] Fix whatever is going on with the `FileSyncProposalMessage` in `Host.models.Cloud::get_change_proposals`
+- [x] Fix whatever is going on with the `child_unsynced` in `Host.models.Cloud::modified_between`
 - [ ] There's a whole ton of "TODOs" listed in
   `local_updates.py:new_main_thread`. They should probably be tracked.
 - [ ] `Host.models.Cloud::generate_handshake` - I don't think that
@@ -467,6 +468,10 @@ The signature should be
   the IP/SSL updates.
 - [x] How is `remote.models.Cloud.last_update` different than `r.m.c.last_sync_time()`?
     * 07-Mar-2020: We're going to remove `last_update`, because that's not needed.
+- [ ] Make sure that the host uses None for future updates after this case is
+  hit. The file changed here at a timestamp that's < the last_sync we're going
+  to assign it.
+
 
 ### File Opening
 This kinda makes it clearer why there was a "ClientFilePut" originally. The Put

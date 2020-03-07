@@ -95,8 +95,13 @@ class FileNode(base):
     def unsynced(self):
         # type: () -> bool
         """
-        Returns true if the current node's state hasn't been synced.
+        Returns true if the current node's state hasn't been synced with the
+        remote & other hosts
         """
+
+        # TODO 07-Mar-2020: This doesn't cover cases where the last_sync is
+        # actually newer than last_modified. If the host had an unsynced change,
+        # it's possible that we assign this node a last_sync > last_modified
         return (self.last_sync is None) or (self.last_modified > self.last_sync)
 
     def unsynced_children(self):
@@ -113,7 +118,8 @@ class FileNode(base):
     def unsynced_children_inclusive(self):
         # type: () -> [FileNode]
         """
-        Returns all of the children of this node that are unsynced
+        Returns all of the children of this node that are unsynced, including
+        this node, if this node is unsynced.
         """
         nodes = self.unsynced_children()
         if self.unsynced():
@@ -163,3 +169,39 @@ class FileNode(base):
             return FILE_DELETED
         return FILE_MODIFIED
 
+
+    def modfied_children_between(self, sync_start, sync_end):
+        # type (datetime, datetime) -> [FileNode]
+        """
+        Returns all child nodes that have been modified or synced in the
+        timeframe (sync_start, sync_end]
+
+        TODO: or synced? I think this is just supposed to be nodes that are
+        last_sync'd on that range.
+
+        This is _inclusive_, meaning it will include this node if this node was
+        modified on this time range.
+        :return:
+        """
+        nodes = []
+        for child in self.children.all():
+            # TODO:
+            child_modified = child.modfied_children_between(sync_start, sync_end)
+            nodes.extend(child_modified)
+
+        if self.modfied_between(sync_start, sync_end):
+            nodes.append(self)
+
+        return nodes
+
+    def modfied_between(self, sync_start, sync_end):
+        # type (datetime, datetime) -> FileNode
+        """
+        Returns all child nodes that have been modified or synced in the
+        timeframe (sync_start, sync_end]
+
+        TODO: _or_ synced? I think this is just supposed to be nodes that are
+        last_sync'd on that range.
+        :return:
+        """
+        return (self.last_sync > sync_start) and (self.last_sync <= sync_end)

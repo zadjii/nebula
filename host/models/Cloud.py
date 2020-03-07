@@ -3,14 +3,14 @@ import platform
 from datetime import datetime
 
 from common.SimpleDB import SimpleDB
-from common_util import ResultAndData, get_mylog, get_free_space_bytes, INFINITE_SIZE, Error
+from common_util import ResultAndData, get_mylog, get_free_space_bytes, INFINITE_SIZE, Error, datetime_to_string
 from common.RelativePath import RelativePath
 from connections.RawConnection import RawConnection
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship, backref
 from FileNode import FileNode, FILE_MOVED
 from host.models import nebs_base as base
-from messages import HostHandshakeMessage, FileSyncProposalMessage
+from messages import HostHandshakeMessage, FileSyncProposalMessage, MirrorHandshakeMessage
 
 __author__ = 'Mike'
 
@@ -129,9 +129,10 @@ class Cloud(base):
 
         target_path_elems = relative_path.to_elements_no_root()
 
-        curr_child = None
+        curr_child = self
         while len(target_path_elems) > 0:
             curr_file = target_path_elems[0]
+
             curr_child = curr_child.children.filter_by(name=curr_file).first()
             target_path_elems.pop(0)
             if curr_child is not None:
@@ -182,9 +183,8 @@ class Cloud(base):
     #     )
     #     return msg
 
-
     def generate_mirror_handshake(self):
-        # type: () -> HostHandshakeMessage
+        # type: () -> MirrorHandshakeMessage
         used_space = self.get_used_size()
         if self.max_size == INFINITE_SIZE:
             remaining_space = get_free_space_bytes('/')
@@ -258,34 +258,44 @@ class Cloud(base):
             nodes.extend(child_unsynced)
         return nodes
 
-
     def modified_between(self, sync_start, sync_end):
         # type (datetime, datetime) -> [FileNode]
         """
-        Returns all child nodes that have been modified in the timeframe [sync_start, sync_end]
-        TODO: Should that be an inclusive or exclusive range?
+        Returns all child nodes that have been modified in the timeframe
+        (sync_start, sync_end]. This is _10a_ in the flowchart
         :return:
         """
         nodes = []
         for child in self.children.all():
-            # TODO:
-            # child_unsynced = child.modfied_children_inclusive(sync_start, sync_end)
-            nodes.extend(child_unsynced)
+            child_modified = child.modfied_children_between(sync_start, sync_end)
+            nodes.extend(child_modified)
         return nodes
 
-    def get_change_proposals(self, db):
-        # type: (SimpleDB) -> [FileSyncProposalMessage]
+    # 07-Mar-2020: We don't need this anymore, right? The host with changes
+    # doesn't need to propose files. Instead, we need to generate Proposals for
+    # all our changes between two timestamps, (start, end]
+    #
+    def get_change_proposals(self, db, sync_start, sync_end, target_mirror_id=-1):
+        # type: (SimpleDB, datetime, datetime, int) -> [FileSyncProposalMessage]
+
         """
-        Generates a list of FileChangeProposals describing the set of changes we
-        have that haven't synced.
-        The caller should make sure to fill in the mirror_id param of these
-        messages with the id of the intended recipient.
+        Generates a list of FileChangeProposals describing the set of changes
+        between the given timestamps.
+
+        IMPORTANT: The caller should make sure to fill in the mirror_id param of
+        these messages with the id of the intended recipient. Or they could just
+        provide it in the parameter target_mirror_id
         :param db:
+        :param sync_start:
+        :param sync_end:
+        :param target_mirror_id:
         :return:
         """
+
         _log = get_mylog()
         proposals = []
-        modified_nodes = self.modified_since_last_sync()
+        modified_nodes = self.modified_between(sync_start, sync_end)
+
         for node in modified_nodes:
             change_type = node.get_update_type()
             rel_src_path = node.relative_path()
@@ -305,23 +315,14 @@ class Cloud(base):
             # Then, the unittests can override as necessary (to fake a filesystem)
             is_dir = os.path.isdir(rel_src_path.to_absolute(self.root_directory))
 
-            # TODO: the mirror_id param - is that the source mirror or the target mirror?
-            # would the mirror proposing know the ID of the mirror it should be intended for?
-            # A FileSyncRequest sure could include the ID of the requestor and
-            #   the id of the mirror it's requesting from (our id)
-            #   So that path could fill in the mirror_id with the id of the
-            #   intended recipient.
-            # When we get a RemoteHandshake suggesting that we need to send
-            #       updates to other hosts, we could generate this list of
-            #       proposals, then fill in the mirror_id for the intended
-            #       recipient as we iterate over them.
             proposal = FileSyncProposalMessage(
-                mirror_id=self.my_id_from_remote,
+                src_id=self.my_id_from_remote,
+                tgt_id=target_mirror_id,
                 rel_path=rel_src_path,
                 tgt_path=rel_tgt_path,
                 change_type=change_type,
                 is_dir=is_dir,
-                sync_time=node.last_sync
+                sync_time=datetime_to_string(node.last_sync)
             )
             proposals.append(proposal)
         return proposals
@@ -391,7 +392,7 @@ class Cloud(base):
             return rd
 
         child_src_node = self.get_child_node(rel_src_path)
-        if child_node is None:
+        if child_src_node is None:
             return Error('Cannot move a file that does not exist')
         if child_src_node.is_root():
             # TODO: you can't modify the root, right? that doesn't make sense
