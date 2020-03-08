@@ -389,10 +389,10 @@ The signature should be
     - [x] Does the mirror need to have a separate last_sync timestamp? or can it derive it from the latest last_sync of all it's children?
         - It can derive it I believe
     - [x]  Does the remote.Mirror AND remote.Cloud need a last_sync? or can it be figured out?
-<!-- - [ ] Add a last_sync to the remote.models.Mirror -->
+<!-- - [/] Add a last_sync to the remote.models.Mirror -->
 - [x] Rename the remote.mirror's last_update to last_sync
 - [x] Add a last_sync_time() to the remote.models.Cloud
-- [ ] host.models.Cloud needs a `last_modified()` function to find the newest modification to a child, or None if none have been modified after their last_sync
+- [x] host.models.Cloud needs a `last_modified()` function to find the newest modification to a child, or None if none have been modified after their last_sync
 - [x] msg_blueprints for messages
     - [x] `HostHandshakeMessage` needs extra members, last_sync and new_updates
     - [x] `RemoteHandshakeMessage`
@@ -409,18 +409,19 @@ The signature should be
 - [x] Remove the code to handle a `FileChangeProposal` in filter_func. The Host
   should not send these - instead the host will ask other hosts if it's out of
   date ONLY.
-- [ ] Host handshakes the remote when it notices a file change, and handles the remote handshake _(2, 3)_
+- [x] Host handshakes the remote when it notices a file change, and handles the remote handshake _(2, 3)_
     - [x] When changes are noticed, send a handshake to the Remote _(2, 3)_
     - [x] Add support to remote to handle `HostHandshake`s according to the above algorithm. _(4)_
         - [x] Remote can tell the host to get updates from others _(4a, 5a)_
         - [x] Remote can tell the host it's up to date _(22b, 23b1, 25b1)_
         - [x] Remote can tell the host it's up to date with a new timestamp t_3 _(28b3, 29b3, 30b3)_
         - [x] Remote can tell the host when others last_sync'd (`last_all_sync`)
-    - [ ] Host supports recieving a RemoteHandshake after a HostHandshake.
-        - [ ] When the Host handshakes a remote and is out of date, the host must send `FileSyncRequest`s to other hosts
+    - [x] Host supports recieving a RemoteHandshake after a HostHandshake.
+        - [x] When the Host handshakes a remote and is out of date, the host must send `FileSyncRequest`s to other hosts
             * see `host.models.Cloud.modified_between()`
-        - [ ] During a `RemoteHandshake`, Host deletes filenodes that have been deleted before `last_all_handshake`
-- [ ] Update the host to be able to handle a `FileSyncRequest` _(9a, 10a, 11a)_
+        - [-] During a `RemoteHandshake`, Host deletes filenodes that have been deleted before `last_all_handshake`
+            * 07-Mar-2020 I'm putting this off for now
+- [x] Update the host to be able to handle a `FileSyncRequest` _(9a, 10a, 11a)_
     - [x] Verify the other host with the remote _(35a)_
         * see `host_verify_host` in `remote/.../mirror.py`
         * see `verify_host` in `network_updates.py`
@@ -433,22 +434,22 @@ The signature should be
           * If we do this, then the remote needs another set of mappings, for hosts that have been told to sync messages from another host. Is this necessary? Or coud we just overload the existing mapping?
           * We'll need to make sure to remove these mappings when we're done mirroring and done syncing
           * [ ] We could do the above things, but as of 07-Mar-2020 I'm just moving on without the above.
-    - [ ] Generate all the `FileChangeProposals` between sync_start and sync_end
-    - [ ] send them to the other host
-    - [ ] Requesting host handles `FileChangeProposals`
+    - [x] Generate all the `FileChangeProposals` between sync_start and sync_end
+    - [x] send them to the other host
+    - [x] Requesting host handles `FileChangeProposals`
 - [ ] Update Host to be able to handle a `FileChangeProposal` Message _(12a1, 13a1, 14a2, 15a2, 16a2, 17a3, 18a3)_
     - [x] ack their change
     - [x] reject their change
     - [x] accept their change (`FileChangeResponse`, followed by (HOST_FILE_TRANSFER, file_data))
-    - [ ] modify our DB appropriately to match their change
+    - [x] modify our DB appropriately to match their change
         * We need to make sure to update the `last_sync` of any new files, and
           that's new. Before `host_file_transfer`'s wouldn't include the sync
           timestamp the file belonged to
-            - [ ] `HOST_FILE_TRANSFER` needs to add the `last_sync` timestamp to
-              the message, so both transfers during a sync and during the
-              initial mirroring will update the `last_sync` timestamp
-              * Actually though, are we even keeping `HostFileTransfer`? -> yes,
-                that's used for actually transfering the files
+            - [x] _(38a2)_: `HOST_FILE_TRANSFER` needs to add the `last_sync`
+              timestamp to the message, so both transfers during a sync and
+              during the initial mirroring will update the `last_sync` timestamp
+              * Are we even keeping `HostFileTransfer`? -> yes, that's used for
+                actually transfering the files
         - [x] Creates
         - [x] modifies
         - [ ] deletes
@@ -468,7 +469,7 @@ The signature should be
   the IP/SSL updates.
 - [x] How is `remote.models.Cloud.last_update` different than `r.m.c.last_sync_time()`?
     * 07-Mar-2020: We're going to remove `last_update`, because that's not needed.
-- [ ] Make sure that the host uses None for future updates after this case is
+- [ ] Make sure that the host uses `None` for future updates after this case is
   hit. The file changed here at a timestamp that's < the last_sync we're going
   to assign it.
 

@@ -48,72 +48,72 @@ __author__ = 'Mike'
 #     _log.info('[{}] updated {} peers'.format(cloud.my_id_from_remote, updated_peers))
 
 
-def update_peer(host_obj, db, cloud, host, updates):
-    host_id = host['id']  # id of host to recv files
-    host_ip = host['ip']
-    host_port = host['port']
+# def update_peer(host_obj, db, cloud, host, updates):
+#     host_id = host['id']  # id of host to recv files
+#     host_ip = host['ip']
+#     host_port = host['port']
 
-    is_ipv6 = ':' in host_ip
-    sock_type = socket.AF_INET6 if is_ipv6 else socket.AF_INET
-    sock_addr = (host_ip, host_port, 0, 0) if is_ipv6 else (host_ip, host_port)
+#     is_ipv6 = ':' in host_ip
+#     sock_type = socket.AF_INET6 if is_ipv6 else socket.AF_INET
+#     sock_addr = (host_ip, host_port, 0, 0) if is_ipv6 else (host_ip, host_port)
 
-    host_sock = socket.socket(sock_type, socket.SOCK_STREAM)
-    host_sock.connect(sock_addr)
+#     host_sock = socket.socket(sock_type, socket.SOCK_STREAM)
+#     host_sock.connect(sock_addr)
 
-    # TODO If this connect fails, We're just gonna crash.
-    # File under the list of try/excepts around connecting.
-    # also todo: re multiple hosts. all kinda related here.
-    # Also, what if we're currently offline? We probably didn't even get this far...
-    # todo: hosts should encrypt to one another, yea?
-    # Todo: how do hosts validate each other's identity?
+#     # TODO If this connect fails, We're just gonna crash.
+#     # File under the list of try/excepts around connecting.
+#     # also todo: re multiple hosts. all kinda related here.
+#     # Also, what if we're currently offline? We probably didn't even get this far...
+#     # todo: hosts should encrypt to one another, yea?
+#     # Todo: how do hosts validate each other's identity?
 
-    raw_connection = RawConnection(host_sock)
+#     raw_connection = RawConnection(host_sock)
 
-    # fixme: Change it to one FILE_PUSH per update. (note have I already done this?)
-    # First check if the peer is local or not,
-    #   then either send_updates_other or send_updates_local
-    #   send_updates_other will open the connection and do the FilePush, HFT/RF
-    #   send_updates_local will just make sure the state is the same on the local machine, EZ
+#     # fixme: Change it to one FILE_PUSH per update. (note have I already done this?)
+#     # First check if the peer is local or not,
+#     #   then either send_updates_other or send_updates_local
+#     #   send_updates_other will open the connection and do the FilePush, HFT/RF
+#     #   send_updates_local will just make sure the state is the same on the local machine, EZ
 
-    # the full path apparently doesn't matter
-    msg = HostFilePushMessage(host_id, cloud.uname(), cloud.cname(), 'i-dont-give-a-fuck')
-    raw_connection.send_obj(msg)
+#     # the full path apparently doesn't matter
+#     msg = HostFilePushMessage(host_id, cloud.uname(), cloud.cname(), 'i-dont-give-a-fuck')
+#     raw_connection.send_obj(msg)
 
-    matching_local_mirror = db.session.query(Cloud).filter_by(my_id_from_remote=host_id).first()
-    local_peer = matching_local_mirror is not None
+#     matching_local_mirror = db.session.query(Cloud).filter_by(my_id_from_remote=host_id).first()
+#     local_peer = matching_local_mirror is not None
 
-    for update in updates:
-        file_path = update[1]
-        rel_path = RelativePath()
-        rd = rel_path.from_absolute(cloud.root_directory, file_path)
-        if not rd.success:
-            # We found an update that isn't actually under the mirror's root.
-            # TODO: log an error?
-            continue
+#     for update in updates:
+#         file_path = update[1]
+#         rel_path = RelativePath()
+#         rd = rel_path.from_absolute(cloud.root_directory, file_path)
+#         if not rd.success:
+#             # We found an update that isn't actually under the mirror's root.
+#             # TODO: log an error?
+#             continue
 
-        if update[0] == FILE_CREATE or update[0] == FILE_UPDATE:
-            if local_peer:
-                send_file_to_local(db, cloud, matching_local_mirror, rel_path)
-            else:
-                send_file_to_other(
-                    host_id
-                    , cloud
-                    , rel_path
-                    , raw_connection
-                    , recurse=False)
+#         if update[0] == FILE_CREATE or update[0] == FILE_UPDATE:
+#             if local_peer:
+#                 send_file_to_local(db, cloud, matching_local_mirror, rel_path)
+#             else:
+#                 send_file_to_other(
+#                     host_id
+#                     , cloud
+#                     , rel_path
+#                     , raw_connection
+#                     , recurse=False)
 
-        elif update[0] == FILE_DELETE:
-            msg = RemoveFileMessage(host_id, cloud.uname(), cloud.cname(), rel_path.to_string())
-            if local_peer:
-                handle_remove_file(host_obj, msg, matching_local_mirror, raw_connection, db)
-                mylog('LOCALLY deleted', '32')
-                # I echo the above fixme, this is stupid
-            else:
-                raw_connection.send_obj(msg)
-                mylog('Sent a delete', '32')
-        else:
-            print 'Welp this shouldn\'t happen'
-    complete_sending_files(host_id, cloud, None, raw_connection)
+#         elif update[0] == FILE_DELETE:
+#             msg = RemoveFileMessage(host_id, cloud.uname(), cloud.cname(), rel_path.to_string())
+#             if local_peer:
+#                 handle_remove_file(host_obj, msg, matching_local_mirror, raw_connection, db)
+#                 mylog('LOCALLY deleted', '32')
+#                 # I echo the above fixme, this is stupid
+#             else:
+#                 raw_connection.send_obj(msg)
+#                 mylog('Sent a delete', '32')
+#         else:
+#             print 'Welp this shouldn\'t happen'
+#     complete_sending_files(host_id, cloud, None, raw_connection)
 
 
 def local_file_create(host_obj, directory_path, dir_node, filename, db):
@@ -340,40 +340,126 @@ def recursive_local_modifications_check(host_obj, directory_path, dir_node, db):
 
     return updates
 
+def _get_updates_from_hosts(host_obj, db, cloud, hosts, sync_end):
+    # type: (HostController, SimpleDB, Cloud, [dict]) -> ResultAndData
+    """
+    Helper to iterate over the hosts until we get the FileSyncComplete.
+
+    For each host (mirror):
+    * 8a: send a file sync request to the mirror
+    * call _handle_file_change_proposal for its response
+
+    :return: A ResultAndData.
+      * Error(None) from this function means we did not get a FileSyncComplete,
+        but we also didn't have a hard failure.
+    """
+    _log = get_mylog()
+
+    sync_start = cloud.last_sync
+
+    # Error(None) from this function means we did not get a FileSyncComplete,
+    # but we also didn't have a hard failure.
+    rd = Error(None)
+
+    for host in hosts:
+        request = FileSyncRequestMessage(src_id=cloud.my_id_from_remote,
+                                         tgt_id=host['id'],
+                                         uname=cloud.uname(),
+                                         cname=cloud.name(),
+                                         sync_start=sync_start,
+                                         sync_end=sync_end)
+        try:
+            host_conn = create_host_connection(host['ip'], host['port'])
+            host_conn.send_obj(request)
+
+            response = host_conn.recv_obj()
+            found_complete = response.type == FILE_SYNC_COMPLETE
+            while not found_complete:
+                if response.type == INVALID_STATE:
+                    err = 'Recieved an INVALID_STATE while processing FileChangeProposals: "{}"'.format(response.message)
+                    _log.error(err)
+                    rd = Error(err)
+                    break
+                elif response.type == FILE_SYNC_PROPOSAL:
+                    handle_file_change_proposal(host_obj, host_conn, None, response)
+
+                # get the next message
+                response = host_conn.recv_obj()
+                found_complete = response.type == FILE_SYNC_COMPLETE
+
+            if found_complete:
+                rd = Success()
+
+        except Exception, e:
+            _log.error('Some error while attempting to connect to host for a FileSyncRequest')
+            _log.error(e.message)
+            rd = Error(e.message)
+
+        # If we got a FileSyncComplete from this host, then we did it! break
+        # this loop, so we can return from this fn. Otherwise, we'll try again
+        # with the next host.
+        if rd.success:
+            break
+
+    return rd
 
 def check_local_modifications(host_obj, cloud, db):
     # type: (HostController, Cloud, SimpleDB) -> None
-    # root = cloud.root_directory
-    # updates = recursive_local_modifications_check(host_obj, root, cloud, db)
-    # if len(updates) > 0:
-    #     send_updates(host_obj, db, cloud, updates)
+
     _log = get_mylog()
     updated_files = cloud.modified_since_last_sync()
     if len(updated_files) > 0:
-        # send a Handshake to the remote
-        rd = host_obj.try_mirror_handshake(cloud)
-        if rd.success:
-            conn = rd.data
-            try:
-                response = conn.recv_obj()
-                resp_type = response.type
-                rd = ResultAndData(resp_type == REMOTE_MIRROR_HANDSHAKE, response)
 
-            except Exception, e:
-                _log.error('Some error recieving handshake from remote')
-                _log.error(e.message)
-                rd = Error(e.message)
+        need_to_handshake_again = True
+        last_sync_end = None
+        while need_to_handshake_again:
 
-        if rd.success:
-            pass
-            # TODO _(7a, 32b, 33b, 34b)_
-            # * Host supports recieving a RemoteMirrorHandshake after a MirrorHandshake.
-            #
-            # 7a: The remote told us we need to get updates from the hosts in [hosts]
-            #     - Introduce some helper to iterate over the hosts until we get the FileSyncComplete
-            #     - That helper will
-            #       * send a file sync request to the mirror
-            #       * call _handle_file_change_proposal for its response
+            # send a Handshake to the remote
+            rd = host_obj.try_mirror_handshake(cloud)
+            if rd.success:
+                conn = rd.data
+                try:
+                    response = conn.recv_obj()
+                    resp_type = response.type
+                    rd = ResultAndData(resp_type == REMOTE_MIRROR_HANDSHAKE, response)
+
+                except Exception, e:
+                    _log.error('Some error recieving handshake from remote')
+                    _log.error(e.message)
+                    rd = Error(e.message)
+                    need_to_handshake_again = False
+
+            if rd.success:
+                # TODO _(7a, 32b, 33b, 34b)_
+                # * Host supports recieving a RemoteMirrorHandshake after a MirrorHandshake.
+                id = rd.data.id
+                new_sync = datetime_from_string(rd.data.new_sync)
+                sync_end = datetime_from_string(rd.data.sync_end)
+                last_all_sync = datetime_from_string(rd.data.last_all_sync)
+                hosts = rd.data.hosts
+                # 7a: The remote told us we need to get updates from the hosts in [hosts]
+                #     - Introduce some helper to iterate over the hosts until we get the FileSyncComplete
+                #     - That helper will
+                #       * 8a: send a file sync request to the mirror
+                #       * call _handle_file_change_proposal for its response
+                if hosts is not None:
+                    if last_sync_end is not None and last_sync_end == sync_end:
+                        _log.warn('This is probably bad - we sync\'d with the remote, but they told us to get updates up till the same timestamp as last time')
+                    last_sync_end = sync_end
+
+                    rd = _get_updates_from_hosts(host_obj, db, cloud, hosts, sync_end)
+                    need_to_handshake_again = True
+
+                # 32b: The remote replied withpout hosts or sync_end
+                #      - 33b: If `new_sync` > (the last_sync we sent), then assign
+                #        all the modified files the timestamp `new_sync`
+                #      - 34b: prune any deleted nodes
+                else:
+                    need_to_handshake_again = False
+                    for f in updated_files:
+                        f.last_sync = new_sync
+                    db.session.commit()
+                    cloud.prune_old_nodes()
 
 
         return rd

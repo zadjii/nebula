@@ -21,6 +21,9 @@ class HostHostFetchMapping(base):
         return (delta.seconds/60) > 30
 
     def __init__(self, old_host, new_host, cloud):
+        """
+        Authorize new_host to look at files in old_host
+        """
         self.cloud_id = cloud.id
         self.old_host_id = old_host.id
         self.new_host_id = new_host.id

@@ -39,7 +39,7 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
     msg_file_isdir = msg.isdir
     msg_file_size = msg.fsize
     msg_rel_path = msg.fpath
-    msg_last_sync = msg.last_sync if not is_client else None
+    msg_last_sync = datetime_from_string(msg.last_sync) if not is_client else None
     rel_path = RelativePath()
     rd = rel_path.from_relative(msg_rel_path)
     if not rd.success:
@@ -56,10 +56,13 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
         # if it wasn't a client file transfer, update our node.
         #   We don't want to see that it was updated and send updates to the other hosts.
         # else (this came from a client):
-        #   We DO want to tell other mirrors about this change, so don't change the DB>
+        #   We DO want to tell other mirrors about this change, so don't change the DB.
         #   The local thread will find the change and alert the other mirrors.
         if not is_client:
             updated_node = cloud.make_tree(rel_path, db)
+
+            # TODO: 07-Mar-2020 - This _looks_ like it's the 38a2 step, but I
+            # have no memory of writing this, and I'd bet it doesn't work.
             if updated_node is not None:
                 old_modified_on = updated_node.last_modified
                 old_last_sync = updated_node.last_sync

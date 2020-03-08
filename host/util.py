@@ -345,3 +345,21 @@ def create_cert_request(pkey, digest="sha256", **name):
     req.set_pubkey(pkey)
     req.sign(pkey, digest)
     return req
+
+def create_host_connection(ip, port):
+    # type: (str, int) -> RawConnection
+
+    """
+    Taken from old update_peer() code in local_updates.py
+    """
+
+    is_ipv6 = ':' in ip
+    sock_type = socket.AF_INET6 if is_ipv6 else socket.AF_INET
+    sock_addr = (ip, port, 0, 0) if is_ipv6 else (ip, port)
+
+    host_sock = socket.socket(sock_type, socket.SOCK_STREAM)
+    host_sock.connect(sock_addr)
+    raw_connection = RawConnection(host_sock)
+
+    return raw_connection
+

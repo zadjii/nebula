@@ -410,4 +410,14 @@ class Cloud(base):
         # Caller will commit the DB changes
         return ResultAndData(child_tgt_node is not None, child_tgt_node)
 
-
+    def prune_old_nodes(self, last_all_sync):
+        # type: (datetime) -> None
+        """
+        Removes all the FileNodes in this tree of files that were deleted before
+        last_all_sync. We need to keep them in the tree as tombstones so that
+        other unsynced hosts can know that they're deleted, but after every host
+        has synced at a newer timestamp than the file was deleted, it can
+        finally be removed.
+        """
+        # TODO: Implement this. This is _34b_ in the flowchart.
+        pass

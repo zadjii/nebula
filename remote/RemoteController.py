@@ -23,6 +23,7 @@ from remote.function.mirror import mirror_complete, host_request_cloud, \
     client_mirror, host_verify_host
 from remote.models.CloudLink import CloudLink
 from remote.models.Mirror import Mirror
+from remote.models.HostHostFetchMapping import HostHostFetchMapping
 from remote.util import get_user_from_session, validate_session_id, \
     get_cloud_by_name, get_user_by_name
 
@@ -90,7 +91,7 @@ def mirror_handshake(remote_obj, connection, address, msg_obj):
 
         for m in up_to_date_mirrors:
             # this was stolen blatently from remote/f/mirror.py:respond_to_mirror_request
-            mapping = HostHostFetchMapping(rand_mirror, new_mirror, cloud)
+            mapping = HostHostFetchMapping(m, mirror, cloud)
             db.session.add(mapping)
         db.session.commit()
 

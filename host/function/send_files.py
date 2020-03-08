@@ -88,10 +88,13 @@ def send_file_to_other(other_id, cloud, rel_path, socket_conn, recurse=True):
     uname = cloud.uname()
     cname = cloud.cname()
     rel_path_string = rel_path.to_string()
+    node = cloud.get_child_node(rel_path)
+    last_sync = datetime_to_string(node.last_sync) if node is not None else None
+
     # mylog('filepath<{}> is_dir={}'.format(filepath, req_file_is_dir))
     if req_file_is_dir:
         if not rel_path.is_root():
-            msg = HostFileTransferMessage(other_id, uname, cname, rel_path_string, 0, req_file_is_dir)
+            msg = HostFileTransferMessage(other_id, uname, cname, rel_path_string, 0, req_file_is_dir, last_sync)
             socket_conn.send_obj(msg)
             # TODO#23: The other host should reply with FileTransferSuccessMessage
         if recurse:
@@ -105,7 +108,7 @@ def send_file_to_other(other_id, cloud, rel_path, socket_conn, recurse=True):
     else:
         req_file_size = req_file_stat.st_size
         requested_file = open(full_path, 'rb')
-        msg = HostFileTransferMessage(other_id, uname, cname, rel_path_string, req_file_size, req_file_is_dir)
+        msg = HostFileTransferMessage(other_id, uname, cname, rel_path_string, req_file_size, req_file_is_dir, last_sync)
         socket_conn.send_obj(msg)
 
         l = 1

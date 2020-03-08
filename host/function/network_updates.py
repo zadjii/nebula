@@ -203,7 +203,7 @@ def do_remove_file(host_obj, mirror, relative_path, db):
     return rd
 
 
-def _handle_file_change_proposal(host_obj, connection, address, msg_obj):
+def handle_file_change_proposal(host_obj, connection, address, msg_obj):
     # type: (HostController, AbstractConnection, str, BaseMessage) -> ResultAndData
 
     # NOTE: as of Feb 2019, FileChangePropoasl messages aren't sent by a host
@@ -378,7 +378,7 @@ def handle_file_sync_request(host_obj, connection, address, msg_obj):
     # the requestor as a `FileChangeProposal`
 
     # This is 10a:
-    proposals = cloud.get_change_proposals(db, sync_start=sync_start, sync_end=sync_end, requestor_id)
+    proposals = cloud.get_change_proposals(db, sync_start=sync_start, sync_end=sync_end, target_mirror_id=requestor_id)
     for p in proposals:
         # Send to requestor
         # This is _11a_ in the flowchart
@@ -402,7 +402,7 @@ def handle_file_sync_request(host_obj, connection, address, msg_obj):
             matching_local_mirror = db.session.query(Cloud).filter_by(my_id_from_remote=requestor_id).first()
             is_local_peer = matching_local_mirror is not None
 
-            if p.change_type == FILE_SYNC_TYPE_CREATE or p.change_type] == FILE_CHANGE_TYPE_MODIFY:
+            if p.change_type == FILE_SYNC_TYPE_CREATE or p.change_type == FILE_CHANGE_TYPE_MODIFY:
                 if local_peer:
                     send_file_to_local(db, cloud, matching_local_mirror, rel_path)
                 else:
