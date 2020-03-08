@@ -51,7 +51,8 @@ class Mirror(base):
         # todo: Replace this with a proper marshmallow implementation
 
         self_dict = {
-            'curr_size': self.curr_size
+            'id': self.id
+            , 'curr_size': self.curr_size
             , 'active': self.is_active()
             , 'ip': self.host.ipv6
             , 'port': self.host.port

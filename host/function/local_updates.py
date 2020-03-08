@@ -1,5 +1,6 @@
 from datetime import datetime
 import socket
+import json
 from stat import S_ISDIR
 
 from common.RelativePath import RelativePath
@@ -11,7 +12,7 @@ from host.models.Cloud import Cloud
 from host.function.network_updates import handle_remove_file
 from host.function.send_files import send_file_to_other, complete_sending_files, send_file_to_local
 from common_util import *
-from host.util import check_response, setup_remote_socket, find_deletable_children
+from host.util import *
 from msg_codes import *
 from messages import *
 
@@ -355,21 +356,27 @@ def _get_updates_from_hosts(host_obj, db, cloud, hosts, sync_end):
     """
     _log = get_mylog()
 
-    sync_start = cloud.last_sync
+    sync_start = cloud.last_sync()
 
     # Error(None) from this function means we did not get a FileSyncComplete,
     # but we also didn't have a hard failure.
     rd = Error(None)
 
     for host in hosts:
+        _log.debug('attempting to _get_updates_from_hosts from {}'.format(json.dumps(host)))
         request = FileSyncRequestMessage(src_id=cloud.my_id_from_remote,
                                          tgt_id=host['id'],
                                          uname=cloud.uname(),
-                                         cname=cloud.name(),
-                                         sync_start=sync_start,
-                                         sync_end=sync_end)
+                                         cname=cloud.cname(),
+                                         sync_start=datetime_to_string(sync_start),
+                                         sync_end=datetime_to_string(sync_end))
         try:
             host_conn = create_host_connection(host['ip'], host['port'])
+            if host_conn is None:
+                _log.warn('Failed to instantiate a connection to the host [{}] at address "{}:{}"'.format(host['id'], host['ip'], host['port']))
+                continue
+
+            _log.debug('[{}] sending a FileSyncRequest to {}'.format(cloud.my_id_from_remote, host['id']))
             host_conn.send_obj(request)
 
             response = host_conn.recv_obj()
@@ -407,6 +414,7 @@ def check_local_modifications(host_obj, cloud, db):
     # type: (HostController, Cloud, SimpleDB) -> None
 
     _log = get_mylog()
+    _log.debug('Sanity check: Cloud[{}] has {} immediate children'.format(cloud.id, len(cloud.children.all())))
     updated_files = cloud.modified_since_last_sync()
     if len(updated_files) > 0:
 
@@ -422,9 +430,13 @@ def check_local_modifications(host_obj, cloud, db):
                     response = conn.recv_obj()
                     resp_type = response.type
                     rd = ResultAndData(resp_type == REMOTE_MIRROR_HANDSHAKE, response)
+                    if not rd.success:
+                        _log.error('Recieved an unexpected message ({}) recieving handshake from remote'.format(resp_type))
+                        _log.error(e.message)
+                        need_to_handshake_again = False
 
                 except Exception, e:
-                    _log.error('Some error recieving handshake from remote')
+                    _log.error('Some exception recieving handshake from remote')
                     _log.error(e.message)
                     rd = Error(e.message)
                     need_to_handshake_again = False
@@ -461,8 +473,11 @@ def check_local_modifications(host_obj, cloud, db):
                     db.session.commit()
                     cloud.prune_old_nodes()
 
-
+        _log.debug('[{}] Completed handshaking remote'.format(cloud.id))
         return rd
+    else:
+        _log.debug('found {} files to that were modified, so no need to handshake the remote.'.format(len(updated_files)))
+    return None
 
 
 def new_main_thread(host_obj):
@@ -483,17 +498,25 @@ def new_main_thread(host_obj):
     host_obj.release_lock()
 
     last_handshake = datetime.utcnow()
-    # Why do I do this? Why do I close the session and create a new one?
+
+    # Close this db session. We're going to create a new one once we've got the lock.
     db.session.close()
 
-    db = host_obj.get_instance().make_db_session()
     _log.info('entering main loop')
 
     while not host_obj.is_shutdown_requested():
 
+
         timed_out = host_obj.network_signal.wait(30)
         host_obj.network_signal.clear()
         host_obj.acquire_lock()
+
+        # Create a new db connection here, inside the lock. If we create a db
+        # session before we lock, another thread might want to write to the DB.
+        # SQLAlchemy is smart enough to prevent two db sessions from existing at
+        # one time.
+        db = host_obj.get_instance().make_db_session()
+
         host_obj.process_connections()
 
         mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
@@ -538,7 +561,6 @@ def new_main_thread(host_obj):
         # However, when A comes back online, it'll be very confused.
 
 
-
         # update network status will handshake the remotes if we've moved.
         rd = host_obj.update_network_status()
         if rd.success:
@@ -549,7 +571,7 @@ def new_main_thread(host_obj):
                 last_handshake = datetime.utcnow()
 
         # Update our loaded mirrors, in case another mirror was added since the last loop
-        new_num_mirrors = _update_num_mirrors(host_obj, num_clouds_mirrored)
+        new_num_mirrors = _update_num_mirrors(host_obj, num_clouds_mirrored, db)
         if num_clouds_mirrored < new_num_mirrors:
             host_obj.refresh_remotes()
             last_handshake = datetime.utcnow()
@@ -569,13 +591,17 @@ def new_main_thread(host_obj):
         if delta.seconds > 30:
             host_obj.refresh_remotes()
             last_handshake = datetime.utcnow()
+
+        # IMPORTANT! Make sure to close the db session, so other threads can use
+        # the DB again.
         db.session.close()
         host_obj.release_lock()
+
     _log.info('Leaving main loop')
 
 
-def _update_num_mirrors(host, initial_mirror_count):
-    # type: (HostController, int) -> int
+def _update_num_mirrors(host, initial_mirror_count, db):
+    # type: (HostController, int, SimpleDB) -> int
     """
     Check to see if the number of mirrors has changed. If it has, then:
     * watch all of the roots of the new mirrors with Watchdog
@@ -584,7 +610,7 @@ def _update_num_mirrors(host, initial_mirror_count):
     :param initial_mirror_count:
     :return: The current number active mirrors on this host.
     """
-    db = host.get_db()
+    # db = host.get_db()
     _log = get_mylog()
     mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
 

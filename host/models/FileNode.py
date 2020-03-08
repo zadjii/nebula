@@ -102,6 +102,9 @@ class FileNode(base):
         # TODO 07-Mar-2020: This doesn't cover cases where the last_sync is
         # actually newer than last_modified. If the host had an unsynced change,
         # it's possible that we assign this node a last_sync > last_modified
+        # log = get_mylog()
+        # log.debug('checking if {} is unsyncd'.format(self.relative_path()))
+        # log.debug('{}, {}'.format(self.last_sync, self.last_modified))
         return (self.last_sync is None) or (self.last_modified > self.last_sync)
 
     def unsynced_children(self):

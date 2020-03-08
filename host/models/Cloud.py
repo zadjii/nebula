@@ -199,8 +199,8 @@ class Cloud(base):
 
         msg = MirrorHandshakeMessage(
             mirror_id=mirror_id,
-            last_sync=self.last_sync().isoformat() + 'Z',
-            last_modified=self.last_modified().isoformat() + 'Z',
+            last_sync=datetime_to_string(self.last_sync()),
+            last_modified=datetime_to_string(self.last_modified()),
             hostname=hostname,  # hostname
             used_space=used_space,
             remaining_space=remaining_space

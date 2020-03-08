@@ -4,7 +4,7 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table
 from sqlalchemy.orm import relationship, backref
 
-from common_util import INFINITE_SIZE
+from common_util import INFINITE_SIZE, datetime_to_string
 from remote.models import nebr_base as base
 from remote.models.Host import Host
 from remote.models.Mirror import Mirror
@@ -155,7 +155,7 @@ class Cloud(base):
         self_dict = {
             'uname': self.uname()
             , 'cname': self.cname()
-            , 'created_on': self.created_on.isoformat() + 'Z'
+            , 'created_on': datetime_to_string(self.created_on)
             # , 'last_update': self.last_update.isoformat() + 'Z'
             , 'max_size': self.max_size
             , 'available_space': self.available_space()
@@ -188,8 +188,8 @@ class Cloud(base):
                 , 'port': mirror.host.port
                 , 'wsport': mirror.host.ws_port
                 , 'id': mirror.id
-                , 'update': mirror.last_sync.isoformat() + 'Z'
-                , 'hndshk': mirror.last_handshake.isoformat() + 'Z'
+                , 'update': datetime_to_string(mirror.last_sync)
+                , 'hndshk': datetime_to_string(mirror.last_handshake)
                 , 'hostname': mirror.host.hostname
             }
             mirror_dicts.append(mirror_obj)

@@ -229,6 +229,8 @@ def handle_file_change_proposal(host_obj, connection, address, msg_obj):
     # TODO 07-Mar-2020: I don't think the above comment is needed anymore. We
     # should go through and update the names in here.
 
+    _log.debug('Attempting to handle a FileSyncProposal={}'.format(msg_obj.serialize()))
+
     mirror_id = msg_obj.tgt_id
     change_type = msg_obj.change_type
     proposed_last_sync = msg_obj.sync_time

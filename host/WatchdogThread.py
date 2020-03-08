@@ -25,7 +25,6 @@ class HostEventHandler(FileSystemEventHandler):
         super(HostEventHandler, self).on_created(event)
         self._host.local_create_file(event.src_path)
 
-
     def on_deleted(self, event):
         super(HostEventHandler, self).on_deleted(event)
         self._host.local_delete_file(event.src_path)

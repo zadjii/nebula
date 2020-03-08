@@ -4,6 +4,7 @@ import logging.handlers
 import os
 import signal
 import sys
+from inspect import getframeinfo, currentframe
 
 from OpenSSL import crypto
 from _socket import gaierror
@@ -380,9 +381,13 @@ class HostController:
 
         new_key = create_key_pair(crypto.TYPE_RSA, 2048)
         ip = self._network_controller.get_external_ip()
+        port = self.active_net_thread_obj.get_external_port()
+        ws_port = self.active_net_thread_obj.get_external_ws_port()
+
+        hostname = platform.uname()[1]
         req = create_cert_request(new_key, CN=ip)
         certificate_request_string = crypto.dump_certificate_request(crypto.FILETYPE_PEM, req)
-        message = HostMoveRequestMessage(remote.my_id_from_remote, ip, certificate_request_string)
+        message = HostMoveRequestMessage(remote.my_id_from_remote, ip, certificate_request_string, port, ws_port, hostname)
 
         attempts = 0
         succeeded = False
@@ -515,6 +520,7 @@ class HostController:
         return NO_ACCESS
 
     def get_db(self):
+
         return self._nebs_instance.get_db()
 
     def filter_func(self, connection, address):
@@ -683,11 +689,26 @@ class HostController:
 
     def acquire_lock(self):
         self._io_lock.acquire()
+        frameinfo = getframeinfo(currentframe().f_back)
+        caller = getframeinfo(currentframe().f_back.f_back)
+        get_mylog().debug('Locking Host - {}/{}:{}'.format(os.path.basename(caller.filename),
+                                                           os.path.basename(frameinfo.filename),
+                                                           frameinfo.lineno))
 
     def release_lock(self):
+        frameinfo = getframeinfo(currentframe().f_back)
+        caller = getframeinfo(currentframe().f_back.f_back)
+        get_mylog().debug('Unlocking Host - {}/{}:{}'.format(os.path.basename(caller.filename),
+                                                             os.path.basename(frameinfo.filename),
+                                                             frameinfo.lineno))
         self._io_lock.release()
 
     def signal(self):
+        frameinfo = getframeinfo(currentframe().f_back)
+        caller = getframeinfo(currentframe().f_back.f_back)
+        get_mylog().debug('Signaling Host - {}/{}:{}'.format(os.path.basename(caller.filename),
+                                                             os.path.basename(frameinfo.filename),
+                                                             frameinfo.lineno))
         self.network_signal.set()
 
     def get_instance(self):
@@ -760,24 +781,28 @@ class HostController:
                 return c
         return None
 
-    def local_create_file(self, path, timestamp=None):
-        # type: (str) -> ResultAndData
-        cloud = self._find_mirror_for_file(path)
+    def local_create_file(self, full_path, timestamp=None):
+        # type: (str, datetime) -> ResultAndData
+        _log = get_mylog()
+        cloud = self._find_mirror_for_file(full_path)
         if cloud is None:
             # we noticed a file creation for a path that isn't under an existing
             #   cloud. We should just ignore this.
             return Error()
         db = self.get_db()
-        rd = cloud.create_file(path, db=db, timestamp=timestamp)
+        rd = cloud.create_file(full_path, db=db, timestamp=timestamp)
         if rd.success:
             db.session.commit()
         else:
+            _log.error('Encountered an error while creating the file <{}> (HostController::local_create_file)'.format(full_path))
+            _log.error(rd.data)
             # todo rollback? error?
             pass
         return rd
 
     def local_modify_file(self, full_path, timestamp=None):
-        # type: (str) -> ResultAndData
+        # type: (str, datetime) -> ResultAndData
+        _log = get_mylog()
         cloud = self._find_mirror_for_file(full_path)
         if cloud is None:
             # we noticed a file creation for a path that isn't under an existing
@@ -788,12 +813,15 @@ class HostController:
         if rd.success:
             db.session.commit()
         else:
+            _log.error('Encountered an error while modifying the file <{}> (HostController::local_modify_file)'.format(full_path))
+            _log.error(rd.data)
             # todo rollback? error?
             pass
         return rd
 
     def local_delete_file(self, full_path, timestamp=None):
-        # type: (str) -> ResultAndData
+        # type: (str, datetime) -> ResultAndData
+        _log = get_mylog()
         cloud = self._find_mirror_for_file(full_path)
         if cloud is None:
             # we noticed a file creation for a path that isn't under an existing
@@ -804,12 +832,15 @@ class HostController:
         if rd.success:
             db.session.commit()
         else:
+            _log.error('Encountered an error while deleting the file <{}> (HostController::local_delete_file)'.format(full_path))
+            _log.error(rd.data)
             # todo rollback? error?
             pass
         return rd
 
     def local_move_file(self, src_path, target_path):
         # type: (str, str) -> ResultAndData
+        _log = get_mylog()
         src_cloud = self._find_mirror_for_file(src_path)
         if src_cloud is None:
             # we noticed a file creation for a path that isn't under an existing
@@ -829,5 +860,7 @@ class HostController:
             db.session.commit()
         else:
             # todo rollback? error?
+            _log.error('Encountered an error while moving the file <{}> (HostController::local_move_file)'.format(src_path))
+            _log.error(rd.data)
             pass
         return rd

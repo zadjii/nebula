@@ -6,6 +6,7 @@ from netifaces import interfaces, ifaddresses, AF_INET6
 from OpenSSL import crypto
 
 from common.SimpleDB import SimpleDB
+from connections.RawConnection import RawConnection
 from host.models import FileNode
 from host.models.Client import Client
 from host.models.Cloud import Cloud
@@ -352,6 +353,8 @@ def create_host_connection(ip, port):
     """
     Taken from old update_peer() code in local_updates.py
     """
+    if ip is None or port is None:
+        return None
 
     is_ipv6 = ':' in ip
     sock_type = socket.AF_INET6 if is_ipv6 else socket.AF_INET

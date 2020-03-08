@@ -122,7 +122,7 @@
 # if my_id is -1, then assume it's a new host that's connecting.
 #todo: add more information to this message so that the remote can validate
 #   this is in fact the host that it gave that ID.
-53  , HOST_MOVE_REQUEST, int:my_id, string:ip, string:csr
+53  , HOST_MOVE_REQUEST, int:my_id, string:ip, string:csr, int:port, int:wsport, string:hostname
 # R->H
 54  , HOST_MOVE_RESPONSE, int:host_id, string:crt
 
@@ -170,6 +170,10 @@
 79  , FILE_SYNC_PROPOSAL, int:src_id, int:tgt_id, string:rel_path, string:tgt_path, int:change_type, bool:is_dir, sync_time
 80  , FILE_SYNC_RESPONSE, int:resp_type
 81  , FILE_SYNC_COMPLETE
+
+# I put used_space, remaining_space in MirrorHandshake without really thinking
+# it through. Don't take that as gospel/intentional. Should we move that
+# information into HostMoveRequest? MirrorHandshake?
 82  , MIRROR_HANDSHAKE, int:mirror_id, last_sync , last_modified, string:hostname, int:used_space, int:remaining_space
 83   , REMOTE_MIRROR_HANDSHAKE      , int:id    , new_sync  , sync_end  , last_all_sync , blob:hosts
 

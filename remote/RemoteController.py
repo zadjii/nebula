@@ -342,13 +342,15 @@ def client_add_owner(remote_obj, connection, address, msg_obj):
     connection.close()
 
 
-def do_host_move(remote_obj, host, ip, csr):
+def do_host_move(remote_obj, host, ip, csr, port, wsport, hostname):
     # type: (RemoteController, Host, str, crypto.X509Req) -> ResultAndData
     if remote_obj.nebr_instance.is_ssl_enabled():
         new_cert = remote_obj.sign_host_csr(csr, ip)
         host.last_certificate = crypto.dump_certificate(crypto.FILETYPE_PEM, new_cert)
     else:
         host.last_certificate = None
+
+    host.handshake_now(ip, port, wsport, hostname)
     return Success(host)
 
 
@@ -366,6 +368,9 @@ def host_move(remote_obj, connection, address, msg_obj):
     host_id = msg_obj.my_id
     ip = msg_obj.ip
     csr = msg_obj.csr
+    port = msg_obj.port
+    wsport = msg_obj.wsport
+    hostname = msg_obj.hostname
 
     if host_id == INVALID_HOST_ID:
         host = Host()
@@ -382,8 +387,9 @@ def host_move(remote_obj, connection, address, msg_obj):
         send_error_and_close(err, connection)
 
     certificate_request = crypto.load_certificate_request(crypto.FILETYPE_PEM, csr) if (csr is not None and not remote_obj._unittesting) else None
-    rd = do_host_move(remote_obj, host, ip, certificate_request)
+    rd = do_host_move(remote_obj, host, ip, certificate_request, port, wsport, hostname)
     if rd.success:
+        db.session.commit()
         host = rd.data
         new_host_id = host.id
         new_host_crt = None
