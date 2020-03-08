@@ -464,7 +464,7 @@ The signature should be
 - [x] Fix whatever is going on with the `child_unsynced` in `Host.models.Cloud::modified_between`
 - [ ] There's a whole ton of "TODOs" listed in
   `local_updates.py:new_main_thread`. They should probably be tracked.
-- [ ] `Host.models.Cloud::generate_handshake` - I don't think that
+- [x] `Host.models.Cloud::generate_handshake` - I don't think that
   `HostHandshakeMessage` should be used anymore, or it should only be used for
   the IP/SSL updates.
 - [x] How is `remote.models.Cloud.last_update` different than `r.m.c.last_sync_time()`?
@@ -472,7 +472,16 @@ The signature should be
 - [ ] Make sure that the host uses `None` for future updates after this case is
   hit. The file changed here at a timestamp that's < the last_sync we're going
   to assign it.
-
+- [ ] If there are no active mirrors when a MirrorHandshake is recieved, it
+  _can't_ be out-of-date, right? WRITE A TEST FOR THIS
+- [x] Update `HostMove` to track the ip, port, wsport, last_handshake for
+  `Host`'s, since we're not sending HostHandshake messages any more.
+- [ ] `r.m.Host` should be tracking the `last_handshake` for a host, not it's
+  `r.m.Mirror`s. See `r.m.Host::handshake_now`
+- [ ] Patch the algorithm to work for requesting files from a local connection.
+  Right now it doesn't work, because they're both on the same nebs process, and
+  you can't cross threads like that. Sending files works similarly to send them
+  to a local host, see if we can't do something similar.
 
 ### File Opening
 This kinda makes it clearer why there was a "ClientFilePut" originally. The Put
