@@ -74,7 +74,7 @@ class HostController:
         db = self.get_db()
         for cloud in db.session.query(Cloud).all():
             self.load_private_data(cloud)
-        db.session.close()
+        # db.session.close()
         # if the mirror was completed before we started, great. We add their
         # .nebs at launch, no problem.
         # what if we complete mirroring while we're running?
@@ -520,8 +520,8 @@ class HostController:
         return NO_ACCESS
 
     def get_db(self):
-        return self._nebs_instance.make_db_session()
-        # return self._nebs_instance.get_db()
+        # return self._nebs_instance.make_db_session()
+        return self._nebs_instance.get_db()
 
     def filter_func(self, connection, address):
         try:
@@ -793,8 +793,8 @@ class HostController:
         rd = cloud.create_file(full_path, db=db, timestamp=timestamp)
         if rd.success:
             db.session.commit()
-            db.session.close()
-            db = None
+            # db.session.close()
+            # db = None
         else:
             _log.error('Encountered an error while creating the file <{}> (HostController::local_create_file)'.format(full_path))
             _log.error(rd.data)
@@ -814,8 +814,8 @@ class HostController:
         rd = cloud.modify_file(full_path, db=db, timestamp=timestamp)
         if rd.success:
             db.session.commit()
-            db.session.close()
-            db = None
+            # db.session.close()
+            # db = None
         else:
             _log.error('Encountered an error while modifying the file <{}> (HostController::local_modify_file)'.format(full_path))
             _log.error(rd.data)
@@ -835,8 +835,8 @@ class HostController:
         rd = cloud.delete_file(full_path, db=db, timestamp=timestamp)
         if rd.success:
             db.session.commit()
-            db.session.close()
-            db = None
+            # db.session.close()
+            # db = None
         else:
             _log.error('Encountered an error while deleting the file <{}> (HostController::local_delete_file)'.format(full_path))
             _log.error(rd.data)
@@ -864,8 +864,8 @@ class HostController:
         rd = src_cloud.move_file(src_path, target_path, db=db)
         if rd.success:
             db.session.commit()
-            db.session.close()
-            db = None
+            # db.session.close()
+            # db = None
         else:
             # todo rollback? error?
             _log.error('Encountered an error while moving the file <{}> (HostController::local_move_file)'.format(src_path))

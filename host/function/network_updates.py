@@ -53,7 +53,7 @@ def verify_host(db, cloud_uname, cname, local_id, other_id):
 
 def handle_fetch(host_obj, connection, address, msg_obj):
     _log = get_mylog()
-    db = host_obj.get_instance().make_db_session()
+    db = host_obj.get_instance().get_db()
     _log.debug('handle_fetch 1')
     # the id's are swapped because they are named from the origin host's POV.
     other_id = msg_obj.my_id

@@ -189,8 +189,8 @@ def handle_go_retrieve(instance, response, remote, cloud, db):
 
     db.session.commit()
     cloud_id = cloud.id
-    db.session.close()
-    db = None
+    # db.session.close()
+    # db = None
 
     host_conn.send_obj(msg)
     _log.debug('Sent HOST_HOST_FETCH as a mirror request.')
@@ -198,7 +198,7 @@ def handle_go_retrieve(instance, response, remote, cloud, db):
 
     resp_obj = host_conn.recv_obj()
 
-    db = instance.make_db_session()
+    db = instance.get_db()
     cloud = db.session.query(Cloud).get(cloud_id)
     resp_type = resp_obj.type
 
@@ -210,7 +210,7 @@ def handle_go_retrieve(instance, response, remote, cloud, db):
     else:
         # Here we recv a whole bunch of files from the host
         recv_file_tree(None, resp_obj, cloud, host_conn, db)
-        rd = Success()
+        rd = Success(cloud_id)
     _log.debug('Bottom of go_retrieve')
     return rd
 
@@ -367,7 +367,8 @@ def _do_mirror(instance, remote_address, remote_port, cloud_uname, cloudname, di
     _log.debug('finished requesting cloud')
 
     if rd.success:
-        rd = complete_mirroring(db, cloud)
+        created_cloud = db.session.query(Cloud).get(rd.data)
+        rd = complete_mirroring(db, created_cloud)
 
     if rd.success:
         sleep(1)

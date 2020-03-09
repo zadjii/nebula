@@ -640,7 +640,8 @@ def new_main_thread(host_obj):
         # session before we lock, another thread might want to write to the DB.
         # SQLAlchemy is smart enough to prevent two db sessions from existing at
         # one time.
-        db = host_obj.get_instance().make_db_session()
+        # db = host_obj.get_instance().make_db_session()
+        db = host_obj.get_db()
 
         mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
         all_mirrored_clouds = mirrored_clouds.all()
@@ -715,10 +716,10 @@ def new_main_thread(host_obj):
             host_obj.refresh_remotes()
             last_handshake = datetime.utcnow()
 
-        # IMPORTANT! Make sure to close the db session, so other threads can use
-        # the DB again.
-        db.session.close()
-        db = None
+        # # IMPORTANT! Make sure to close the db session, so other threads can use
+        # # the DB again.
+        # db.session.close()
+        # db = None
         host_obj.release_lock()
 
     _log.info('Leaving main loop')
