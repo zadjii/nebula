@@ -71,7 +71,20 @@ def mirror_handshake(remote_obj, connection, address, msg_obj):
 
     response = InvalidStateMessage('Unhandled case in `mirror_handshake`')
 
-    if last_sync is None or last_sync < cloud_last_sync:
+    # filter out this mirror
+    up_to_date_mirrors = [m for m in cloud.up_to_date_mirrors() if m.id != mirror.id]
+
+    if len(up_to_date_mirrors) == 0:
+        # special case: There are no other mirrors
+        mirror.last_sync = cloud_last_sync
+        # Their last update was at the last sync time, or they have no updates.
+        response = RemoteMirrorHandshakeMessage(id=mirror.id,
+                                                new_sync=datetime_to_string(cloud_last_sync),
+                                                sync_end=None,
+                                                last_all_sync=datetime_to_string(cloud_last_sync),
+                                                hosts=None)
+
+    elif last_sync is None or last_sync < cloud_last_sync:
         # update our tracker to match when the cloud said their last sync was.
         if last_sync is not None:
             mirror.last_sync = last_sync
@@ -87,7 +100,6 @@ def mirror_handshake(remote_obj, connection, address, msg_obj):
         # specific to mirroring.
         # * We _should_ have our own map for normal sync's
         # * We _should_ revoke these mappings once a host syncs up.
-        up_to_date_mirrors = cloud.up_to_date_mirrors()
 
         for m in up_to_date_mirrors:
             # this was stolen blatently from remote/f/mirror.py:respond_to_mirror_request

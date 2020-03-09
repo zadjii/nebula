@@ -347,22 +347,29 @@ def create_cert_request(pkey, digest="sha256", **name):
     req.sign(pkey, digest)
     return req
 
-def create_host_connection(ip, port):
-    # type: (str, int) -> RawConnection
+def create_host_connection(db, id, ip, port):
+    # type: (SimpleDB, int, str, int) -> ResultAndData
+    # type: (SimpleDB, int, str, int) -> ResultAndData(True, RawConnection)
 
     """
     Taken from old update_peer() code in local_updates.py
     """
     if ip is None or port is None:
-        return None
+        return Error(None)
 
-    is_ipv6 = ':' in ip
-    sock_type = socket.AF_INET6 if is_ipv6 else socket.AF_INET
-    sock_addr = (ip, port, 0, 0) if is_ipv6 else (ip, port)
+    matching_local_mirror = db.session.query(Cloud).filter_by(my_id_from_remote=id).first()
+    if matching_local_mirror:
+        return Success(None)
 
-    host_sock = socket.socket(sock_type, socket.SOCK_STREAM)
-    host_sock.connect(sock_addr)
-    raw_connection = RawConnection(host_sock)
+    try:
 
-    return raw_connection
+        is_ipv6 = ':' in ip
+        sock_type = socket.AF_INET6 if is_ipv6 else socket.AF_INET
+        sock_addr = (ip, port, 0, 0) if is_ipv6 else (ip, port)
+        host_sock = socket.socket(sock_type, socket.SOCK_STREAM)
+        host_sock.connect(sock_addr)
+        raw_connection = RawConnection(host_sock)
 
+        return Success(raw_connection)
+    except Exception as e:
+        return Error(e.message)

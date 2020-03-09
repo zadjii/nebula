@@ -9,7 +9,8 @@ from connections.RawConnection import RawConnection
 from host.HostController import HostController
 from host.models.FileNode import FileNode
 from host.models.Cloud import Cloud
-from host.function.network_updates import handle_remove_file
+from host.function.network_updates import handle_remove_file, get_proposals_for_message, \
+    prepare_and_do_file_change_proposal, handle_file_change_proposal
 from host.function.send_files import send_file_to_other, complete_sending_files, send_file_to_local
 from common_util import *
 from host.util import *
@@ -341,6 +342,120 @@ def recursive_local_modifications_check(host_obj, directory_path, dir_node, db):
 
     return updates
 
+
+def get_update_from_local_host(host_obj, db, request, this_mirror, other_mirror):
+    # type: (HostController, SimpleDB, FileSyncRequestMessage, Cloud, Cloud) -> ResultAndData
+    _log = get_mylog()
+    try:
+        _log.debug('[{}] performing a local FileSyncRequest on {}'.format(this_mirror.my_id_from_remote, other_mirror.my_id_from_remote))
+
+        # TODO: Skip the network bits
+
+        rd = get_proposals_for_message(host_obj, request)
+        if not rd.success:
+            _log.error('Error during get_proposals_for_message "{}"'.format(rd.data))
+            return rd
+        proposals, cloud = rd.data
+
+        _log.debug('Found {} proposals'.format(len(proposals)))
+        if len(proposals) == 0:
+            return Success()
+
+        _log.debug('proposals={}'.format(proposals))
+        for p in proposals:
+
+            rd = prepare_and_do_file_change_proposal(host_obj, p)
+
+            if not rd.success:
+                _log.error('error calculating response to local file proposal')
+                return rd
+            else:
+                # We succeeded, the data is our response type (ACK, ACCEPT, REJECT)
+                # if it's ack, just send it and be done
+                # reject, send and be done
+                # accept, send our response, then read the file transfer message
+                response_type = rd.data
+                response = FileSyncResponseMessage(response_type)
+                # connection.send_obj(response)
+
+                if response_type == FILE_SYNC_PROPOSAL_ACCEPT:
+                    # handle the file transfer
+
+                    # TODO: this_mirror needs to recieve the change from other_mirror.
+                    # other_mirror is performing _16a2_
+
+                    rd, src_path = RelativePath.make_relative(p.rel_path)
+                    if not rd.success:
+                        # This is unexpected, by this point we should have already made a relative path from this path.
+                        return rd
+
+                    if p.change_type == FILE_CHANGE_TYPE_CREATE or p.change_type == FILE_CHANGE_TYPE_MODIFY:
+                        send_file_to_local(db, this_mirror, other_mirror, src_path)
+
+                    elif p.change_type == FILE_CHANGE_TYPE_DELETE:
+                        msg = RemoveFileMessage(this_mirror.id, this_mirror.uname(), this_mirror.cname(), src_path.to_string())
+                        handle_remove_file(host_obj, msg, this_mirror, db)
+
+                    # TODO: If we _moved_ the file, move it here?
+                    elif p.change_type == FILE_CHANGE_TYPE_MOVE:
+                        # TODO: I don't think we support this at all yet
+                        err = 'We don\'t yet support FILE_CHANGE_TYPE_MOVE, but it happened...'
+                        _log.error(err)
+                        # connection.send_obj(InvalidStateMessage(err))
+                        return Error(err)
+
+
+                    # rd = _retrieve_file_from_connection(host_obj, connection, db, matching_mirror)
+                    # if not rd.success:
+                    #     _log.error(rd.data)
+                else:
+                    # Reject or ack -> just continue the loop
+                    pass
+
+        rd = Success()
+
+    except Exception, e:
+        _log.error('Some error while performing a local FileSyncRequest')
+        _log.error(e.message)
+        rd = Error(e.message)
+
+    return rd
+
+
+def get_update_from_remote_host(host_obj, db, request, this_mirror, host_conn):
+    # type: (HostController, SimpleDB, FileSyncRequestMessage, Cloud, RawConnection) -> ResultAndData
+    _log = get_mylog()
+    rd = Error()
+    try:
+        _log.debug('[{}] sending a FileSyncRequest'.format(this_mirror.my_id_from_remote))
+        host_conn.send_obj(request)
+        response = host_conn.recv_obj()
+
+        found_complete = response.type == FILE_SYNC_COMPLETE
+        while not found_complete:
+            if response.type == INVALID_STATE:
+                err = 'Recieved an INVALID_STATE while processing FileChangeProposals: "{}"'.format(response.message)
+                _log.error(err)
+                rd = Error(err)
+                break
+            elif response.type == FILE_SYNC_PROPOSAL:
+                handle_file_change_proposal(host_obj, host_conn, None, response)
+
+            # get the next message
+            response = host_conn.recv_obj()
+            found_complete = response.type == FILE_SYNC_COMPLETE
+
+        if found_complete:
+            rd = Success()
+
+    except Exception, e:
+        _log.error('Some error while attempting to connect to host for a FileSyncRequest')
+        _log.error(e.message)
+        rd = Error(e.message)
+
+    return rd
+
+
 def _get_updates_from_hosts(host_obj, db, cloud, hosts, sync_end):
     # type: (HostController, SimpleDB, Cloud, [dict]) -> ResultAndData
     """
@@ -364,38 +479,34 @@ def _get_updates_from_hosts(host_obj, db, cloud, hosts, sync_end):
 
     for host in hosts:
         _log.debug('attempting to _get_updates_from_hosts from {}'.format(json.dumps(host)))
+        id = host['id']
+        ip = host['ip']
+        port = host['port']
         request = FileSyncRequestMessage(src_id=cloud.my_id_from_remote,
-                                         tgt_id=host['id'],
+                                         tgt_id=id,
                                          uname=cloud.uname(),
                                          cname=cloud.cname(),
                                          sync_start=datetime_to_string(sync_start),
                                          sync_end=datetime_to_string(sync_end))
+
+        _log.debug('Looking for updates between ({}, {}]'.format(request.sync_start, request.sync_end))
+
         try:
-            host_conn = create_host_connection(host['ip'], host['port'])
-            if host_conn is None:
-                _log.warn('Failed to instantiate a connection to the host [{}] at address "{}:{}"'.format(host['id'], host['ip'], host['port']))
-                continue
+            rd = create_host_connection(db, id, ip, port)
+            if not rd.success:
+                _log.warn('Failed to instantiate a connection to the host [{}] at address "{}:{}"'.format(id, ip, port))
+                if rd.data:
+                    _log.error('Error message from create_host_connection: "{}"'.format(e.data))
+                return Error(None)
 
-            _log.debug('[{}] sending a FileSyncRequest to {}'.format(cloud.my_id_from_remote, host['id']))
-            host_conn.send_obj(request)
+            host_conn = rd.data
+            is_local = host_conn is None
 
-            response = host_conn.recv_obj()
-            found_complete = response.type == FILE_SYNC_COMPLETE
-            while not found_complete:
-                if response.type == INVALID_STATE:
-                    err = 'Recieved an INVALID_STATE while processing FileChangeProposals: "{}"'.format(response.message)
-                    _log.error(err)
-                    rd = Error(err)
-                    break
-                elif response.type == FILE_SYNC_PROPOSAL:
-                    handle_file_change_proposal(host_obj, host_conn, None, response)
-
-                # get the next message
-                response = host_conn.recv_obj()
-                found_complete = response.type == FILE_SYNC_COMPLETE
-
-            if found_complete:
-                rd = Success()
+            if is_local:
+                other_mirror = db.session.query(Cloud).filter_by(my_id_from_remote=id).first()
+                rd = get_update_from_local_host(host_obj, db, request, cloud, other_mirror)
+            else:
+                rd = get_update_from_remote_host(host_obj, db, request, cloud, host_conn)
 
         except Exception, e:
             _log.error('Some error while attempting to connect to host for a FileSyncRequest')
@@ -409,6 +520,7 @@ def _get_updates_from_hosts(host_obj, db, cloud, hosts, sync_end):
             break
 
     return rd
+
 
 def check_local_modifications(host_obj, cloud, db):
     # type: (HostController, Cloud, SimpleDB) -> None
@@ -440,6 +552,11 @@ def check_local_modifications(host_obj, cloud, db):
                     _log.error(e.message)
                     rd = Error(e.message)
                     need_to_handshake_again = False
+            else:
+                _log.error('Failed to handshake the remote for this mirror[id={}]'.format(mirror.id))
+                _log.error('{}'.format(rd))
+                need_to_handshake_again = False
+                # TODO: We should probably take ourselves offline, right?
 
             if rd.success:
                 # TODO _(7a, 32b, 33b, 34b)_
@@ -455,6 +572,7 @@ def check_local_modifications(host_obj, cloud, db):
                 #       * 8a: send a file sync request to the mirror
                 #       * call _handle_file_change_proposal for its response
                 if hosts is not None:
+                    _log.debug('Remote indicated that we should look for updates from other mirrors')
                     if last_sync_end is not None and last_sync_end == sync_end:
                         _log.warn('This is probably bad - we sync\'d with the remote, but they told us to get updates up till the same timestamp as last time')
                     last_sync_end = sync_end
@@ -467,11 +585,15 @@ def check_local_modifications(host_obj, cloud, db):
                 #        all the modified files the timestamp `new_sync`
                 #      - 34b: prune any deleted nodes
                 else:
+                    _log.debug('We\'re up to date.')
+                    _log.debug('The new sync time is {}'.format(rd.data.new_sync))
+
                     need_to_handshake_again = False
                     for f in updated_files:
+                        _log.debug('updating the last_sync of "{}" ({})->{}'.format(f.relative_path().to_string(), f.last_sync, new_sync))
                         f.last_sync = new_sync
                     db.session.commit()
-                    cloud.prune_old_nodes()
+                    cloud.prune_old_nodes(last_all_sync)
 
         _log.debug('[{}] Completed handshaking remote'.format(cloud.id))
         return rd
@@ -501,6 +623,7 @@ def new_main_thread(host_obj):
 
     # Close this db session. We're going to create a new one once we've got the lock.
     db.session.close()
+    db = None
 
     _log.info('entering main loop')
 
@@ -511,13 +634,13 @@ def new_main_thread(host_obj):
         host_obj.network_signal.clear()
         host_obj.acquire_lock()
 
+        host_obj.process_connections()
+
         # Create a new db connection here, inside the lock. If we create a db
         # session before we lock, another thread might want to write to the DB.
         # SQLAlchemy is smart enough to prevent two db sessions from existing at
         # one time.
         db = host_obj.get_instance().make_db_session()
-
-        host_obj.process_connections()
 
         mirrored_clouds = db.session.query(Cloud).filter_by(completed_mirroring=True)
         all_mirrored_clouds = mirrored_clouds.all()
@@ -595,6 +718,7 @@ def new_main_thread(host_obj):
         # IMPORTANT! Make sure to close the db session, so other threads can use
         # the DB again.
         db.session.close()
+        db = None
         host_obj.release_lock()
 
     _log.info('Leaving main loop')

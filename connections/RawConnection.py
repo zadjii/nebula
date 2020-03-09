@@ -12,7 +12,11 @@ class RawConnection(AbstractConnection):
     def recv_obj(self):
         data = self._socket.recv(8)
         size = decode_msg_size(data)
-        buff = self._socket.recv(size)
+        try:
+            buff = self._socket.recv(size)
+        except Exception as e:
+            print(size)
+            raise e
         return MessageDeserializer.decode_msg(buff)
 
     def send_obj(self, message_obj):

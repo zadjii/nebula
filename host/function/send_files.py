@@ -4,7 +4,7 @@ from stat import S_ISDIR
 
 from datetime import datetime
 
-from common_util import Error, Success, ResultAndData
+from common_util import Error, Success, ResultAndData, datetime_to_string, get_mylog
 from common.RelativePath import RelativePath
 from host.util import mylog
 from messages import HostFileTransferMessage
@@ -12,7 +12,7 @@ from messages import HostFileTransferMessage
 __author__ = 'Mike'
 
 
-def send_tree(db, other_id, cloud, rel_path, connection):
+def send_tree(other_id, cloud, rel_path, connection):
     # type: (SimpleDB, int, Cloud, RelativePath, AbstractConnection) -> None
     """
     Note: This can't be used to send a tree of files over the network
@@ -78,6 +78,7 @@ def send_file_to_other(other_id, cloud, rel_path, socket_conn, recurse=True):
     """
     Assumes that the other host was already verified, and the cloud is non-null
     """
+    _log = get_mylog()
     full_path = rel_path.to_absolute(cloud.root_directory)
     req_file_stat = os.stat(full_path)
     # relative_pathname = os.path.relpath(filepath, cloud.root_directory)
@@ -89,14 +90,19 @@ def send_file_to_other(other_id, cloud, rel_path, socket_conn, recurse=True):
     cname = cloud.cname()
     rel_path_string = rel_path.to_string()
     node = cloud.get_child_node(rel_path)
-    last_sync = datetime_to_string(node.last_sync) if node is not None else None
-
+    last_sync = None
+    if node is not None:
+        last_sync = datetime_to_string(node.last_sync()) if node.is_root() else datetime_to_string(node.last_sync)
+    _log.debug('"{}"\'s last_sync was {}'.format(rel_path.to_string(), last_sync))
     # mylog('filepath<{}> is_dir={}'.format(filepath, req_file_is_dir))
     if req_file_is_dir:
         if not rel_path.is_root():
+            _log.debug('Sending directory')
             msg = HostFileTransferMessage(other_id, uname, cname, rel_path_string, 0, req_file_is_dir, last_sync)
             socket_conn.send_obj(msg)
+            _log.debug('Sent msg={}'.format(msg))
             # TODO#23: The other host should reply with FileTransferSuccessMessage
+
         if recurse:
             subdirectories = os.listdir(full_path)
             # mylog('Sending children of <{}>={}'.format(filepath, subdirectories))
@@ -106,15 +112,18 @@ def send_file_to_other(other_id, cloud, rel_path, socket_conn, recurse=True):
                 send_file_to_other(other_id, cloud, child_rel_path, socket_conn)
 
     else:
+        _log.debug('Sending file')
         req_file_size = req_file_stat.st_size
         requested_file = open(full_path, 'rb')
+        _log.debug('file size is {}'.format(req_file_size))
         msg = HostFileTransferMessage(other_id, uname, cname, rel_path_string, req_file_size, req_file_is_dir, last_sync)
         socket_conn.send_obj(msg)
-
+        _log.debug('Sent msg={}'.format(msg.serialize()))
         l = 1
         while l:
             new_data = requested_file.read(1024)
             l = socket_conn.send_next_data(new_data)
+            _log.debug('Sent data="{}"'.format(new_data))
             # mylog(
             #     '[{}]Sent {}B of file<{}> data'
             #     .format(cloud.my_id_from_remote, l, filepath)

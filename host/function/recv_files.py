@@ -4,7 +4,7 @@ import os
 
 import errno
 
-from common_util import ResultAndData, get_mylog, send_error_and_close, Error, Success
+from common_util import ResultAndData, get_mylog, send_error_and_close, Error, Success, datetime_from_string
 from common.RelativePath import RelativePath
 from host.PrivateData import WRITE_ACCESS
 from host.models import Cloud
@@ -50,7 +50,9 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
         return rd
 
     full_path = rel_path.to_absolute(cloud.root_directory)
+    _log.debug('Entering do_recv_file_transfer')
     rd = do_recv_file_transfer(host_obj, cloud, socket_conn, rel_path, msg_file_isdir, msg_file_size)
+    _log.debug('do_recv_file_transfer returned {}'.format(rd))
     if rd.success:
 
         # if it wasn't a client file transfer, update our node.
@@ -59,7 +61,9 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
         #   We DO want to tell other mirrors about this change, so don't change the DB.
         #   The local thread will find the change and alert the other mirrors.
         if not is_client:
+            _log.debug('Making FileNode tree for {}...'.format(rel_path.to_string()))
             updated_node = cloud.make_tree(rel_path, db)
+            _log.debug('... Complete')
 
             # TODO: 07-Mar-2020 - This _looks_ like it's the 38a2 step, but I
             # have no memory of writing this, and I'd bet it doesn't work.
@@ -89,19 +93,20 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
                 _log.debug('<{}> update mtime {}=>{}'.format(rel_path.to_string(), old_modified_on, updated_node.last_modified))
                 _log.debug('<{}> update stime {}=>{}'.format(rel_path.to_string(), old_last_sync, updated_node.last_sync))
                 db.session.commit()
-
+    else:
+        _log.error('Error recieving file: {}'.format(rd.data))
     return rd
 
 
 def do_recv_file_transfer(host_obj, cloud, socket_conn, rel_path, is_dir, fsize):
     # type: (HostController, Cloud, AbstractConnection, RelativePath, bool, int) -> ResultAndData
     _log = get_mylog()
-    if host_obj is None:
-        return Error(InvalidStateMessage('Did not supply a host_obj to do_recv_file_transfer'))
+    # if host_obj is None:
+    #     return Error(InvalidStateMessage('Did not supply a host_obj to do_recv_file_transfer'))
 
     full_path = rel_path.to_absolute(cloud.root_directory)
 
-    is_private_data_file = host_obj.is_private_data_file(full_path, cloud)
+    is_private_data_file = host_obj.is_private_data_file(full_path, cloud) if host_obj is not None else False
 
     full_dir_path = os.path.dirname(full_path)
     _log.debug('full_dir_path={}'.format(full_dir_path))
@@ -167,7 +172,7 @@ def do_recv_file_transfer(host_obj, cloud, socket_conn, rel_path, is_dir, fsize)
 
     resp = FileTransferSuccessMessage(cloud.uname(), cloud.cname(), rel_path.to_string())
 
-    if is_private_data_file:
+    if is_private_data_file and host_obj is not None:
         host_obj.reload_private_data(cloud)
 
     return Success(resp)

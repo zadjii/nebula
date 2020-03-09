@@ -1,18 +1,18 @@
 import os
 from datetime import datetime
 
-from common_util import ResultAndData, send_error_and_close, Error, Success, get_mylog
+from common_util import ResultAndData, send_error_and_close, Error, Success, get_mylog, datetime_from_string
 from common.RelativePath import RelativePath
 from host import Cloud
 # from host.function.network.ls_handler import list_files_handler
 from host.function.recv_files import recv_file_tree
-from host.function.send_files import send_tree
+from host.function.send_files import send_tree, send_file_to_local, send_file_to_other, complete_sending_files
 from host.util import check_response, mylog, find_deletable_children, \
     get_matching_clouds, FILE_SYNC_PROPOSAL_ACKNOWLEDGE, \
     FILE_SYNC_PROPOSAL_REJECT, FILE_SYNC_PROPOSAL_ACCEPT, FILE_CHANGE_TYPE_CREATE, \
     FILE_CHANGE_TYPE_MODIFY, FILE_CHANGE_TYPE_DELETE, FILE_CHANGE_TYPE_MOVE
 from messages import HostVerifyHostFailureMessage, HostVerifyHostRequestMessage, InvalidStateMessage, \
-    UnknownIoErrorMessage, FileSyncResponseMessage
+    UnknownIoErrorMessage, FileSyncResponseMessage, RemoveFileMessage, FileSyncCompleteMessage
 from msg_codes import *
 
 __author__ = 'Mike'
@@ -81,7 +81,8 @@ def handle_fetch(host_obj, connection, address, msg_obj):
         err = InvalidStateMessage('{} is not a valid path'.format(requested_root))
         send_error_and_close(err, connection)
 
-    send_tree(db, other_id, matching_mirror, rel_path, connection)
+    # db.session.close()
+    send_tree(other_id, matching_mirror, rel_path, connection)
     _log.debug('Bottom of handle_fetch')
     _log.debug('handle_fetch 3')
 
@@ -130,12 +131,12 @@ def _retrieve_file_from_connection(host_obj, connection, db, mirror):
     if resp_type == HOST_FILE_TRANSFER:
         rd = recv_file_tree(host_obj, resp_obj, mirror, connection, db)
     elif resp_type == REMOVE_FILE:
-        rd = handle_remove_file(host_obj, resp_obj, mirror, connection, db)
+        rd = handle_remove_file(host_obj, resp_obj, mirror, db)
     return rd
 
 
-def handle_remove_file(host_obj, msg_obj, mirror, connection, db):
-    # type: (Host, BaseMessage, Cloud, AbstractConnection, SimpleDB) -> Any
+def handle_remove_file(host_obj, msg_obj, mirror, db):
+    # type: (Host, BaseMessage, Cloud, SimpleDB) -> Any
     if mirror is None:
         pass  # fixme magic error
 
@@ -202,24 +203,15 @@ def do_remove_file(host_obj, mirror, relative_path, db):
 
     return rd
 
+def prepare_and_do_file_change_proposal(host_obj, msg_obj):
+    # type: (HostController, FileSyncProposalMessage) -> ResultAndData
+    # type: (HostController, FileSyncProposalMessage) -> ResultAndData(True, int)
+    # type: (HostController, FileSyncProposalMessage) -> ResultAndData(False, BasMessage)
 
-def handle_file_change_proposal(host_obj, connection, address, msg_obj):
-    # type: (HostController, AbstractConnection, str, BaseMessage) -> ResultAndData
-
-    # NOTE: as of Feb 2019, FileChangePropoasl messages aren't sent by a host
-    #   in response to a RemoteHandshake anymore. They are sent in response to
-    #   a FileSyncRequest from another host
 
     # 07-Mar-2020: This represents the 12a1, 14a2, 17a3 cases in the flow chart.
     # We're handling the 11a message here, _from the host we asked_ in
     # `handle_file_sync_request`
-    #
-    # TODO: This isn't called anywhere yet. This needs to be called in
-    # local_updates.py:check_local_modifications. That method is going to
-    # recieve a RemoteMirrorHandshake, then find another mirror, and send a
-    # FileSyncRequest to that mirror. That other mirror will handle the message
-    # in handle_file_sync_request, and send a FileChangePropoasl back to us to
-    # handle here.
 
     db = host_obj.get_db()
     _log = get_mylog()
@@ -240,7 +232,7 @@ def handle_file_change_proposal(host_obj, connection, address, msg_obj):
     if not rd.success:
         # todo: this error isn't very informative
         response = InvalidStateMessage(rd.data)
-        connection.send_obj(response)
+        # connection.send_obj(response)
         return rd
     matching_mirror = rd.data
 
@@ -248,7 +240,7 @@ def handle_file_change_proposal(host_obj, connection, address, msg_obj):
     if not rd.success:
         # todo: this error isn't very informative
         response = UnknownIoErrorMessage(rd.data)
-        connection.send_obj(response)
+        # connection.send_obj(response)
         return rd
 
     tgt_path = None
@@ -257,14 +249,79 @@ def handle_file_change_proposal(host_obj, connection, address, msg_obj):
         if not rd.success:
             # todo: this error isn't very informative
             response = UnknownIoErrorMessage(rd.data)
-            connection.send_obj(response)
+            # connection.send_obj(response)
             return rd
 
     rd = _do_file_change_proposal(db, matching_mirror, src_path, tgt_path, change_type, is_dir, proposed_last_sync)
     if not rd.success:
-        # todo: this error isn't very informative
-        response = UnknownIoErrorMessage(rd.data)
-        connection.send_obj(response)
+        _log.error('Encountered an error in _do_file_change_proposal="{}"'.format(rd.data))
+        rd = InvalidStateMessage(rd.data)
+    return rd
+
+
+def handle_file_change_proposal(host_obj, connection, address, msg_obj):
+    # type: (HostController, AbstractConnection, str, BaseMessage) -> ResultAndData
+
+    # # NOTE: as of Feb 2019, FileChangePropoasl messages aren't sent by a host
+    # #   in response to a RemoteHandshake anymore. They are sent in response to
+    # #   a FileSyncRequest from another host
+
+    # # 07-Mar-2020: This represents the 12a1, 14a2, 17a3 cases in the flow chart.
+    # # We're handling the 11a message here, _from the host we asked_ in
+    # # `handle_file_sync_request`
+    # #
+    # # TODO: This isn't called anywhere yet. This needs to be called in
+    # # local_updates.py:check_local_modifications. That method is going to
+    # # recieve a RemoteMirrorHandshake, then find another mirror, and send a
+    # # FileSyncRequest to that mirror. That other mirror will handle the message
+    # # in handle_file_sync_request, and send a FileChangePropoasl back to us to
+    # # handle here.
+
+    db = host_obj.get_db()
+    _log = get_mylog()
+    # requestor_id = msg_obj.src_id
+    # # TODO: validate the requestor with the remote
+    # #
+    # # TODO 07-Mar-2020: I don't think the above comment is needed anymore. We
+    # # should go through and update the names in here.
+
+    # _log.debug('Attempting to handle a FileSyncProposal={}'.format(msg_obj.serialize()))
+
+    # mirror_id = msg_obj.tgt_id
+    # change_type = msg_obj.change_type
+    # proposed_last_sync = msg_obj.sync_time
+    # is_dir = msg_obj.is_dir
+
+    # rd = get_matching_clouds(db, mirror_id)
+    # if not rd.success:
+    #     # todo: this error isn't very informative
+    #     response = InvalidStateMessage(rd.data)
+    #     connection.send_obj(response)
+    #     return rd
+    # matching_mirror = rd.data
+
+    # rd, src_path = RelativePath.make_relative(msg_obj.rel_path)
+    # if not rd.success:
+    #     # todo: this error isn't very informative
+    #     response = UnknownIoErrorMessage(rd.data)
+    #     connection.send_obj(response)
+    #     return rd
+
+    # tgt_path = None
+    # if msg_obj.tgt_path is not None:
+    #     rd, tgt_path = RelativePath.make_relative(msg_obj.tgt_path)
+    #     if not rd.success:
+    #         # todo: this error isn't very informative
+    #         response = UnknownIoErrorMessage(rd.data)
+    #         connection.send_obj(response)
+    #         return rd
+
+    # rd = _do_file_change_proposal(db, matching_mirror, src_path, tgt_path, change_type, is_dir, proposed_last_sync)
+
+    rd = prepare_and_do_file_change_proposal(host_obj, msg_obj)
+
+    if not rd.success:
+        connection.send_obj(rd.data)
         return rd
     else:
         # We succeeded, the data is our response type (ACK, ACCEPT, REJECT)
@@ -275,8 +332,17 @@ def handle_file_change_proposal(host_obj, connection, address, msg_obj):
         response = FileSyncResponseMessage(response_type)
         connection.send_obj(response)
 
-        if response_type is not FILE_CHANGE_PROPOSAL_ACCEPT:
+        if response_type is not FILE_SYNC_PROPOSAL_ACCEPT:
             return Success()
+
+        rd = get_matching_clouds(db, msg_obj.tgt_id)
+        if not rd.success:
+            # This is very unexpected. We should have already failed in prepare_and_do_file_change_proposal if the mirror doesn't exist.
+            # todo: this error isn't very informative
+            response = InvalidStateMessage(rd.data)
+            connection.send_obj(response)
+            return rd
+        matching_mirror = rd.data
 
         # handle the file transfer
         rd = _retrieve_file_from_connection(host_obj, connection, db, matching_mirror)
@@ -307,12 +373,12 @@ def _do_file_change_proposal(db, mirror, src_path, tgt_path, change_type, is_dir
     rd = Error('I wasnt prepared for this case of file change proposal')
 
     if src_node is None:
-        if change_type is FILE_SYNC_TYPE_CREATE:
+        if change_type is FILE_CHANGE_TYPE_CREATE:
             rd = Success(FILE_SYNC_PROPOSAL_ACCEPT)
         else:
             rd = Success(FILE_SYNC_PROPOSAL_REJECT)
     else:
-        if change_type is FILE_SYNC_TYPE_CREATE:
+        if change_type is FILE_CHANGE_TYPE_CREATE:
             rd = Success(FILE_SYNC_PROPOSAL_REJECT)
         else:
             file_last_sync = src_node.last_sync
@@ -344,13 +410,7 @@ def _do_file_change_proposal(db, mirror, src_path, tgt_path, change_type, is_dir
     _log.debug('Bottom of _do_file_change_proposal(type={}, src={}, proposed_last_sync={})'.format(change_type, src_path.to_string(), proposed_last_sync))
     return rd
 
-
-def handle_file_sync_request(host_obj, connection, address, msg_obj):
-    # type: (HostController, AbstractConnection, str, BaseMessage) -> ResultAndData
-    """
-    9a-19a in the flowchart
-
-    """
+def get_proposals_for_message(host_obj, msg_obj):
 
     rd = Error()
 
@@ -374,13 +434,47 @@ def handle_file_sync_request(host_obj, connection, address, msg_obj):
     rd = verify_host(db, uname, cname, tgt_id, requestor_id)
     if not rd.success:
         _log.error(rd.data)
+    else:
+        # If we have files whose last_sync timestamp is in t:(t_0, t_1], send it to
+        # the requestor as a `FileChangeProposal`
+
+        cloud = rd.data
+
+        _log.debug('Collecting updates between ({}, {}]'.format(sync_start, sync_end))
+
+        # This is 10a:
+        proposals = cloud.get_change_proposals(db,
+                                               sync_start=sync_start,
+                                               sync_end=sync_end,
+                                               target_mirror_id=requestor_id)
+        rd = Success((proposals, cloud))
+    return rd
+
+
+def handle_file_sync_request(host_obj, connection, address, msg_obj):
+    # type: (HostController, AbstractConnection, str, BaseMessage) -> ResultAndData
+    """
+    9a-19a in the flowchart
+
+    """
+
+    rd = Error()
+
+    db = host_obj.get_db()
+    _log = get_mylog()
+    requestor_id = msg_obj.src_id
+
+    tgt_id = msg_obj.tgt_id
+    uname = msg_obj.uname
+    cname = msg_obj.cname
+    sync_start = datetime_from_string(msg_obj.sync_start)
+    sync_end = datetime_from_string(msg_obj.sync_end)
+
+    rd = get_proposals_for_message(host_obj, msg_obj)
+    if not rd.success:
         return rd
 
-    # If we have files whose last_sync timestamp is in t:(t_0, t_1], send it to
-    # the requestor as a `FileChangeProposal`
-
-    # This is 10a:
-    proposals = cloud.get_change_proposals(db, sync_start=sync_start, sync_end=sync_end, target_mirror_id=requestor_id)
+    proposals, cloud = rd.data
     for p in proposals:
         # Send to requestor
         # This is _11a_ in the flowchart
@@ -402,19 +496,27 @@ def handle_file_sync_request(host_obj, connection, address, msg_obj):
             # This is _16a2_
 
             matching_local_mirror = db.session.query(Cloud).filter_by(my_id_from_remote=requestor_id).first()
+
+            rd, src_path = RelativePath.make_relative(msg_obj.rel_path)
+            if not rd.success:
+                # This is unexpected, by this point we should have already made a relative path from this path.
+                return rd
+
+            # TODO: I don't think we need the is_local_peer code here - we'll
+            # handle that way sooner, in get_update_from_local_host
             is_local_peer = matching_local_mirror is not None
 
-            if p.change_type == FILE_SYNC_TYPE_CREATE or p.change_type == FILE_CHANGE_TYPE_MODIFY:
-                if local_peer:
-                    send_file_to_local(db, cloud, matching_local_mirror, rel_path)
+            if p.change_type == FILE_CHANGE_TYPE_CREATE or p.change_type == FILE_CHANGE_TYPE_MODIFY:
+                if is_local_peer:
+                    send_file_to_local(db, cloud, matching_local_mirror, src_path)
                 else:
-                    send_file_to_other(requestor_id, cloud, rel_path, connection, recurse=False)
+                    send_file_to_other(requestor_id, cloud, src_path, connection, recurse=False)
 
             # If we deleted the file, delete it here.
             elif p.change_type == FILE_CHANGE_TYPE_DELETE:
-                msg = RemoveFileMessage(requestor_id, cloud.uname(), cloud.cname(), rel_path.to_string())
-                if local_peer:
-                    handle_remove_file(host_obj, msg, matching_local_mirror, connection, db)
+                msg = RemoveFileMessage(requestor_id, cloud.uname(), cloud.cname(), src_path.to_string())
+                if is_local_peer:
+                    handle_remove_file(host_obj, msg, matching_local_mirror, db)
                 else:
                     connection.send_obj(msg)
 
@@ -426,8 +528,7 @@ def handle_file_sync_request(host_obj, connection, address, msg_obj):
                 connection.send_obj(InvalidStateMessage(err))
                 return Error(err)
 
-            complete_sending_files(requestor_id, cloud, rel_path, connection)
-
+            complete_sending_files(requestor_id, cloud, src_path, connection)
 
         elif (sync_response_type == FILE_SYNC_PROPOSAL_ACKNOWLEDGE) or (sync_response_type == FILE_SYNC_PROPOSAL_REJECT):
             # they either already have this change, or they rejected this

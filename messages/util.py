@@ -72,4 +72,8 @@ def get_msg_size(msg_json):
 
 
 def decode_msg_size(long_long):
-    return struct.unpack('Q', long_long)[0]
+    try:
+        return struct.unpack('Q', long_long)[0]
+    except Exception as e:
+        print('failed to decode a size of {}'.format(long_long))
+        raise e

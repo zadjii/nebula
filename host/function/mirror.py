@@ -84,8 +84,8 @@ __author__ = 'Mike'
 #     # I've been in kernel land too long, haven't I...
 
 
-def request_cloud(remote, cloud, test_enabled, db):
-    # type: (Remote, Cloud, bool, SimpleDB) -> ResultAndData
+def request_cloud(instance, remote, cloud, test_enabled, db):
+    # type: (NebsInstance, Remote, Cloud, bool, SimpleDB) -> ResultAndData
     full_name = cloud.full_name()
     if test_enabled:
         print('please enter username for {}:'.format(full_name))
@@ -105,11 +105,11 @@ def request_cloud(remote, cloud, test_enabled, db):
     msg = RequestCloudMessage(remote.my_id_from_remote, cloud.uname(), cloud.cname(), username, password)
     raw_conn.send_obj(msg)
 
-    return finish_request_cloud(remote, cloud, db, raw_conn)
+    return finish_request_cloud(instance, remote, cloud, db, raw_conn)
 
 
-def client_request_cloud(remote, cloud, session_id, db):
-    # type: (Remote, Cloud, str, SimpleDB) -> ResultAndData
+def client_request_cloud(instance, remote, cloud, session_id, db):
+    # type: (NebsInstance, Remote, Cloud, str, SimpleDB) -> ResultAndData
 
     rd = remote.setup_socket()
     if not rd.success:
@@ -119,11 +119,11 @@ def client_request_cloud(remote, cloud, session_id, db):
     msg = ClientMirrorMessage(session_id, remote.my_id_from_remote, cloud.uname(), cloud.cname())
     raw_conn.send_obj(msg)
 
-    return finish_request_cloud(remote, cloud, db, raw_conn)
+    return finish_request_cloud(instance, remote, cloud, db, raw_conn)
 
 
-def finish_request_cloud(remote, cloud, db, connection):
-    # type: (Remote, Cloud, SimpleDB, AbstractConnection) -> ResultAndData
+def finish_request_cloud(instance, remote, cloud, db, connection):
+    # type: (NebsInstance, Remote, Cloud, SimpleDB, AbstractConnection) -> ResultAndData
     resp_obj = connection.recv_obj()
     if resp_obj.type == INVALID_STATE:
         rd = Error(resp_obj.message)
@@ -132,7 +132,7 @@ def finish_request_cloud(remote, cloud, db, connection):
     elif resp_obj.type == AUTH_ERROR:
         rd = Error('Failed to authenticate with the remote')
     elif resp_obj.type == GO_RETRIEVE_HERE:
-        rd = handle_go_retrieve(resp_obj, remote, cloud, db)
+        rd = handle_go_retrieve(instance, resp_obj, remote, cloud, db)
         # attempt_wakeup()
     else:
         rd = Error('Unidentified error {} while mirroring'.format(resp_obj.type))
@@ -141,8 +141,8 @@ def finish_request_cloud(remote, cloud, db, connection):
     return rd
 
 
-def handle_go_retrieve(response, remote, cloud, db):
-    # type: (GoRetrieveHereMessage, Remote, Cloud, SimpleDB) -> ResultAndData
+def handle_go_retrieve(instance, response, remote, cloud, db):
+    # type: (NebsInstance, GoRetrieveHereMessage, Remote, Cloud, SimpleDB) -> ResultAndData
     _log = get_mylog()
     check_response(GO_RETRIEVE_HERE, response.type)
     other_address = response.ip
@@ -155,7 +155,6 @@ def handle_go_retrieve(response, remote, cloud, db):
     cloud.max_size = max_size
     db.session.add(cloud)
     remote.clouds.append(cloud)
-    db.session.commit()
 
     if other_address == '0' and other_port == 0:
         _log.debug('No other hosts in cloud')
@@ -167,6 +166,9 @@ def handle_go_retrieve(response, remote, cloud, db):
         owner_ids = response.owner_ids
         private_data = PrivateData(cloud, owner_ids)
         # just instantiating the private data is enough to write the backend
+        cloud.last_sync = datetime.utcnow()
+        rd = cloud.create_file(os.path.join(cloud.root_directory, '.nebs'), db=db, timestamp=None)
+        db.session.commit()
         return Success()
 
     _log.debug('requesting host at [{}]({},{})'.format(other_id, other_address, other_port))
@@ -184,10 +186,20 @@ def handle_go_retrieve(response, remote, cloud, db):
     cname = cloud.cname()
     my_id = cloud.my_id_from_remote
     msg = HostHostFetchMessage(my_id, other_id, cloud_uname, cname, '/')
+
+    db.session.commit()
+    cloud_id = cloud.id
+    db.session.close()
+    db = None
+
     host_conn.send_obj(msg)
     _log.debug('Sent HOST_HOST_FETCH as a mirror request.')
+    _log.debug('Sent {}'.format(msg.serialize()))
 
     resp_obj = host_conn.recv_obj()
+
+    db = instance.make_db_session()
+    cloud = db.session.query(Cloud).get(cloud_id)
     resp_type = resp_obj.type
 
     rd = Error()
@@ -349,9 +361,9 @@ def _do_mirror(instance, remote_address, remote_port, cloud_uname, cloudname, di
     rd = Error()
     db = instance.get_db()
     if session_id is None:
-        rd = request_cloud(remote, cloud, test, db)
+        rd = request_cloud(instance, remote, cloud, test, db)
     else:
-        rd = client_request_cloud(remote, cloud, session_id, db)
+        rd = client_request_cloud(instance, remote, cloud, session_id, db)
     _log.debug('finished requesting cloud')
 
     if rd.success:
