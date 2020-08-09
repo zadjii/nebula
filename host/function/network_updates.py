@@ -82,7 +82,7 @@ def handle_fetch(host_obj, connection, address, msg_obj):
         send_error_and_close(err, connection)
 
     # db.session.close()
-    send_tree(other_id, matching_mirror, rel_path, connection)
+    send_tree(db, other_id, matching_mirror, rel_path, connection)
     _log.debug('Bottom of handle_fetch')
     _log.debug('handle_fetch 3')
 
@@ -225,7 +225,7 @@ def prepare_and_do_file_change_proposal(host_obj, msg_obj):
 
     mirror_id = msg_obj.tgt_id
     change_type = msg_obj.change_type
-    proposed_last_sync = msg_obj.sync_time
+    proposed_last_sync = datetime_from_string(msg_obj.sync_time)
     is_dir = msg_obj.is_dir
 
     rd = get_matching_clouds(db, mirror_id)

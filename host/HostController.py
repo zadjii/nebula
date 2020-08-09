@@ -299,7 +299,7 @@ class HostController:
             remote_sock = rd.data
             remote_conn = RawConnection(remote_sock)
             msg = cloud.generate_mirror_handshake()
-
+            _log.debug('sending MirrorHandshake({})'.format(msg.serialize()))
             remote_conn.send_obj(msg)
 
         except gaierror as e:

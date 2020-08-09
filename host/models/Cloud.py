@@ -103,6 +103,7 @@ class Cloud(base):
             if child is None:
                 child = FileNode(dirs[0], created_on=created_on)
                 db.session.add(child)
+                db.session.commit()
                 if curr_parent_node is not None:
                     curr_parent_node.children.append(child)
                 else:
@@ -197,6 +198,11 @@ class Cloud(base):
         # last_modified() will automatically determine our latest modification,
         # based on the timestamps of our children.
 
+        ls = self.last_sync()
+        get_mylog().debug('last_sync = {}'.format(ls))
+        lm = self.last_modified()
+        get_mylog().debug('last_modified = {}'.format(lm))
+
         msg = MirrorHandshakeMessage(
             mirror_id=mirror_id,
             last_sync=datetime_to_string(self.last_sync()),
@@ -226,7 +232,7 @@ class Cloud(base):
         newest = None
         for child in self.all_children():
             child_last_recursive = child.last_sync_recursive()
-            if newest is None or child_last_recursive > newest:
+            if newest is None or (child_last_recursive is not None and child_last_recursive > newest):
                 newest = child_last_recursive
         return newest
 
@@ -318,8 +324,8 @@ class Cloud(base):
             proposal = FileSyncProposalMessage(
                 src_id=self.my_id_from_remote,
                 tgt_id=target_mirror_id,
-                rel_path=rel_src_path,
-                tgt_path=rel_tgt_path,
+                rel_path=rel_src_path.to_string(),
+                tgt_path=(rel_tgt_path.to_string() if rel_tgt_path is not None else None),
                 change_type=change_type,
                 is_dir=is_dir,
                 sync_time=datetime_to_string(node.last_sync)

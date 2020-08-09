@@ -168,8 +168,10 @@ def handle_go_retrieve(instance, response, remote, cloud, db):
         # just instantiating the private data is enough to write the backend
         cloud.last_sync = datetime.utcnow()
         rd = cloud.create_file(os.path.join(cloud.root_directory, '.nebs'), db=db, timestamp=None)
+        rd.data.last_sync = datetime.utcnow()
         db.session.commit()
-        return Success()
+        # TODO: I'm not using that rd above, that's not intentional, I don't know why.
+        return Success(cloud.id)
 
     _log.debug('requesting host at [{}]({},{})'.format(other_id, other_address, other_port))
     is_ipv6 = ':' in other_address
@@ -198,8 +200,8 @@ def handle_go_retrieve(instance, response, remote, cloud, db):
 
     resp_obj = host_conn.recv_obj()
 
-    db = instance.get_db()
-    cloud = db.session.query(Cloud).get(cloud_id)
+    # db = instance.get_db()
+    # cloud = db.session.query(Cloud).get(cloud_id)
     resp_type = resp_obj.type
 
     rd = Error()
@@ -210,6 +212,8 @@ def handle_go_retrieve(instance, response, remote, cloud, db):
     else:
         # Here we recv a whole bunch of files from the host
         recv_file_tree(None, resp_obj, cloud, host_conn, db)
+        db.session.commit()
+
         rd = Success(cloud_id)
     _log.debug('Bottom of go_retrieve')
     return rd
@@ -367,6 +371,7 @@ def _do_mirror(instance, remote_address, remote_port, cloud_uname, cloudname, di
     _log.debug('finished requesting cloud')
 
     if rd.success:
+        _log.debug('Created cloud\'s ID={}'.format(rd.data))
         created_cloud = db.session.query(Cloud).get(rd.data)
         rd = complete_mirroring(db, created_cloud)
 

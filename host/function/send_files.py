@@ -7,12 +7,13 @@ from datetime import datetime
 from common_util import Error, Success, ResultAndData, datetime_to_string, get_mylog
 from common.RelativePath import RelativePath
 from host.util import mylog
+from host import Cloud
 from messages import HostFileTransferMessage
 
 __author__ = 'Mike'
 
 
-def send_tree(other_id, cloud, rel_path, connection):
+def send_tree(db, other_id, cloud, rel_path, connection):
     # type: (SimpleDB, int, Cloud, RelativePath, AbstractConnection) -> None
     """
     Note: This can't be used to send a tree of files over the network
@@ -26,6 +27,7 @@ def send_tree(other_id, cloud, rel_path, connection):
     :param connection:
     :return:
     """
+    _log = get_mylog()
     # mylog('They requested the file {}'.format(requested_root))
     # # find the file on the system, get it's size.
     # requesting_all = requested_root == '/'
@@ -37,16 +39,23 @@ def send_tree(other_id, cloud, rel_path, connection):
     #     filepath = os.path.join(cloud.root_directory, requested_root)
     # mylog('The translated request path was {}'.format(rel_path.to_absolute(cloud.root_directory)))
 
-    send_file_to_other(other_id, cloud, rel_path, connection)
+    matching_local_mirror = db.session.query(Cloud).filter_by(my_id_from_remote=other_id).first()
+    is_local = matching_local_mirror is not None
+    if is_local:
+        _log.debug('Sending file tree to local')
+        send_file_to_local(db, cloud, matching_local_mirror, rel_path, True)
+    else:
+        _log.debug('Sending file tree to other')
+        send_file_to_other(other_id, cloud, rel_path, connection)
     complete_sending_files(other_id, cloud, rel_path, connection)
     connection.close()
 
 
-def send_file_to_local(db, src_mirror, tgt_mirror, relative_pathname):
+def send_file_to_local(db, src_mirror, tgt_mirror, relative_pathname, recurse=False):
     # type: (SimpleDB, Cloud, Cloud, RelativePath) -> ResultAndData
     rd = Error()
     full_src_path = relative_pathname.to_absolute(src_mirror.root_directory)
-    full_tgt_path = relative_pathname.to_absolute(src_mirror.root_directory)
+    full_tgt_path = relative_pathname.to_absolute(tgt_mirror.root_directory)
 
     src_file_stat = os.stat(full_src_path)
     src_file_is_dir = S_ISDIR(src_file_stat.st_mode)
@@ -66,9 +75,24 @@ def send_file_to_local(db, src_mirror, tgt_mirror, relative_pathname):
             old_modified_on = updated_node.last_modified
             updated_node.last_modified = datetime.utcfromtimestamp(os.path.getmtime(full_tgt_path))
             mylog('update mtime {}=>{}'.format(old_modified_on, updated_node.last_modified))
+
+            src_node = src_mirror.get_child_node(relative_pathname)
+            last_sync = src_node.last_sync() if src_node.is_root() else src_node.last_sync
+            if not updated_node.is_root():
+                updated_node.last_sync = last_sync
+
             db.session.commit()
         else:
             mylog('ERROR: Failed to create a FileNode for the new file {}'.format(full_tgt_path))
+
+
+    if src_file_is_dir and recurse:
+        subdirectories = os.listdir(full_src_path)
+        # mylog('Sending children of <{}>={}'.format(filepath, subdirectories))
+        for f in subdirectories:
+            child_rel_path = RelativePath()
+            child_rel_path.from_relative(os.path.join(relative_pathname.to_string(), f))
+            send_file_to_local(db, src_mirror, tgt_mirror, child_rel_path, recurse)
 
     return rd
 

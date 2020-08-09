@@ -92,7 +92,7 @@ def recv_file_transfer(host_obj, msg, cloud, socket_conn, db, is_client):
 
                 _log.debug('<{}> update mtime {}=>{}'.format(rel_path.to_string(), old_modified_on, updated_node.last_modified))
                 _log.debug('<{}> update stime {}=>{}'.format(rel_path.to_string(), old_last_sync, updated_node.last_sync))
-                db.session.commit()
+                # db.session.commit()
     else:
         _log.error('Error recieving file: {}'.format(rd.data))
     return rd

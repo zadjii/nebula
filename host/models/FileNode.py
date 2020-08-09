@@ -4,6 +4,7 @@ from sqlalchemy.orm import relationship, backref
 from host.models import nebs_base as base
 import os
 from common.RelativePath import RelativePath
+from common_util import ResultAndData, get_mylog, get_free_space_bytes, INFINITE_SIZE, Error, datetime_to_string
 
 __author__ = 'Mike'
 
@@ -145,8 +146,10 @@ class FileNode(base):
         newest = self.last_sync
         for child in self.children.all():
             child_recursive = child.last_sync_recursive()
+            get_mylog().debug('Comaparing newest={}, child_recursive={}'.format(newest, child_recursive))
             if newest is None or (child_recursive is not None and child_recursive > newest):
                 newest = child_recursive
+        get_mylog().debug('last_sync_recursive={}'.format(newest))
         return newest
 
     def last_modified_recursive(self):
@@ -207,4 +210,4 @@ class FileNode(base):
         last_sync'd on that range.
         :return:
         """
-        return (self.last_sync > sync_start) and (self.last_sync <= sync_end)
+        return sync_start is None or ((self.last_sync > sync_start) and (self.last_sync <= sync_end))

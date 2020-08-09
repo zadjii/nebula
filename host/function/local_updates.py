@@ -361,7 +361,7 @@ def get_update_from_local_host(host_obj, db, request, this_mirror, other_mirror)
         if len(proposals) == 0:
             return Success()
 
-        _log.debug('proposals={}'.format(proposals))
+        _log.debug('proposals={}'.format([p.serialize() for p in proposals]))
         for p in proposals:
 
             rd = prepare_and_do_file_change_proposal(host_obj, p)
@@ -553,7 +553,7 @@ def check_local_modifications(host_obj, cloud, db):
                     rd = Error(e.message)
                     need_to_handshake_again = False
             else:
-                _log.error('Failed to handshake the remote for this mirror[id={}]'.format(mirror.id))
+                _log.error('Failed to handshake the remote for this mirror[id={}]'.format(cloud.id))
                 _log.error('{}'.format(rd))
                 need_to_handshake_again = False
                 # TODO: We should probably take ourselves offline, right?
@@ -634,6 +634,7 @@ def new_main_thread(host_obj):
         host_obj.network_signal.clear()
         host_obj.acquire_lock()
 
+        db = host_obj.get_db()
         host_obj.process_connections()
 
         # Create a new db connection here, inside the lock. If we create a db
@@ -720,6 +721,7 @@ def new_main_thread(host_obj):
         # # the DB again.
         # db.session.close()
         # db = None
+        host_obj.get_instance().close_db()
         host_obj.release_lock()
 
     _log.info('Leaving main loop')

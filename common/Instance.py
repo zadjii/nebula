@@ -5,6 +5,8 @@ import thread
 import signal
 from argparse import Namespace
 
+from inspect import getframeinfo, currentframe
+
 import psutil
 import sys
 from migrate.versioning import api
@@ -157,9 +159,18 @@ class Instance(object):
     def get_db(self):
         thread_id = thread.get_ident()
 
+        frameinfo = getframeinfo(currentframe().f_back)
+        caller = getframeinfo(currentframe().f_back.f_back)
+        get_mylog().debug('Calling get_db - {}/{}:{}'.format(os.path.basename(caller.filename),
+                                                           os.path.basename(frameinfo.filename),
+                                                           frameinfo.lineno))
+
         if not (thread_id in self._db_map.keys()):
             db = self.make_db_session()
+            get_mylog().debug('Created new session')
             self._db_map[thread_id] = db
+        else:
+            get_mylog().debug('found existing session')
 
         return self._db_map[thread_id]
 
@@ -168,6 +179,24 @@ class Instance(object):
         db = SimpleDB(self._db_uri(), self._db_models)
         db.engine.echo = False
         return db
+
+
+    def close_db(self):
+        thread_id = thread.get_ident()
+
+        frameinfo = getframeinfo(currentframe().f_back)
+        caller = getframeinfo(currentframe().f_back.f_back)
+        get_mylog().debug('Calling close_db - {}/{}:{}'.format(os.path.basename(caller.filename),
+                                                           os.path.basename(frameinfo.filename),
+                                                           frameinfo.lineno))
+
+        if (thread_id in self._db_map.keys()):
+            get_mylog().debug('Closing existing session')
+            self._db_map[thread_id].session.close()
+            self._db_map[thread_id] = None
+            self._db_map.pop(thread_id)
+        else:
+            get_mylog().debug('no existing session to close')
 
     def _db_path(self):
         return os.path.join(self._working_dir, self._db_name)
